@@ -1,0 +1,17 @@
+{
+    "developer_token": "",
+    "client_id": "",
+    "client_secret": "",
+    "refresh_token": "",
+    "customer_id": "",
+    "login_customer_id": "",
+    "gemini_api_key": "",
+    "mock_mode": true,
+    "safe_mode": true,
+    "google_client_id": "",
+    "google_client_secret": "",
+    "google_developer_token": "",
+    "meta_app_id": "",
+    "meta_app_secret": "",
+    "redirect_base_url": "http://127.0.0.1:8000"
+}

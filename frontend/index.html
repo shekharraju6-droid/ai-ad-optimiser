@@ -1,0 +1,1389 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AdOptima AI - Multi-Account Ad Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #f3f4f6;
+            --bg-surface: #ffffff;
+            --bg-sidebar: #f9fafb;
+            --border-color: #e5e7eb;
+            --color-primary: #4f46e5;
+            --color-primary-glow: rgba(79, 70, 229, 0.08);
+            --color-secondary: #0891b2;
+            --color-success: #059669;
+            --color-warning: #d97706;
+            --color-danger: #dc2626;
+            --text-main: #1f2937;
+            --text-muted: #4b5563;
+            --text-light: #6b7280;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-base); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; }
+        h1,h2,h3,h4,.font-outfit { font-family: 'Outfit', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.03); }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+
+        .app-layout { display: flex; width: 100vw; height: 100vh; }
+        .sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.75rem; }
+        .app-logo { font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.6rem; }
+        .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; }
+        .sidebar-scroll { flex-grow: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; }
+        .sidebar-section-title { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.08em; margin-bottom: 0.5rem; }
+        .nav-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.8rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 500; color: var(--text-muted); transition: 0.15s; }
+        .nav-item:hover { background: rgba(0,0,0,0.03); color: var(--text-main); }
+        .nav-item.active { background: white; color: var(--color-primary); border: 1px solid var(--border-color); }
+        .status-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.6rem; border-radius: 20px; background: rgba(217,119,6,0.08); color: var(--color-warning); border: 1px solid rgba(217,119,6,0.2); }
+        .status-badge.live { background: rgba(5,150,105,0.08); color: var(--color-success); border-color: rgba(5,150,105,0.2); }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+        .main { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; }
+        .topbar { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; }
+        .topbar-left { display: flex; align-items: center; gap: 1rem; }
+        .topbar h1 { font-size: 1.1rem; font-weight: 700; }
+        .btn { padding: 0.5rem 0.9rem; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 0.35rem; transition: 0.15s; }
+        .btn-primary { background: var(--color-primary); color: white; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-secondary { background: white; border-color: var(--border-color); color: var(--text-muted); }
+        .btn-secondary:hover { background: var(--bg-sidebar); color: var(--text-main); }
+        .btn-success { background: var(--color-success); color: white; }
+        .btn-success:hover { filter: brightness(1.1); }
+        .btn-danger { background: var(--color-danger); color: white; }
+        .btn-danger:hover { filter: brightness(1.1); }
+        .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.78rem; }
+        .date-input { padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.78rem; font-family: 'Inter', sans-serif; color: var(--text-main); }
+        .date-input:disabled { background: var(--bg-sidebar); opacity: 0.6; }
+        .pending-badge { background: var(--color-danger); color: white; font-size: 0.7rem; padding: 0.12rem 0.4rem; border-radius: 12px; margin-left: 0.3rem; font-weight: 700; }
+        .icon, .icon-sm, .icon-tiny { display: inline-block; vertical-align: middle; }
+        .icon { width: 18px; height: 18px; }
+        .icon-sm { width: 14px; height: 14px; }
+        .icon-tiny { width: 12px; height: 12px; }
+        .nav-item svg { margin-right: 0.5rem; }
+        .refresh-mini svg { display: block; }
+
+        .toggle { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--border-color); border-radius: 22px; transition: 0.2s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+        .toggle input:checked + .toggle-slider { background: var(--color-success); }
+        .toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+        .content { flex-grow: 1; overflow-y: auto; padding: 1.5rem; }
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .kpi-card { background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .kpi-title { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
+        .kpi-value { font-size: 1.5rem; font-weight: 800; font-family: 'Outfit', sans-serif; margin-top: 0.25rem; }
+        .kpi-sub { font-size: 0.75rem; color: var(--text-light); margin-top: 0.2rem; }
+
+        .section-header { display: flex; align-items: center; justify-content: space-between; margin: 1.5rem 0 0.75rem; }
+        .section-header h2 { font-size: 1rem; font-weight: 700; }
+        .group-card { background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+        .group-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; }
+        .accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+
+        .account-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; cursor: pointer; transition: 0.15s; position: relative; background: white; }
+        .account-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-2px); border-color: var(--color-primary); }
+        .account-card.status-healthy { border-left: 4px solid var(--color-success); }
+        .account-card.status-warning { border-left: 4px solid var(--color-warning); }
+        .account-card.status-critical { border-left: 4px solid var(--color-danger); }
+        .account-card.status-disconnected { border-left: 4px solid var(--text-light); }
+        .account-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+        .account-name { font-weight: 700; font-size: 0.95rem; }
+        .account-type { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.2rem 0.45rem; border-radius: 4px; background: var(--bg-base); color: var(--text-muted); }
+        .account-type.google, .account-type.Google { background: rgba(66,133,244,0.1); color: #4285f4; }
+        .account-type.meta, .account-type.Meta { background: rgba(24,119,242,0.1); color: #1877f2; }
+        .account-type.both, .account-type.Both { background: rgba(15,23,42,0.08); color: #0f172a; }
+
+        .account-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; margin-bottom: 0.75rem; }
+        .metric { background: var(--bg-sidebar); border-radius: 8px; padding: 0.55rem; }
+        .metric-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .metric-value { font-size: 0.95rem; font-weight: 700; margin-top: 0.15rem; }
+        .account-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); }
+        .last-sync { font-size: 0.72rem; color: var(--text-light); }
+        .refresh-mini { background: transparent; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.3rem; cursor: pointer; color: var(--text-muted); }
+        .refresh-mini:hover { color: var(--color-primary); border-color: var(--color-primary); }
+        .refresh-mini.spinning { animation: spin 1s linear infinite; }
+
+        .perf-badge { display: inline-flex; align-items: center; font-size: 0.7rem; font-weight: 700; padding: 0.25rem 0.5rem; border-radius: 4px; text-transform: uppercase; }
+        .perf-bad { background: rgba(220,38,38,0.1); color: var(--color-danger); }
+        .perf-average { background: rgba(217,119,6,0.1); color: var(--color-warning); }
+        .perf-good { background: rgba(5,150,105,0.1); color: var(--color-success); }
+        .perf-excellent { background: rgba(79,70,229,0.1); color: var(--color-primary); }
+        .account-actions { display: flex; gap: 0.4rem; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        .card-title { font-size: 1rem; font-weight: 700; }
+        .form-group { margin-bottom: 0.75rem; }
+        .form-group label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.35rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.5rem 0.7rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; font-family: 'Inter', sans-serif; color: var(--text-main); }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--color-primary); }
+        .form-row { display: flex; gap: 0.75rem; }
+        .form-row .form-group { flex: 1; }
+
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 0.7rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { font-weight: 600; color: var(--text-muted); background: var(--bg-sidebar); }
+        .text-right { text-align: right; }
+        .flag-tag { font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.45rem; border-radius: 4px; text-transform: uppercase; }
+        .flag-success { background: rgba(5,150,105,0.1); color: var(--color-success); }
+        .flag-warning { background: rgba(217,119,6,0.1); color: var(--color-warning); }
+        .flag-danger { background: rgba(220,38,38,0.1); color: var(--color-danger); }
+
+        .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--text-main); color: white; padding: 0.8rem 1.2rem; border-radius: 8px; font-size: 0.85rem; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; opacity: 0; transform: translateY(10px); transition: 0.3s; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background: var(--color-danger); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 500; }
+        .modal-overlay.hidden { display: none; }
+        .modal { background: white; border-radius: 12px; padding: 1.5rem; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem; }
+
+        .hidden { display: none !important; }
+
+        .auth-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+        .auth-overlay.hidden { display: none; }
+        .auth-card { background: white; border-radius: 16px; padding: 2rem; width: 90%; max-width: 420px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        .auth-tabs { display: flex; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border-color); }
+        .auth-tab { flex: 1; text-align: center; padding: 0.75rem; cursor: pointer; font-weight: 600; color: var(--text-muted); }
+        .auth-tab.active { color: var(--color-primary); border-bottom: 2px solid var(--color-primary); margin-bottom: -2px; }
+
+        .oauth-section { margin:1rem 0; padding:0.75rem; border:1px solid var(--border-color); border-radius:8px; }
+        .oauth-status { display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin:0.5rem 0; }
+        .oauth-status.connected { color:var(--color-success); }
+        .oauth-status.disconnected { color:var(--text-muted); }
+        .oauth-buttons { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem; }
+        .platform-fields.hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="app-logo"><div class="logo-icon">AI</div>AdOptima</div>
+            </div>
+            <div class="sidebar-scroll">
+                <div>
+                    <div class="sidebar-section-title">Overview</div>
+                    <div class="nav-item active" data-nav="dashboard" onclick="switchPanel('dashboard')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg> Account Dashboard</div>
+                    <div class="nav-item" data-nav="accounts" onclick="switchPanel('accounts')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Manage Accounts</div>
+                    <div class="nav-item" data-nav="approvals" onclick="switchPanel('approvals')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Approval Queue <span id="pendingBadge" class="pending-badge hidden">0</span></div>
+                    <div class="nav-item" data-nav="settings" onclick="switchPanel('settings')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v10M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m6 0h10M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"></path></svg> Global Settings</div>
+                    <div class="nav-item" data-nav="logs" onclick="switchPanel('logs')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Notification Logs</div>
+                    <div class="nav-item" onclick="logout()" style="color:var(--color-danger);"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg> Logout</div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="topbar">
+                <div class="topbar-left">
+                    <h1 id="pageTitle">Account Dashboard</h1>
+                    <div class="status-badge" id="systemStatusBadge"><span class="status-dot"></span>Mock Mode</div>
+                </div>
+                <div style="display:flex; gap:0.5rem; align-items:center;">
+                    <select id="globalDatePreset" class="date-input" onchange="applyGlobalDatePreset(this.value)" style="width:130px;">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="last7">Last 7 Days</option>
+                        <option value="last15">Last 15 Days</option>
+                        <option value="last30" selected>Last 30 Days</option>
+                        <option value="thisMonth">This Month</option>
+                        <option value="allTime">All Time</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                    <input type="date" id="globalStartDate" class="date-input" onchange="onGlobalCustomDate()">
+                    <input type="date" id="globalEndDate" class="date-input" onchange="onGlobalCustomDate()">
+                    <button class="btn btn-primary" onclick="refreshAllAccounts()">Refresh All</button>
+                    <button class="btn btn-success" onclick="runGlobalAudit()">Run Audit</button>
+                </div>
+            </div>
+
+            <div class="content">
+                <div id="panel-dashboard" class="panel active">
+                    <div class="kpi-grid">
+                        <div class="kpi-card"><div class="kpi-title">Total Accounts</div><div class="kpi-value" id="kpi-total-accounts">0</div></div>
+                        <div class="kpi-card"><div class="kpi-title">Total Spend</div><div class="kpi-value" id="kpi-total-spend">Rs 0</div></div>
+                        <div class="kpi-card"><div class="kpi-title">Total Conversions</div><div class="kpi-value" id="kpi-total-conversions">0</div></div>
+                        <div class="kpi-card"><div class="kpi-title">Avg CTR</div><div class="kpi-value" id="kpi-avg-ctr">0%</div></div>
+                    </div>
+                    <div id="dashboardGroups"></div>
+                </div>
+
+                <div id="panel-accounts" class="panel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Manage Accounts</h2>
+                            <div style="display:flex; gap:0.5rem;">
+                                <button class="btn btn-primary" onclick="openAddAccountModal()">Add Account</button>
+                                <button class="btn btn-secondary" onclick="openAddGroupModal()">Add Group</button>
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead><tr><th>Name</th><th>Platforms</th><th>Group</th><th>External ID</th><th>Mode</th><th>Status</th><th class="text-right">Spend</th><th class="text-right">Refresh</th><th>Actions</th></tr></thead>
+                                <tbody id="accountsTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-account-detail" class="panel">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <h2 class="card-title" id="detail-account-name">Account Detail</h2>
+                                <div id="detail-account-meta" style="font-size:0.78rem; color:var(--text-muted); margin-top:0.3rem;"></div>
+                            </div>
+                            <div style="display:flex; gap:0.5rem;">
+                                <select id="detailDatePreset" class="date-input" onchange="applyDetailDatePreset(this.value)" style="width:130px;">
+                                    <option value="inherit" selected>Inherit global</option>
+                                    <option value="today">Today</option>
+                                    <option value="yesterday">Yesterday</option>
+                                    <option value="last7">Last 7 Days</option>
+                                    <option value="last15">Last 15 Days</option>
+                                    <option value="last30">Last 30 Days</option>
+                                    <option value="thisMonth">This Month</option>
+                                    <option value="allTime">All Time</option>
+                                    <option value="custom">Custom Range</option>
+                                </select>
+                                <input type="date" id="detailStartDate" class="date-input" onchange="onDetailCustomDate()">
+                                <input type="date" id="detailEndDate" class="date-input" onchange="onDetailCustomDate()">
+                                <button class="btn btn-primary" onclick="refreshCurrentAccount()">Refresh</button>
+                                <button class="btn btn-secondary" onclick="switchPanel('dashboard')">Back</button>
+                            </div>
+                        </div>
+                        <div class="kpi-grid">
+                            <div class="kpi-card"><div class="kpi-title">Spend</div><div class="kpi-value" id="detail-spend">Rs 0</div></div>
+                            <div class="kpi-card"><div class="kpi-title">Conversions</div><div class="kpi-value" id="detail-conversions">0</div></div>
+                            <div class="kpi-card"><div class="kpi-title">CTR</div><div class="kpi-value" id="detail-ctr">0%</div></div>
+                            <div class="kpi-card"><div class="kpi-title">CPA</div><div class="kpi-value" id="detail-cpa">Rs 0</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-approvals" class="panel">
+                    <div class="card">
+                        <div class="card-header"><h2 class="card-title">Approval Queue</h2><button class="btn btn-secondary btn-sm" onclick="loadPendingActions()"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh</button></div>
+                        <div id="pendingActionsContainer"></div>
+                    </div>
+                </div>
+
+                <div id="panel-settings" class="panel">
+                    <div class="card">
+                        <div class="card-header"><h2 class="card-title">Global Settings</h2></div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Default Refresh Interval (minutes)</label><input type="number" id="globalRefreshInterval" value="60" min="15"></div>
+                            <div class="form-group"><label>Default Audit Interval (minutes, 0 = off)</label><input type="number" id="globalAuditInterval" value="60" min="0"></div>
+                            <div class="form-group"><label>Currency</label><input type="text" value="INR" disabled></div>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveGlobalSettings()">Save Settings</button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header"><h2 class="card-title">OAuth App Credentials</h2></div>
+                        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">Configure default Google Ads and Meta Marketing API OAuth apps. These are used when connecting client accounts unless overridden per account.</p>
+                        <div class="form-row">
+                            <div class="form-group"><label>Google Client ID</label><input type="text" id="cfgGoogleClientId" placeholder=""></div>
+                            <div class="form-group"><label>Google Client Secret</label><input type="password" id="cfgGoogleClientSecret" placeholder=""></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Google Developer Token</label><input type="password" id="cfgGoogleDeveloperToken" placeholder=""></div>
+                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="cfgRedirectBaseUrl" placeholder="http://127.0.0.1:8000"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Meta App ID</label><input type="text" id="cfgMetaAppId" placeholder=""></div>
+                            <div class="form-group"><label>Meta App Secret</label><input type="password" id="cfgMetaAppSecret" placeholder=""></div>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveOAuthConfig()">Save OAuth Credentials</button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header"><h2 class="card-title">Notifications</h2></div>
+                        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">Enable or disable alert channels. Live dispatch requires provider credentials.</p>
+                        <div id="notificationsContainer"></div>
+                    </div>
+                </div>
+
+                <div id="panel-logs" class="panel">
+                    <div class="card">
+                        <div class="card-header"><h2 class="card-title">Notification Logs</h2><button class="btn btn-secondary btn-sm" onclick="loadNotificationLogs()"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh</button></div>
+                        <div id="notificationLogsContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Auth Overlay -->
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-card">
+            <div class="app-logo" style="justify-content:center; margin-bottom:1rem;">
+                <div class="logo-icon">AI</div>
+                <span style="font-size:1.4rem;">AdOptima</span>
+            </div>
+            <div class="auth-tabs">
+                <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Login</div>
+                <div class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Register</div>
+            </div>
+            <div id="auth-login">
+                <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="you@example.com"></div>
+                <div class="form-group"><label>Password</label><input type="password" id="loginPassword"></div>
+                <button class="btn btn-primary" style="width:100%;" onclick="login()">Login</button>
+            </div>
+            <div id="auth-register" class="hidden">
+                <div class="form-group"><label>Full Name</label><input type="text" id="regName" placeholder="John Doe"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="you@example.com"></div>
+                <div class="form-group"><label>Password</label><input type="password" id="regPassword"></div>
+                <button class="btn btn-primary" style="width:100%;" onclick="register()">Create Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Account Modal -->
+    <div id="addAccountModal" class="modal-overlay hidden" onclick="closeAddAccountModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h2>Add Account</h2>
+            <div class="form-group"><label>Client Name</label><input type="text" id="accName" placeholder="e.g. DSU"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Group</label><select id="accGroup"><option value="">None</option></select></div>
+                <div class="form-group"><label>Refresh Interval (min)</label><input type="number" id="accRefreshInterval" value="60" min="15"></div>
+                <div class="form-group"><label>Audit Interval (min, 0=use global)</label><input type="number" id="accAuditInterval" value="0" min="0"></div>
+            </div>
+
+            <div class="oauth-section">
+                <label style="display:flex; align-items:center; gap:0.5rem; font-weight:600; margin-bottom:0.5rem; cursor:pointer;">
+                    <input type="checkbox" id="accHasGoogle" checked onchange="togglePlatformFields()">
+                    <span>Google Ads</span>
+                </label>
+                <div id="googleFields" class="platform-fields">
+                    <div class="form-group">
+                        <label>Google Ads Customer ID *</label>
+                        <input type="text" id="accGoogleExternalId" placeholder="123-456-7890" onblur="validateGoogleCustomerId()">
+                        <div id="googleCustomerIdHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">Find this in the top-right corner of the Google Ads account. Format: 123-456-7890.</div>
+                    </div>
+                    <div class="form-group" style="flex:1;"><label>Currency</label><input type="text" id="accGoogleCurrency" value="INR" disabled></div>
+
+                    <div style="margin:0.75rem 0; padding:0.5rem; background:var(--bg-sidebar); border-radius:6px;">
+                        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; font-weight:600; cursor:pointer;">
+                            <input type="checkbox" id="accGoogleUseGlobal" checked onchange="toggleGoogleUseGlobal()">
+                            <span>Use global OAuth credentials from Settings</span>
+                        </label>
+                        <div id="googleGlobalHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">Client ID / Secret / Developer Token will be taken from Global Settings.</div>
+                    </div>
+
+                    <div id="googleAccountCreds" class="platform-fields hidden" style="margin-top:0.5rem;">
+                        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this specific Google Ads account:</p>
+                        <div class="form-row">
+                            <div class="form-group"><label>Client ID *</label><input type="text" id="accGoogleClientId" placeholder="xxx.apps.googleusercontent.com"></div>
+                            <div class="form-group"><label>Client Secret *</label><input type="password" id="accGoogleClientSecret" placeholder="GOCSPX-..."></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Developer Token *</label><input type="password" id="accGoogleDeveloperToken" placeholder="From Google Ads API Center"></div>
+                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accGoogleRedirectBaseUrl" value="http://127.0.0.1:8000" disabled></div>
+                        </div>
+                    </div>
+
+                    <div id="googleOAuthStatus" class="oauth-status disconnected">
+                        <svg class="icon-tiny" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        <span>Not connected via OAuth</span>
+                    </div>
+                    <div class="oauth-buttons">
+                        <button class="btn btn-sm btn-secondary" id="btnConnectGoogle" onclick="startOAuth('google')">Connect Google</button>
+                        <button class="btn btn-sm btn-danger" id="btnDisconnectGoogle" onclick="disconnectOAuth('google')" style="display:none;">Disconnect</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="oauth-section">
+                <label style="display:flex; align-items:center; gap:0.5rem; font-weight:600; margin-bottom:0.5rem; cursor:pointer;">
+                    <input type="checkbox" id="accHasMeta" onchange="togglePlatformFields()">
+                    <span>Meta Ads</span>
+                </label>
+                <div id="metaFields" class="platform-fields hidden">
+                    <div class="form-group">
+                        <label>Meta Ad Account ID *</label>
+                        <input type="text" id="accMetaExternalId" placeholder="act_123456789" onblur="validateMetaAccountId()">
+                        <div id="metaAccountIdHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">Format: act_123456789. Find this in Meta Ads Manager.</div>
+                    </div>
+                    <div class="form-group" style="flex:1;"><label>Currency</label><input type="text" id="accMetaCurrency" value="INR" disabled></div>
+
+                    <div style="margin:0.75rem 0; padding:0.5rem; background:var(--bg-sidebar); border-radius:6px;">
+                        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; font-weight:600; cursor:pointer;">
+                            <input type="checkbox" id="accMetaUseGlobal" checked onchange="toggleMetaUseGlobal()">
+                            <span>Use global OAuth credentials from Settings</span>
+                        </label>
+                        <div id="metaGlobalHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">App ID / App Secret will be taken from Global Settings.</div>
+                    </div>
+
+                    <div id="metaAccountCreds" class="platform-fields hidden" style="margin-top:0.5rem;">
+                        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this specific Meta Ads account:</p>
+                        <div class="form-row">
+                            <div class="form-group"><label>App ID *</label><input type="text" id="accMetaAppId" placeholder="1234567890"></div>
+                            <div class="form-group"><label>App Secret *</label><input type="password" id="accMetaAppSecret" placeholder="..."></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accMetaRedirectBaseUrl" value="http://127.0.0.1:8000" disabled></div>
+                        </div>
+                    </div>
+
+                    <div id="metaOAuthStatus" class="oauth-status disconnected">
+                        <svg class="icon-tiny" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        <span>Not connected via OAuth</span>
+                    </div>
+                    <div class="oauth-buttons">
+                        <button class="btn btn-sm btn-secondary" id="btnConnectMeta" onclick="startOAuth('meta')">Connect Meta</button>
+                        <button class="btn btn-sm btn-danger" id="btnDisconnectMeta" onclick="disconnectOAuth('meta')" style="display:none;">Disconnect</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeAddAccountModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveAccount()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Group Modal -->
+    <div id="addGroupModal" class="modal-overlay hidden" onclick="closeAddGroupModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h2>Add Group</h2>
+            <div class="form-group"><label>Group Name</label><input type="text" id="groupName" placeholder="e.g. Education"></div>
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeAddGroupModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveGroup()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const API = 'http://127.0.0.1:8000/api';
+    let token = localStorage.getItem('adoptima_token') || '';
+    let currentUser = null;
+    let allAccounts = [];
+    let allGroups = [];
+    let pendingActions = [];
+    let currentDetailAccount = null;
+    let editingAccountId = null;
+    let dateRange = { preset: 'last30', start: '', end: '' };
+    let detailDateRange = { preset: 'inherit', start: '', end: '' };
+
+    const ICONS = {
+        refresh: '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>',
+        check: '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+        x: '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+        play: '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>'
+    };
+
+    function $(id) { return document.getElementById(id); }
+
+    async function api(method, path, body) {
+        const opts = { method, headers: {} };
+        if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+        if (body) {
+            opts.headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(body);
+        }
+        const res = await fetch(API + path, opts);
+        if (res.status === 401) {
+            token = '';
+            localStorage.removeItem('adoptima_token');
+            showAuth(true);
+            throw new Error('Session expired. Please login.');
+        }
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.detail || `Request failed (${res.status})`);
+        }
+        return res.status === 204 ? null : res.json();
+    }
+
+    function formatMoney(n) {
+        if (n === undefined || n === null) return 'Rs 0';
+        return 'Rs ' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    }
+
+    function formatNum(n) { return Number(n || 0).toLocaleString('en-IN'); }
+    function formatPct(n) { return Number(n || 0).toFixed(2) + '%'; }
+    function formatDate(iso) { return iso ? new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Never'; }
+
+    function toast(msg, error) {
+        const t = $('toast');
+        if (!t) {
+            const div = document.createElement('div');
+            div.id = 'toast'; div.className = 'toast' + (error ? ' error' : '');
+            div.textContent = msg;
+            document.body.appendChild(div);
+            requestAnimationFrame(() => div.classList.add('show'));
+            setTimeout(() => { div.classList.remove('show'); setTimeout(() => div.remove(), 300); }, 3000);
+            return;
+        }
+        t.className = 'toast' + (error ? ' error' : '');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ---------- Auth ----------
+    async function checkAuth() {
+        if (!token) { showAuth(true); return; }
+        try {
+            currentUser = await api('GET', '/auth/me');
+            showAuth(false);
+            initApp();
+        } catch (e) {
+            showAuth(true);
+        }
+    }
+
+    function showAuth(show) {
+        $('authOverlay').classList.toggle('hidden', !show);
+    }
+
+    function switchAuthTab(tab) {
+        $('tab-login').classList.toggle('active', tab === 'login');
+        $('tab-register').classList.toggle('active', tab === 'register');
+        $('auth-login').classList.toggle('hidden', tab !== 'login');
+        $('auth-register').classList.toggle('hidden', tab !== 'register');
+    }
+
+    async function login() {
+        const email = $('loginEmail').value.trim();
+        const password = $('loginPassword').value;
+        if (!email || !password) { toast('Enter email and password', true); return; }
+        try {
+            const body = new URLSearchParams({ username: email, password });
+            const res = await fetch(API + '/auth/login', { method: 'POST', body });
+            if (!res.ok) throw new Error('Invalid credentials');
+            const data = await res.json();
+            token = data.access_token;
+            currentUser = data.user;
+            localStorage.setItem('adoptima_token', token);
+            showAuth(false);
+            initApp();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function register() {
+        const name = $('regName').value.trim();
+        const email = $('regEmail').value.trim();
+        const password = $('regPassword').value;
+        if (!email || !password) { toast('Enter email and password', true); return; }
+        try {
+            await api('POST', '/auth/register', { email, password, full_name: name });
+            toast('Account created. Please login.');
+            switchAuthTab('login');
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function logout() {
+        token = '';
+        localStorage.removeItem('adoptima_token');
+        currentUser = null;
+        showAuth(true);
+    }
+
+    // ---------- Navigation ----------
+    function switchPanel(name) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-item[data-nav]').forEach(n => n.classList.remove('active'));
+        const panel = $('panel-' + name);
+        if (panel) panel.classList.add('active');
+        const nav = document.querySelector('.nav-item[data-nav="' + name + '"]');
+        if (nav) nav.classList.add('active');
+        const titles = { dashboard: 'Account Dashboard', accounts: 'Manage Accounts', approvals: 'Approval Queue', settings: 'Global Settings', logs: 'Notification Logs', 'account-detail': 'Account Detail' };
+        $('pageTitle').textContent = titles[name] || 'AdOptima';
+        if (name === 'accounts') loadAccounts();
+        if (name === 'approvals') loadPendingActions();
+        if (name === 'settings') loadSettings();
+        if (name === 'logs') loadNotificationLogs();
+    }
+
+    function initApp() {
+        computeDateRange('last30');
+        applyDateInputs();
+        loadSummary();
+        loadPendingActionsCount();
+        switchPanel('dashboard');
+        handleOAuthParams();
+    }
+
+    // ---------- Date range ----------
+    function today() {
+        const d = new Date();
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    function fmtDate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    function computeDateRange(preset) {
+        const end = today();
+        let start = new Date(end);
+        switch (preset) {
+            case 'today': break;
+            case 'yesterday': start.setDate(end.getDate() - 1); end.setDate(end.getDate() - 1); break;
+            case 'last7': start.setDate(end.getDate() - 6); break;
+            case 'last15': start.setDate(end.getDate() - 14); break;
+            case 'last30': start.setDate(end.getDate() - 29); break;
+            case 'thisMonth': start.setDate(1); break;
+            case 'allTime': start = new Date('2020-01-01'); break;
+            case 'custom': return;
+        }
+        dateRange = { preset, start: fmtDate(start), end: fmtDate(end) };
+    }
+
+    function applyGlobalDatePreset(val) {
+        computeDateRange(val);
+        applyDateInputs();
+        loadSummary();
+    }
+
+    function onGlobalCustomDate() {
+        $('globalDatePreset').value = 'custom';
+        dateRange = { preset: 'custom', start: $('globalStartDate').value, end: $('globalEndDate').value };
+        loadSummary();
+    }
+
+    function applyDateInputs() {
+        $('globalStartDate').value = dateRange.start;
+        $('globalEndDate').value = dateRange.end;
+    }
+
+    function getEffectiveDetailRange() {
+        if (detailDateRange.preset === 'inherit') return dateRange;
+        if (detailDateRange.preset === 'custom') return detailDateRange;
+        const r = { preset: detailDateRange.preset };
+        const end = today();
+        let start = new Date(end);
+        switch (detailDateRange.preset) {
+            case 'today': break;
+            case 'yesterday': start.setDate(end.getDate() - 1); end.setDate(end.getDate() - 1); break;
+            case 'last7': start.setDate(end.getDate() - 6); break;
+            case 'last15': start.setDate(end.getDate() - 14); break;
+            case 'last30': start.setDate(end.getDate() - 29); break;
+            case 'thisMonth': start.setDate(1); break;
+            case 'allTime': start = new Date('2020-01-01'); break;
+        }
+        r.start = fmtDate(start); r.end = fmtDate(end);
+        return r;
+    }
+
+    function applyDetailDatePreset(val) {
+        detailDateRange.preset = val;
+        const r = getEffectiveDetailRange();
+        $('detailStartDate').value = r.start;
+        $('detailEndDate').value = r.end;
+        $('detailStartDate').disabled = (val !== 'custom');
+        $('detailEndDate').disabled = (val !== 'custom');
+        if (currentDetailAccount) loadAccountDetail(currentDetailAccount.id);
+    }
+
+    function onDetailCustomDate() {
+        $('detailDatePreset').value = 'custom';
+        detailDateRange = { preset: 'custom', start: $('detailStartDate').value, end: $('detailEndDate').value };
+        if (currentDetailAccount) loadAccountDetail(currentDetailAccount.id);
+    }
+
+    function dateParams(range) {
+        const r = range || dateRange;
+        const params = [];
+        if (r.start) params.push('start_date=' + encodeURIComponent(r.start));
+        if (r.end) params.push('end_date=' + encodeURIComponent(r.end));
+        return params.length ? '?' + params.join('&') : '';
+    }
+
+    // ---------- Dashboard ----------
+    async function loadSummary() {
+        try {
+            const data = await api('GET', '/accounts/summary' + dateParams());
+            $('kpi-total-accounts').textContent = data.total_accounts || 0;
+            $('kpi-total-spend').textContent = formatMoney(data.total_spend);
+            $('kpi-total-conversions').textContent = formatNum(data.total_conversions);
+            const ctr = data.total_impressions ? (data.total_clicks / data.total_impressions) * 100 : 0;
+            $('kpi-avg-ctr').textContent = formatPct(ctr);
+            renderDashboardGroups(data.groups || [], data.ungrouped || []);
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function renderDashboardGroups(groups, ungrouped) {
+        const container = $('dashboardGroups');
+        container.innerHTML = '';
+        groups.forEach(g => {
+            container.appendChild(buildGroupCard(g.group_name, g.accounts));
+        });
+        if (ungrouped.length) {
+            container.appendChild(buildGroupCard('Ungrouped', ungrouped));
+        }
+    }
+
+    function buildGroupCard(title, accounts) {
+        const card = document.createElement('div');
+        card.className = 'group-card';
+        card.innerHTML = '<div class="group-title"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> ' + escapeHtml(title) + '</div>';
+        const grid = document.createElement('div');
+        grid.className = 'accounts-grid';
+        accounts.forEach(a => grid.appendChild(buildAccountTile(a)));
+        card.appendChild(grid);
+        return card;
+    }
+
+    function buildAccountTile(a) {
+        const el = document.createElement('div');
+        el.className = 'account-card status-' + (a.status || 'disconnected');
+        el.onclick = () => openAccountDetail(a.id, a.platform);
+        const platformLabel = a.platform === 'google' ? 'Google' : 'Meta';
+        const isLive = a.is_live;
+        const perf = scorePerformance(a);
+        el.innerHTML = `
+            <div class="account-header">
+                <div>
+                    <div class="account-name">${escapeHtml(a.name)}</div>
+                    <div style="font-size:0.75rem;color:var(--text-light);margin-top:0.15rem;">${escapeHtml(a.external_id || '')}</div>
+                </div>
+                <span class="account-type ${platformLabel}">${platformLabel}</span>
+            </div>
+            <div class="account-metrics">
+                <div class="metric"><div class="metric-label">Spend</div><div class="metric-value">${formatMoney(a.spend)}</div></div>
+                <div class="metric"><div class="metric-label">Conversions</div><div class="metric-value">${formatNum(a.conversions)}</div></div>
+                <div class="metric"><div class="metric-label">CTR</div><div class="metric-value">${formatPct(a.ctr)}</div></div>
+                <div class="metric"><div class="metric-label">CPA</div><div class="metric-value">${formatMoney(a.cpa)}</div></div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem; margin:0.5rem 0;">
+                <span class="perf-badge perf-${perf.class}">${perf.label}</span>
+            </div>
+            <div class="account-footer">
+                <span class="last-sync">${isLive ? '<span class="status-badge live"><span class="status-dot"></span>Live</span>' : '<span class="status-badge"><span class="status-dot"></span>Mock</span>'} &nbsp; Sync: ${formatDate(a.last_sync_at)}</span>
+                <div class="account-actions">
+                    <button class="refresh-mini" onclick="event.stopPropagation(); runAccountAudit(${a.id}, '${a.platform}')" title="Audit">${ICONS.play}</button>
+                    <button class="refresh-mini" onclick="event.stopPropagation(); refreshTile(${a.id}, '${a.platform}', this)" title="Refresh">${ICONS.refresh}</button>
+                </div>
+            </div>`;
+        return el;
+    }
+
+    function scorePerformance(a) {
+        const ctr = Number(a.ctr || 0);
+        const cpa = Number(a.cpa || 0);
+        const conversions = Number(a.conversions || 0);
+        let score = 0;
+        if (ctr >= 5) score += 3;
+        else if (ctr >= 2) score += 2;
+        else if (ctr >= 1) score += 1;
+        if (cpa > 0) {
+            if (cpa <= 500) score += 3;
+            else if (cpa <= 1000) score += 2;
+            else if (cpa <= 2000) score += 1;
+        } else {
+            if (conversions > 0) score += 1;
+        }
+        if (score >= 5) return { label: 'Excellent', class: 'excellent' };
+        if (score >= 3) return { label: 'Good', class: 'good' };
+        if (score >= 1) return { label: 'Average', class: 'average' };
+        return { label: 'Bad', class: 'bad' };
+    }
+
+    async function refreshTile(accountId, platform, btn) {
+        btn.classList.add('spinning');
+        try {
+            await api('POST', '/accounts/' + accountId + '/refresh' + dateParams() + (dateParams() ? '&' : '?') + 'platform=' + platform);
+            toast('Refreshed');
+            loadSummary();
+        } catch (e) { toast(e.message, true); }
+        finally { btn.classList.remove('spinning'); }
+    }
+
+    async function refreshAllAccounts() {
+        try {
+            for (const a of allAccounts) {
+                if (a.has_google) await api('POST', '/accounts/' + a.id + '/refresh?platform=google').catch(() => {});
+                if (a.has_meta) await api('POST', '/accounts/' + a.id + '/refresh?platform=meta').catch(() => {});
+            }
+            toast('All accounts refreshed');
+            loadSummary();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    // ---------- Account Detail ----------
+    async function openAccountDetail(id, platform) {
+        currentDetailAccount = { id, platform };
+        const r = getEffectiveDetailRange();
+        try {
+            const a = await api('GET', '/accounts/' + id + dateParams(r) + (dateParams(r) ? '&' : '?') + 'platform=' + platform);
+            $('detail-account-name').textContent = a.name + ' - ' + (platform === 'google' ? 'Google Ads' : 'Meta Ads');
+            $('detail-account-meta').textContent = (a.external_id || '') + ' | ' + (a.group_name || 'No group');
+            $('detail-spend').textContent = formatMoney(a.spend);
+            $('detail-conversions').textContent = formatNum(a.conversions);
+            $('detail-ctr').textContent = formatPct(a.ctr);
+            $('detail-cpa').textContent = formatMoney(a.cpa);
+            switchPanel('account-detail');
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function refreshCurrentAccount() {
+        if (!currentDetailAccount) return;
+        const r = getEffectiveDetailRange();
+        try {
+            await api('POST', '/accounts/' + currentDetailAccount.id + '/refresh' + dateParams(r) + (dateParams(r) ? '&' : '?') + 'platform=' + currentDetailAccount.platform);
+            toast('Account refreshed');
+            openAccountDetail(currentDetailAccount.id, currentDetailAccount.platform);
+            loadSummary();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    // ---------- Manage Accounts ----------
+    async function loadAccounts() {
+        try {
+            allAccounts = await api('GET', '/accounts');
+            allGroups = await api('GET', '/account-groups');
+            renderAccountsTable();
+            populateGroupSelects();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function renderAccountsTable() {
+        const tbody = $('accountsTableBody');
+        tbody.innerHTML = '';
+        allAccounts.forEach(a => {
+            const platforms = [];
+            if (a.has_google) platforms.push('Google');
+            if (a.has_meta) platforms.push('Meta');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${escapeHtml(a.name)}</strong></td>
+                <td>${platforms.join(', ')}</td>
+                <td>${escapeHtml(a.group_name || '-')}</td>
+                <td>${escapeHtml(a.external_id || '')}</td>
+                <td>${a.is_live ? '<span class="flag-tag flag-success">Live</span>' : '<span class="flag-tag flag-warning">Mock</span>'}</td>
+                <td>${a.status}</td>
+                <td class="text-right">${formatMoney(a.spend)}</td>
+                <td class="text-right">${a.refresh_interval_minutes}m</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="openEditAccountModal(${a.id})">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteAccount(${a.id})">Delete</button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function populateGroupSelects() {
+        const selects = ['accGroup'];
+        selects.forEach(id => {
+            const sel = $(id);
+            if (!sel) return;
+            const val = sel.value;
+            sel.innerHTML = '<option value="">None</option>';
+            allGroups.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g.id; opt.textContent = g.name;
+                sel.appendChild(opt);
+            });
+            sel.value = val;
+        });
+    }
+
+    function openAddAccountModal() {
+        editingAccountId = null;
+        $('addAccountModal').querySelector('h2').textContent = 'Add Account';
+        $('accName').value = '';
+        $('accGroup').value = '';
+        $('accRefreshInterval').value = 60;
+        $('accAuditInterval').value = 0;
+        $('accHasGoogle').checked = true;
+        $('accHasMeta').checked = false;
+        $('accGoogleExternalId').value = '';
+        $('accMetaExternalId').value = '';
+        $('accGoogleUseGlobal').checked = true;
+        $('accMetaUseGlobal').checked = true;
+        ['accGoogleClientId','accGoogleClientSecret','accGoogleDeveloperToken','accMetaAppId','accMetaAppSecret'].forEach(id => $(id).value = '');
+        togglePlatformFields();
+        toggleGoogleUseGlobal();
+        toggleMetaUseGlobal();
+        updateOAuthStatus(null);
+        $('addAccountModal').classList.remove('hidden');
+    }
+
+    async function openEditAccountModal(id) {
+        const a = allAccounts.find(x => x.id === id);
+        if (!a) return;
+        editingAccountId = id;
+        $('addAccountModal').querySelector('h2').textContent = 'Edit Account';
+        $('accName').value = a.name;
+        $('accGroup').value = a.group_id || '';
+        $('accRefreshInterval').value = a.refresh_interval_minutes;
+        $('accAuditInterval').value = a.audit_interval_minutes || 0;
+        $('accHasGoogle').checked = a.has_google;
+        $('accHasMeta').checked = a.has_meta;
+        $('accGoogleExternalId').value = a.google_external_id || '';
+        $('accMetaExternalId').value = a.meta_external_id || '';
+        const hasGoogleCreds = !!(a.google_client_id || a.google_client_secret || a.google_developer_token);
+        const hasMetaCreds = !!(a.meta_app_id || a.meta_app_secret);
+        $('accGoogleUseGlobal').checked = !hasGoogleCreds;
+        $('accMetaUseGlobal').checked = !hasMetaCreds;
+        $('accGoogleClientId').value = a.google_client_id || '';
+        $('accGoogleClientSecret').value = a.google_client_secret ? '●●●●●●●●' + (a.google_client_secret || '').slice(-4) : '';
+        $('accGoogleDeveloperToken').value = a.google_developer_token ? '●●●●●●●●' + (a.google_developer_token || '').slice(-4) : '';
+        $('accMetaAppId').value = a.meta_app_id || '';
+        $('accMetaAppSecret').value = a.meta_app_secret ? '●●●●●●●●' + (a.meta_app_secret || '').slice(-4) : '';
+        togglePlatformFields();
+        toggleGoogleUseGlobal();
+        toggleMetaUseGlobal();
+        updateOAuthStatus(a);
+        $('addAccountModal').classList.remove('hidden');
+    }
+
+    function closeAddAccountModal(e) {
+        if (e && e.target !== $('addAccountModal')) return;
+        $('addAccountModal').classList.add('hidden');
+        editingAccountId = null;
+    }
+
+    function togglePlatformFields() {
+        const g = $('accHasGoogle').checked;
+        const m = $('accHasMeta').checked;
+        $('googleFields').classList.toggle('hidden', !g);
+        $('metaFields').classList.toggle('hidden', !m);
+        if (!g && !m) { $('accHasGoogle').checked = true; $('googleFields').classList.remove('hidden'); }
+    }
+
+    function toggleGoogleUseGlobal() {
+        const useGlobal = $('accGoogleUseGlobal').checked;
+        $('googleAccountCreds').classList.toggle('hidden', useGlobal);
+        $('googleGlobalHelp').textContent = useGlobal ? 'Client ID / Secret / Developer Token will be taken from Global Settings.' : 'You must enter account-specific OAuth credentials below.';
+    }
+
+    function toggleMetaUseGlobal() {
+        const useGlobal = $('accMetaUseGlobal').checked;
+        $('metaAccountCreds').classList.toggle('hidden', useGlobal);
+        $('metaGlobalHelp').textContent = useGlobal ? 'App ID / App Secret will be taken from Global Settings.' : 'You must enter account-specific OAuth credentials below.';
+    }
+
+    function validateGoogleCustomerId() {
+        const val = $('accGoogleExternalId').value.trim();
+        const help = $('googleCustomerIdHelp');
+        const re = /^\d{3}-\d{3}-\d{4}$/;
+        if (!val) { help.textContent = 'Customer ID is required to connect Google Ads.'; help.style.color = 'var(--color-danger)'; return false; }
+        if (!re.test(val)) { help.textContent = 'Invalid format. Use 123-456-7890 (with dashes).'; help.style.color = 'var(--color-danger)'; return false; }
+        help.textContent = 'Valid Google Ads Customer ID format.'; help.style.color = 'var(--color-success)'; return true;
+    }
+
+    function validateMetaAccountId() {
+        const val = $('accMetaExternalId').value.trim();
+        if (!val) return true;
+        const re = /^act_\d+$/;
+        const help = $('metaAccountIdHelp');
+        if (!re.test(val)) { if (help) { help.textContent = 'Invalid format. Use act_123456789.'; help.style.color = 'var(--color-danger)'; } return false; }
+        if (help) { help.textContent = 'Valid Meta Ad Account ID format.'; help.style.color = 'var(--color-success)'; }
+        return true;
+    }
+
+    function validateGoogleAccountCreds() {
+        if ($('accGoogleUseGlobal').checked) return true;
+        const cid = $('accGoogleClientId').value.trim();
+        const secret = $('accGoogleClientSecret').value.trim();
+        const dev = $('accGoogleDeveloperToken').value.trim();
+        if (!cid || !secret || !dev) { toast('Enter Google Client ID, Client Secret, and Developer Token (or use global).', true); return false; }
+        return true;
+    }
+
+    function validateMetaAccountCreds() {
+        if ($('accMetaUseGlobal').checked) return true;
+        const appId = $('accMetaAppId').value.trim();
+        const secret = $('accMetaAppSecret').value.trim();
+        if (!appId || !secret) { toast('Enter Meta App ID and App Secret (or use global).', true); return false; }
+        return true;
+    }
+
+    function updateOAuthStatus(a) {
+        if (!a) {
+            $('googleOAuthStatus').innerHTML = '<svg class="icon-tiny" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg><span>Not connected via OAuth</span>';
+            $('googleOAuthStatus').className = 'oauth-status disconnected';
+            $('btnConnectGoogle').style.display = 'inline-flex';
+            $('btnDisconnectGoogle').style.display = 'none';
+            $('metaOAuthStatus').innerHTML = '<svg class="icon-tiny" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg><span>Not connected via OAuth</span>';
+            $('metaOAuthStatus').className = 'oauth-status disconnected';
+            $('btnConnectMeta').style.display = 'inline-flex';
+            $('btnDisconnectMeta').style.display = 'none';
+            return;
+        }
+        const googleConnected = a.google_credentials_masked;
+        $('googleOAuthStatus').className = 'oauth-status ' + (googleConnected ? 'connected' : 'disconnected');
+        $('googleOAuthStatus').innerHTML = (googleConnected ? '<svg class="icon-tiny" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg><span>Connected via OAuth</span>' : '<svg class="icon-tiny" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg><span>Not connected via OAuth</span>');
+        $('btnConnectGoogle').style.display = googleConnected ? 'none' : 'inline-flex';
+        $('btnDisconnectGoogle').style.display = googleConnected ? 'inline-flex' : 'none';
+
+        const metaConnected = a.meta_credentials_masked;
+        $('metaOAuthStatus').className = 'oauth-status ' + (metaConnected ? 'connected' : 'disconnected');
+        $('metaOAuthStatus').innerHTML = (metaConnected ? '<svg class="icon-tiny" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg><span>Connected via OAuth</span>' : '<svg class="icon-tiny" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg><span>Not connected via OAuth</span>');
+        $('btnConnectMeta').style.display = metaConnected ? 'none' : 'inline-flex';
+        $('btnDisconnectMeta').style.display = metaConnected ? 'inline-flex' : 'none';
+    }
+
+    async function saveAccount() {
+        const name = $('accName').value.trim();
+        if (!name) { toast('Client name is required', true); return; }
+        const hasGoogle = $('accHasGoogle').checked;
+        const hasMeta = $('accHasMeta').checked;
+        if (hasGoogle && !validateGoogleCustomerId()) { toast('Fix Google Customer ID format', true); return; }
+        if (hasMeta && !validateMetaAccountId()) { toast('Fix Meta Ad Account ID format', true); return; }
+        if (hasGoogle && !validateGoogleAccountCreds()) return;
+        if (hasMeta && !validateMetaAccountCreds()) return;
+        const payload = {
+            name,
+            group_id: $('accGroup').value ? parseInt($('accGroup').value) : null,
+            refresh_interval_minutes: parseInt($('accRefreshInterval').value) || 60,
+            audit_interval_minutes: parseInt($('accAuditInterval').value) || 0,
+            has_google: hasGoogle,
+            has_meta: hasMeta,
+            google_external_id: hasGoogle ? $('accGoogleExternalId').value.trim() : null,
+            meta_external_id: hasMeta ? $('accMetaExternalId').value.trim() : null,
+        };
+        if (!payload.has_google && !payload.has_meta) { toast('At least one platform must be enabled', true); return; }
+        if (!$('accGoogleUseGlobal').checked) {
+            payload.google_client_id = $('accGoogleClientId').value.trim() || null;
+            const secret = $('accGoogleClientSecret').value;
+            if (secret && !secret.startsWith('●●●●')) payload.google_client_secret = secret;
+            const dev = $('accGoogleDeveloperToken').value;
+            if (dev && !dev.startsWith('●●●●')) payload.google_developer_token = dev;
+            payload.redirect_base_url = 'http://127.0.0.1:8000';
+        } else {
+            payload.google_client_id = null;
+            payload.google_client_secret = null;
+            payload.google_developer_token = null;
+        }
+        if (!$('accMetaUseGlobal').checked) {
+            payload.meta_app_id = $('accMetaAppId').value.trim() || null;
+            const secret = $('accMetaAppSecret').value;
+            if (secret && !secret.startsWith('●●●●')) payload.meta_app_secret = secret;
+            payload.redirect_base_url = 'http://127.0.0.1:8000';
+        } else {
+            payload.meta_app_id = null;
+            payload.meta_app_secret = null;
+        }
+        try {
+            if (editingAccountId) {
+                await api('PUT', '/accounts/' + editingAccountId, payload);
+                toast('Account updated');
+            } else {
+                await api('POST', '/accounts', payload);
+                toast('Account created');
+            }
+            closeAddAccountModal();
+            loadAccounts();
+            loadSummary();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function deleteAccount(id) {
+        if (!confirm('Delete this account?')) return;
+        try {
+            await api('DELETE', '/accounts/' + id);
+            toast('Account deleted');
+            loadAccounts();
+            loadSummary();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function startOAuth(platform) {
+        if (!editingAccountId) { toast('Save the account first before connecting OAuth', true); return; }
+        try {
+            const data = await api('GET', '/oauth/' + platform + '/' + editingAccountId + '/connect');
+            if (data.authorization_url) window.location.href = data.authorization_url;
+            else toast('OAuth URL not returned', true);
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function disconnectOAuth(platform) {
+        if (!editingAccountId) return;
+        try {
+            await api('POST', '/oauth/' + platform + '/' + editingAccountId + '/disconnect');
+            toast('Disconnected ' + platform);
+            loadAccounts();
+            const a = allAccounts.find(x => x.id === editingAccountId);
+            if (a) { a[platform === 'google' ? 'google_credentials_masked' : 'meta_credentials_masked'] = false; a.is_live = false; updateOAuthStatus(a); }
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function handleOAuthParams() {
+        const url = new URL(window.location.href);
+        const success = url.searchParams.get('oauth_success');
+        const error = url.searchParams.get('oauth_error');
+        if (success) { toast('OAuth connected: ' + success); window.history.replaceState({}, '', '/'); }
+        if (error) { toast('OAuth error: ' + error, true); window.history.replaceState({}, '', '/'); }
+    }
+
+    // ---------- Groups ----------
+    function openAddGroupModal() { $('addGroupModal').classList.remove('hidden'); }
+    function closeAddGroupModal(e) {
+        if (e && e.target !== $('addGroupModal')) return;
+        $('addGroupModal').classList.add('hidden');
+    }
+    async function saveGroup() {
+        const name = $('groupName').value.trim();
+        if (!name) { toast('Group name required', true); return; }
+        try {
+            await api('POST', '/account-groups', { name });
+            toast('Group created');
+            closeAddGroupModal();
+            loadAccounts();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    // ---------- Approvals ----------
+    async function loadPendingActionsCount() {
+        try {
+            const data = await api('GET', '/pending-actions');
+            const count = (data || []).filter(x => x.status === 'pending').length;
+            $('pendingBadge').textContent = count;
+            $('pendingBadge').classList.toggle('hidden', count === 0);
+        } catch (e) {}
+    }
+
+    function actionTypeLabel(type) {
+        const labels = {
+            'ADD_NEGATIVE_KEYWORD': 'Add Negative Keyword',
+            'PAUSE_KEYWORD': 'Pause Keyword',
+            'REDUCE_BID': 'Reduce Bid',
+            'PAUSE_OR_REDUCE_BUDGET': 'Reduce / Pause Budget',
+            'FIX_LANDING_PAGE': 'Fix Landing Page',
+            'ALERT_SETUP_ISSUE': 'Setup Issue',
+            'ALERT_PERFORMANCE_ISSUE': 'Performance Alert',
+            'ALERT_KEYWORD_QUALITY': 'Keyword Quality',
+            'ALERT_KEYWORD_RELEVANCE': 'Keyword Relevance',
+            'REVIEW_ADSET': 'Review Ad Set',
+        };
+        return labels[type] || type;
+    }
+
+    function actionApplyHint(type) {
+        if (type === 'ADD_NEGATIVE_KEYWORD') return 'Auto-applies when approved.';
+        return 'Manual implementation required after approval.';
+    }
+
+    function actionSeverityClass(type) {
+        if (['FIX_LANDING_PAGE', 'PAUSE_OR_REDUCE_BUDGET', 'PAUSE_KEYWORD'].includes(type)) return 'flag-danger';
+        if (['ALERT_SETUP_ISSUE', 'ALERT_KEYWORD_QUALITY', 'ALERT_KEYWORD_RELEVANCE', 'REVIEW_ADSET'].includes(type)) return 'flag-warning';
+        if (['REDUCE_BID'].includes(type)) return 'flag-warning';
+        return 'flag-success';
+    }
+
+    async function loadPendingActions() {
+        try {
+            pendingActions = await api('GET', '/pending-actions');
+            const container = $('pendingActionsContainer');
+            if (!pendingActions.length) { container.innerHTML = '\u003cp style="color:var(--text-muted);"\u003eNo pending actions.\u003c/p\u003e'; return; }
+            container.innerHTML = '';
+            pendingActions.forEach(action => {
+                const el = document.createElement('div');
+                el.className = 'card';
+                el.style.marginBottom = '0.75rem';
+                const meta = [];
+                if (action.campaign_id) meta.push('Campaign: ' + action.campaign_id);
+                if (action.adset_id) meta.push('AdSet: ' + action.adset_id);
+                if (action.estimated_savings) meta.push('Est. savings: ' + formatMoney(action.estimated_savings));
+                el.innerHTML = `
+                    \u003cdiv style="display:flex; justify-content:space-between; align-items:flex-start;"\u003e
+                        \u003cdiv style="flex:1; min-width:0;"\u003e
+                            \u003cdiv style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;"\u003e
+                                \u003cdiv style="font-weight:700; font-size:0.95rem;"\u003e${escapeHtml(action.account_name)} \u0026mdash; ${escapeHtml(action.platform)}\u003c/div\u003e
+                                \u003cspan class="flag-tag ${actionSeverityClass(action.action_type)}"\u003e${actionTypeLabel(action.action_type)}\u003c/span\u003e
+                            \u003c/div\u003e
+                            \u003cdiv style="font-size:0.78rem; color:var(--text-muted); margin-top:0.2rem;"\u003e${action.keyword ? '\u003cstrong\u003e' + escapeHtml(action.keyword) + '\u003c/strong\u003e ' + (action.match_type ? '(' + escapeHtml(action.match_type) + ')' : '') : meta.join(' \u0026bull; ')}\u003c/div\u003e
+                            \u003cdiv style="font-size:0.78rem; color:var(--text-light); margin-top:0.3rem; max-width:600px;"\u003e${escapeHtml(action.reason || '')}\u003c/div\u003e
+                            \u003cdiv style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem; font-style:italic;"\u003e${actionApplyHint(action.action_type)}\u003c/div\u003e
+                        \u003c/div\u003e
+                        \u003cdiv style="display:flex; gap:0.5rem; margin-left:1rem;"\u003e
+                            \u003cbutton class="btn btn-success btn-sm" onclick="reviewAction(${action.id}, 'approve')"\u003e${ICONS.check} Approve\u003c/button\u003e
+                            \u003cbutton class="btn btn-danger btn-sm" onclick="reviewAction(${action.id}, 'reject')"\u003e${ICONS.x} Reject\u003c/button\u003e
+                        \u003c/div\u003e
+                    \u003c/div\u003e`;
+                container.appendChild(el);
+            });
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function reviewAction(id, decision) {
+        try {
+            await api('POST', '/pending-actions/' + id + '/review', { decision, reviewer: currentUser ? currentUser.email : 'admin' });
+            toast('Action ' + decision + 'd');
+            loadPendingActions();
+            loadPendingActionsCount();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function runGlobalAudit() {
+        try {
+            const result = await api('POST', '/audit-all' + dateParams());
+            toast('Audit complete. Actions: ' + (result.total_actions_generated || 0));
+            loadPendingActionsCount();
+            switchPanel('approvals');
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function runAccountAudit(id, platform) {
+        try {
+            const result = await api('POST', '/accounts/' + id + '/audit' + dateParams() + (dateParams() ? '&' : '?') + 'platform=' + platform);
+            toast('Audit: ' + (result.actions_generated || 0) + ' actions');
+            loadPendingActionsCount();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    // ---------- Settings ----------
+    async function loadSettings() {
+        try {
+            const cfg = await api('GET', '/config');
+            $('cfgGoogleClientId').value = cfg.google_client_id || '';
+            $('cfgGoogleClientSecret').value = cfg.google_client_secret || '';
+            $('cfgGoogleDeveloperToken').value = cfg.google_developer_token || '';
+            $('cfgMetaAppId').value = cfg.meta_app_id || '';
+            $('cfgMetaAppSecret').value = cfg.meta_app_secret || '';
+            $('cfgRedirectBaseUrl').value = cfg.redirect_base_url || 'http://127.0.0.1:8000';
+            $('globalAuditInterval').value = cfg.global_audit_interval_minutes || 60;
+            $('systemStatusBadge').innerHTML = (cfg.mock_mode ? '<span class="status-badge"><span class="status-dot"></span>Mock Mode</span>' : '<span class="status-badge live"><span class="status-dot"></span>Live Mode</span>');
+            loadNotificationSettings();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function saveOAuthConfig() {
+        try {
+            const current = await api('GET', '/config');
+            const cfg = {
+                google_client_id: $('cfgGoogleClientId').value.trim(),
+                google_client_secret: maskAware(current.google_client_secret, $('cfgGoogleClientSecret').value),
+                google_developer_token: maskAware(current.google_developer_token, $('cfgGoogleDeveloperToken').value),
+                meta_app_id: $('cfgMetaAppId').value.trim(),
+                meta_app_secret: maskAware(current.meta_app_secret, $('cfgMetaAppSecret').value),
+                redirect_base_url: $('cfgRedirectBaseUrl').value.trim() || 'http://127.0.0.1:8000',
+                mock_mode: current.mock_mode,
+                safe_mode: current.safe_mode,
+            };
+            await api('POST', '/config', cfg);
+            toast('OAuth credentials saved');
+            loadSettings();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function maskAware(current, val) {
+        if (!val) return '';
+        if (val.includes('●●●●')) return current || '';
+        return val;
+    }
+
+    async function saveGlobalSettings() {
+        try {
+            const current = await api('GET', '/config');
+            const cfg = {
+                refresh_interval_minutes: parseInt($('globalRefreshInterval').value) || 60,
+                global_audit_interval_minutes: parseInt($('globalAuditInterval').value) || 0,
+                mock_mode: current.mock_mode,
+                safe_mode: current.safe_mode,
+            };
+            await api('POST', '/config', cfg);
+            toast('Global settings saved');
+        } catch (e) { toast(e.message, true); }
+    }
+
+    // ---------- Notifications ----------
+    async function loadNotificationSettings() {
+        try {
+            const settings = await api('GET', '/notification-settings');
+            const container = $('notificationsContainer');
+            container.innerHTML = '';
+            const channels = ['email', 'whatsapp'];
+            channels.forEach(channel => {
+                const s = settings.find(x => x.channel === channel) || {};
+                const cfg = s.config || {};
+                const el = document.createElement('div');
+                el.className = 'oauth-section';
+                el.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                        <strong style="text-transform:capitalize;">${channel}</strong>
+                        <label class="toggle"><input type="checkbox" id="notif_${channel}_enabled" ${s.enabled ? 'checked' : ''} onchange="toggleNotification('${channel}')"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Provider</label><input type="text" id="notif_${channel}_provider" value="${escapeHtml(cfg.provider || s.provider || '')}" placeholder="e.g. smtp / twilio"></div>
+                        <div class="form-group"><label>Recipient</label><input type="text" id="notif_${channel}_recipient" value="${escapeHtml(cfg.recipient || '')}" placeholder="email / phone"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Config JSON</label><textarea id="notif_${channel}_config" rows="2" placeholder='{"smtp_host":"..."}'>${escapeHtml(JSON.stringify(cfg, null, 2))}</textarea></div>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                        <button class="btn btn-primary btn-sm" onclick="saveNotificationSetting('${channel}')">Save</button>
+                        <button class="btn btn-secondary btn-sm" onclick="testNotification('${channel}')">Test</button>
+                    </div>`;
+                container.appendChild(el);
+            });
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function toggleNotification(channel) {
+        const enabled = $('notif_' + channel + '_enabled').checked;
+        try {
+            await api('PUT', '/notification-settings/' + channel, { enabled });
+            toast(channel + ' ' + (enabled ? 'enabled' : 'disabled'));
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function saveNotificationSetting(channel) {
+        const provider = $('notif_' + channel + '_provider').value.trim();
+        const recipient = $('notif_' + channel + '_recipient').value.trim();
+        let config = {};
+        try {
+            const raw = $('notif_' + channel + '_config').value.trim();
+            if (raw) config = JSON.parse(raw);
+        } catch (e) { toast('Invalid JSON config', true); return; }
+        if (recipient) config.recipient = recipient;
+        if (provider) config.provider = provider;
+        try {
+            await api('PUT', '/notification-settings/' + channel, { provider, config });
+            toast(channel + ' settings saved');
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function testNotification(channel) {
+        try {
+            await api('POST', '/notification-settings/' + channel + '/test');
+            toast('Test ' + channel + ' sent');
+            loadNotificationLogs();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function loadNotificationLogs() {
+        try {
+            const logs = await api('GET', '/notification-logs');
+            const container = $('notificationLogsContainer');
+            if (!logs.length) { container.innerHTML = '<p style="color:var(--text-muted);">No notification logs.</p>'; return; }
+            let html = '<table><thead><tr><th>Time</th><th>Channel</th><th>Event</th><th>Subject</th><th>Status</th></tr></thead><tbody>';
+            logs.forEach(l => {
+                html += `<tr><td>${formatDate(l.created_at)}</td><td>${escapeHtml(l.channel)}</td><td>${escapeHtml(l.event_type)}</td><td>${escapeHtml(l.subject || '')}</td><td><span class="flag-tag ${l.status === 'sent' ? 'flag-success' : 'flag-danger'}">${escapeHtml(l.status)}</span></td></tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function escapeHtml(str) {
+        if (str === undefined || str === null) return '';
+        return String(str).replace(/[&<>"']/g, function(m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]); });
+    }
+
+    window.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
+</body>
+</html>
