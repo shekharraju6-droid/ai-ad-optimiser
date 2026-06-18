@@ -1,0 +1,51 @@
+# Environment variables and secrets
+.env
+.env.*
+.env.local
+.env.production
+
+# OAuth / API credentials
+config.json
+config.jsonc
+*.credentials.json
+client_secret*.json
+google-ads*.yaml
+adsapi*.pb
+
+# Local tokens and keys
+*.tmp_token.txt
+*.token
+*.key
+*.pem
+*.p12
+*.pfx
+*.secret
+
+# Databases and logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.bak
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Node / Frontend
+node_modules/
+*.lock
