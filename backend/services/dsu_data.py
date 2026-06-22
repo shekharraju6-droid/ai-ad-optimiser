@@ -17,7 +17,7 @@ logger = logging.getLogger("AdOptima")
 # Cache for LSQ lead counts (keyed by "start_date_end_date")
 _LSQ_CACHE: Dict[str, Dict[str, int]] = {}
 _LSQ_CACHE_TIME: Dict[str, float] = {}
-_LSQ_CACHE_TTL = 3600  # 1 hour in seconds
+_LSQ_CACHE_TTL = 1800  # 30 minutes in seconds
 
 # Course list as shown in DSU Table 1
 DSU_COURSES = [

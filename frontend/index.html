@@ -91,24 +91,24 @@
         .group-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; }
         .accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
 
-        .account-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; cursor: pointer; transition: 0.15s; position: relative; background: white; }
+        .account-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 0.75rem; cursor: pointer; transition: 0.15s; position: relative; background: white; }
         .account-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-2px); border-color: var(--color-primary); }
         .account-card.status-healthy { border-left: 4px solid var(--color-success); }
         .account-card.status-warning { border-left: 4px solid var(--color-warning); }
         .account-card.status-critical { border-left: 4px solid var(--color-danger); }
         .account-card.status-disconnected { border-left: 4px solid var(--text-light); }
-        .account-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+        .account-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
         .account-name { font-weight: 700; font-size: 0.95rem; }
         .account-type { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.2rem 0.45rem; border-radius: 4px; background: var(--bg-base); color: var(--text-muted); }
         .account-type.google, .account-type.Google { background: rgba(66,133,244,0.1); color: #4285f4; }
         .account-type.meta, .account-type.Meta { background: rgba(24,119,242,0.1); color: #1877f2; }
         .account-type.both, .account-type.Both { background: rgba(15,23,42,0.08); color: #0f172a; }
 
-        .account-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; margin-bottom: 0.75rem; }
-        .metric { background: var(--bg-sidebar); border-radius: 8px; padding: 0.55rem; }
+        .account-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-bottom: 0.4rem; }
+        .metric { background: var(--bg-sidebar); border-radius: 8px; padding: 0.4rem 0.5rem; }
         .metric-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
-        .metric-value { font-size: 0.95rem; font-weight: 700; margin-top: 0.15rem; }
-        .account-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); }
+        .metric-value { font-size: 0.9rem; font-weight: 700; margin-top: 0.1rem; }
+        .account-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--border-color); }
         .last-sync { font-size: 0.72rem; color: var(--text-light); }
         .refresh-mini { background: transparent; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.3rem; cursor: pointer; color: var(--text-muted); }
         .refresh-mini:hover { color: var(--color-primary); border-color: var(--color-primary); }
@@ -821,9 +821,14 @@
                 <div class="metric"><div class="metric-label">CTR</div><div class="metric-value">${formatPct(a.ctr)}</div></div>
                 <div class="metric"><div class="metric-label">CPA</div><div class="metric-value">${formatMoney(a.cpa)}</div></div>
             </div>
-            <div style="display:flex; align-items:center; gap:0.5rem; margin:0.5rem 0;">
-                <span class="perf-badge perf-${perf.class}">${perf.label}</span>
-                ${isLive ? '<span class="leads-badge" id="leads-' + a.id + '" style="font-size:0.72rem;font-weight:600;color:var(--color-secondary);background:rgba(8,145,178,0.08);padding:0.25rem 0.5rem;border-radius:4px;">Leads: ...</span>' : ''}
+            <div style="display:flex; align-items:stretch; gap:0.4rem; margin-bottom:0.4rem;">
+                <div class="metric" style="flex:1;">
+                    <div class="metric-label">Leads</div>
+                    <div class="metric-value" id="leads-${a.id}">${isLive ? '...' : '0'}</div>
+                </div>
+                <div style="display:flex; align-items:center;">
+                    <span class="perf-badge perf-${perf.class}">${perf.label}</span>
+                </div>
             </div>
             <div class="account-footer">
                 <span class="last-sync">${isLive ? '<span class="status-badge live"><span class="status-dot"></span>Live</span>' : '<span class="status-badge"><span class="status-dot"></span>Not Connected</span>'} &nbsp; Sync: ${formatDate(a.last_sync_at)}</span>
@@ -840,7 +845,7 @@
         try {
             const data = await api('GET', '/accounts/' + accountId + '/leads' + dateParams());
             const el = document.getElementById('leads-' + accountId);
-            if (el) el.textContent = 'Leads: ' + formatNum(data.leads);
+            if (el) el.textContent = formatNum(data.leads);
         } catch (e) {
             const el = document.getElementById('leads-' + accountId);
             if (el) el.textContent = 'Leads: -';
