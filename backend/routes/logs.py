@@ -1,15 +1,19 @@
-from fastapi import APIRouter
-from backend.services.mock_db import mock_db
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from backend.db.database import get_db
+from backend.db.models import PendingAction
 
 router = APIRouter(prefix="/api", tags=["logs"])
 
 
 @router.get("/logs")
-def get_logs():
-    return mock_db.action_logs
-
-
-@router.post("/reset-mock")
-def reset_mock():
-    mock_db.reset()
-    return {"status": "success", "message": "Mock database reset successfully."}
+def get_logs(db: Session = Depends(get_db)):
+    actions = db.query(PendingAction).order_by(PendingAction.id.desc()).limit(200).all()
+    return [
+        {
+            "time": (a.created_at.isoformat() if a.created_at else None),
+            "type": "OPTIMIZATION",
+            "message": f"{a.action_type} for {a.account.name if a.account else 'Unknown'} - {a.keyword or a.campaign_id or a.adset_id or 'n/a'} [{a.status}]",
+        }
+        for a in actions
+    ]

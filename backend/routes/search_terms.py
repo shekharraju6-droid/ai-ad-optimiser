@@ -2,7 +2,6 @@ from typing import Optional
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from backend.services.config import load_config
-from backend.services.mock_db import mock_db
 from backend.services.google_ads import GoogleAdsApiClient
 
 router = APIRouter(prefix="/api", tags=["search-terms"])
@@ -62,9 +61,6 @@ def _format_search_term_row(row):
 @router.get("/search-terms")
 def get_search_terms(campaign_id: Optional[str] = None):
     config = load_config()
-    if config.get("mock_mode", True):
-        return mock_db.get_filtered_search_terms(campaign_id)
-
     client = GoogleAdsApiClient(config)
     if not client.is_valid:
         return JSONResponse(status_code=400, content={"error": "Google Ads API credentials not configured."})

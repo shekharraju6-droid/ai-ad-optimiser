@@ -49,6 +49,9 @@ class AccountUpdate(BaseModel):
     meta_app_id: Optional[str] = None
     meta_app_secret: Optional[str] = None
     redirect_base_url: Optional[str] = None
+    lsq_access_key: Optional[str] = None
+    lsq_secret_key: Optional[str] = None
+    lsq_base_url: Optional[str] = None
 
 
 class GroupCreate(BaseModel):
@@ -63,18 +66,18 @@ def list_accounts(db: Session = Depends(get_db)):
 
 @router.get("/accounts/summary")
 def dashboard_summary(start_date: Optional[str] = None, end_date: Optional[str] = None, db: Session = Depends(get_db)):
-    """Grouped dashboard summary across all accounts. Optionally filtered by date range."""
+    """Grouped dashboard summary across all accounts. Optionally filtered by date range.
+    Only live accounts (DSU, DSI) contribute to totals and tile metrics; non-live accounts show zeros."""
     accounts = db.query(Account).filter(Account.is_active == True).all()
     groups = db.query(AccountGroup).all()
 
-    # For now, account-level cached metrics are not date-filtered. Date range is passed through
-    # for live connectors and audit context. A future reporting layer will store daily metrics.
+    live_accounts = [a for a in accounts if a.is_live]
     result = {
         "total_accounts": len(accounts),
-        "total_spend": sum(a.spend for a in accounts),
-        "total_conversions": sum(a.conversions for a in accounts),
-        "total_clicks": sum(a.clicks for a in accounts),
-        "total_impressions": sum(a.impressions for a in accounts),
+        "total_spend": sum(a.spend for a in live_accounts),
+        "total_conversions": sum(a.conversions for a in live_accounts),
+        "total_clicks": sum(a.clicks for a in live_accounts),
+        "total_impressions": sum(a.impressions for a in live_accounts),
         "start_date": start_date,
         "end_date": end_date,
         "groups": [],
@@ -87,6 +90,16 @@ def dashboard_summary(start_date: Optional[str] = None, end_date: Optional[str] 
     ungrouped = []
     for a in accounts:
         d = a.to_dict()
+        # Zero out metrics for non-live accounts so dashboard only shows real data
+        if not a.is_live:
+            d["spend"] = 0.0
+            d["conversions"] = 0.0
+            d["clicks"] = 0.0
+            d["impressions"] = 0.0
+            d["ctr"] = 0.0
+            d["cpa"] = 0.0
+            d["budget"] = 0.0
+            d["budget_used_pct"] = 0.0
         for platform in ["google", "meta"]:
             if (platform == "google" and not a.has_google) or (platform == "meta" and not a.has_meta):
                 continue
@@ -188,6 +201,13 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
     if req.redirect_base_url is not None:
         account.redirect_base_url = req.redirect_base_url or None
 
+    if req.lsq_access_key is not None:
+        account.lsq_access_key = req.lsq_access_key or None
+    if req.lsq_secret_key is not None:
+        account.lsq_secret_key = req.lsq_secret_key or None
+    if req.lsq_base_url is not None:
+        account.lsq_base_url = req.lsq_base_url or None
+
     # Keep legacy fields in sync
     if account.has_google and account.has_meta:
         account.account_type = AccountType.BOTH
@@ -269,8 +289,6 @@ def refresh_account(account_id: int, start_date: Optional[str] = None, end_date:
             account.last_sync_error = "Invalid credentials or connector not configured"
             account.status = AccountStatus.DISCONNECTED
 
-    # Fallback to mock data
-    refresh_account_internal(account)
     db.commit()
     db.refresh(account)
     data = account.to_dict()
@@ -284,6 +302,16 @@ def get_account(account_id: int, start_date: Optional[str] = None, end_date: Opt
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     data = account.to_dict()
+    # Zero out metrics for non-live accounts
+    if not account.is_live:
+        data["spend"] = 0.0
+        data["conversions"] = 0.0
+        data["clicks"] = 0.0
+        data["impressions"] = 0.0
+        data["ctr"] = 0.0
+        data["cpa"] = 0.0
+        data["budget"] = 0.0
+        data["budget_used_pct"] = 0.0
     data["start_date"] = start_date
     data["end_date"] = end_date
     data["platform"] = platform
@@ -294,6 +322,30 @@ def get_account(account_id: int, start_date: Optional[str] = None, end_date: Opt
 def list_groups(db: Session = Depends(get_db)):
     groups = db.query(AccountGroup).all()
     return [{"id": g.id, "name": g.name} for g in groups]
+
+
+@router.get("/accounts/{account_id}/leads")
+def get_account_leads(account_id: int, start_date: Optional[str] = None, end_date: Optional[str] = None, db: Session = Depends(get_db)):
+    """Fetch lead count from LeadSquared for a live account (DSU/DSI). Returns 0 for non-live accounts."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if not account.is_live:
+        return {"account_id": account_id, "leads": 0, "source": "leadsquared"}
+
+    from datetime import datetime, timedelta
+    if not end_date:
+        end_date = (datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d")
+    if not start_date:
+        start_date = end_date
+
+    try:
+        from backend.services.dsu_data import _fetch_lsq_leads
+        course_leads = _fetch_lsq_leads(start_date, end_date, account_id=account_id)
+        total = sum(course_leads.values())
+        return {"account_id": account_id, "leads": total, "source": "leadsquared", "by_course": course_leads}
+    except Exception as e:
+        return {"account_id": account_id, "leads": 0, "source": "leadsquared", "error": str(e)}
 
 
 @router.post("/account-groups")
@@ -307,70 +359,5 @@ def create_group(req: GroupCreate, db: Session = Depends(get_db)):
 
 @router.post("/seed-demo-accounts")
 def seed_demo_accounts(db: Session = Depends(get_db)):
-    """Seed demo accounts if none exist."""
-    if db.query(Account).first():
-        return {"status": "skipped", "message": "Accounts already exist"}
-
-    groups = ["Education", "E-Commerce", "SaaS", "Real Estate"]
-    group_objs = {}
-    for g in groups:
-        grp = AccountGroup(name=g)
-        db.add(grp)
-        db.flush()
-        group_objs[g] = grp.id
-
-    demo_accounts = [
-        {"name": "BBA Brand - Google", "type": "google", "external_id": "123-456-7890", "group": "Education"},
-        {"name": "BBA Brand - Meta", "type": "meta", "external_id": "act_123456789", "group": "Education"},
-        {"name": "MBA Lead Gen - Google", "type": "google", "external_id": "123-456-7891", "group": "Education"},
-        {"name": "Shoes Store - Meta", "type": "meta", "external_id": "act_987654321", "group": "E-Commerce"},
-        {"name": "SaaS Platform - Google", "type": "google", "external_id": "456-789-0123", "group": "SaaS"},
-        {"name": "CRM Campaign - Meta", "type": "meta", "external_id": "act_555666777", "group": "SaaS"},
-    ]
-
-    for da in demo_accounts:
-        acc = Account(
-            name=da["name"],
-            account_type=AccountType(da["type"]),
-            external_id=da["external_id"],
-            group_id=group_objs.get(da["group"]),
-            currency="INR",
-            status=AccountStatus.DISCONNECTED,
-        )
-        db.add(acc)
-    db.commit()
-
-    # Refresh all to generate initial mock metrics
-    for acc in db.query(Account).all():
-        refresh_account_internal(acc)
-    db.commit()
-
-    return {"status": "success", "accounts_added": len(demo_accounts)}
-
-
-def refresh_account_internal(account: Account):
-    import random, datetime
-    spend = random.randint(5000, 150000)
-    conversions = random.randint(5, 300)
-    clicks = random.randint(200, 5000)
-    impressions = clicks * random.randint(20, 80)
-    budget = spend * random.uniform(1.1, 1.5)
-    ctr = (clicks / impressions) * 100 if impressions else 0.0
-    cpa = spend / conversions if conversions else 0.0
-
-    account.spend = round(spend, 2)
-    account.conversions = conversions
-    account.clicks = clicks
-    account.impressions = impressions
-    account.ctr = round(ctr, 2)
-    account.cpa = round(cpa, 2)
-    account.budget = round(budget, 2)
-    account.budget_used_pct = round((spend / budget) * 100, 2) if budget else 0.0
-    account.last_sync_at = datetime.datetime.utcnow()
-
-    if account.budget_used_pct > 90:
-        account.status = AccountStatus.CRITICAL
-    elif account.budget_used_pct > 70:
-        account.status = AccountStatus.WARNING
-    else:
-        account.status = AccountStatus.HEALTHY
+    """Seed demo accounts if none exist. Deprecated — disabled."""
+    return {"status": "skipped", "message": "Demo account seeding is disabled. Create accounts manually."}

@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 from backend.db.database import SessionLocal
 from backend.db.models import Account, AccountType, PendingAction
 from backend.services.connectors import get_connector
-from backend.services.mock_campaign_data import generate_google_mock_data, generate_meta_mock_data, NEGATIVE_INTENT_WORDS
+
+NEGATIVE_INTENT_WORDS = [
+    "free", "job", "jobs", "salary", "download", "tutorial", "tutorials",
+    "crack", "what is", "how to", "definition", "ppt", "pdf", "question paper",
+    "question papers", "time table", "syllabus", "notes",
+]
 
 logger = logging.getLogger("AdOptima")
 
@@ -89,7 +94,7 @@ def _resolve_platform(account: Account, platform: Optional[str]) -> Optional[str
 # ------------------------ Google Ads audit ------------------------
 
 def _audit_google(account: Account, db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[PendingAction]:
-    """Full Google Ads audit with mock or live data."""
+    """Full Google Ads audit using live data only."""
     platform_live = account.google_is_live
     campaigns, keywords, search_terms = [], [], []
     if platform_live:
@@ -98,15 +103,8 @@ def _audit_google(account: Account, db: Session, start_date: Optional[str] = Non
             if connector and connector.is_valid:
                 campaigns = connector.fetch_campaigns()
                 search_terms = connector.fetch_search_terms()
-                # TODO: add keyword fetch when live
         except Exception as e:
-            logger.warning(f"Live Google connector failed for account {account.id}, falling back to mock: {e}")
-
-    if not campaigns:
-        data = generate_google_mock_data(account.name, account.google_external_id or account.external_id or "")
-        campaigns = data["campaigns"]
-        keywords = data["keywords"]
-        search_terms = data["search_terms"]
+            logger.warning(f"Live Google connector failed for account {account.id}: {e}")
 
     new_actions = []
 
@@ -380,15 +378,14 @@ def _audit_search_term(account: Account, term: Dict[str, Any]) -> Optional[Pendi
 # ------------------------ Meta Ads audit ------------------------
 
 def _audit_meta(account: Account, db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[PendingAction]:
-    """Meta Ads audit with mock or live data."""
+    """Meta Ads audit using live data only."""
     platform_live = account.meta_is_live
+    campaigns, adsets, ads = [], [], []
     if platform_live:
-        campaigns, adsets, ads = [], [], []  # TODO: live Meta fetch
-    else:
-        data = generate_meta_mock_data(account.name, account.meta_external_id or account.external_id or "")
-        campaigns = data["campaigns"]
-        adsets = data["adsets"]
-        ads = data["ads"]
+        connector = get_connector(account, platform="meta", start_date=start_date, end_date=end_date)
+        if connector and connector.is_valid:
+            campaigns = connector.fetch_campaigns()
+            # TODO: fetch adsets + ads when live Meta support is added
 
     new_actions = []
 
@@ -525,8 +522,7 @@ def review_action(action_id: int, decision: str, reviewer: str = "admin") -> Dic
 
 
 def _apply_action(action: PendingAction, db: Session) -> Dict[str, Any]:
-    """Apply an approved action to the live or mock platform."""
-    from backend.services.mock_db import mock_db
+    """Apply an approved action to the live platform."""
     account = db.query(Account).filter(Account.id == action.account_id).first()
     if not account:
         return {"success": False, "error": "Account not found"}
@@ -542,12 +538,7 @@ def _apply_action(action: PendingAction, db: Session) -> Dict[str, Any]:
                         action.match_type or "EXACT",
                     )
                 return {"success": False, "error": "Live Google connector not valid"}
-            else:
-                return mock_db.add_negative_keyword(
-                    action.campaign_id or "104",
-                    action.keyword or "",
-                    action.match_type or "EXACT",
-                )
+            return {"success": False, "error": "Account is not live; cannot apply action"}
 
         if action.action_type in ("PAUSE_OR_REDUCE_BUDGET", "REDUCE_BID", "PAUSE_KEYWORD", "FIX_LANDING_PAGE", "ALERT_SETUP_ISSUE", "ALERT_PERFORMANCE_ISSUE", "ALERT_KEYWORD_QUALITY", "ALERT_KEYWORD_RELEVANCE"):
             return {"success": True, "message": "Action logged for manual implementation"}

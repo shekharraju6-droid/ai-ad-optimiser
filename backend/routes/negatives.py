@@ -3,7 +3,6 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from backend.services.config import load_config
-from backend.services.mock_db import mock_db
 from backend.services.google_ads import GoogleAdsApiClient
 
 router = APIRouter(prefix="/api", tags=["negatives"])
@@ -18,16 +17,6 @@ class AddNegativeRequest(BaseModel):
 @router.get("/negative-keywords")
 def get_negative_keywords(campaign_id: Optional[str] = None):
     config = load_config()
-    if config.get("mock_mode", True):
-        if campaign_id:
-            return mock_db.negatives.get(campaign_id, [])
-        all_negatives = []
-        for c_id, negs in mock_db.negatives.items():
-            c_name = next((c["name"] for c in mock_db.campaigns if c["id"] == c_id), "Unknown")
-            for n in negs:
-                all_negatives.append({"campaign_id": c_id, "campaign_name": c_name, **n})
-        return all_negatives
-
     client = GoogleAdsApiClient(config)
     if not client.is_valid:
         return JSONResponse(status_code=400, content={"error": "Google Ads API credentials not configured."})
@@ -65,12 +54,6 @@ def get_negative_keywords(campaign_id: Optional[str] = None):
 @router.post("/negative-keywords")
 def add_negative_keyword(req: AddNegativeRequest):
     config = load_config()
-    if config.get("mock_mode", True):
-        res = mock_db.add_negative_keyword(req.campaign_id, req.keyword, req.match_type)
-        if not res["success"]:
-            raise HTTPException(status_code=400, detail=res["message"])
-        return res
-
     client = GoogleAdsApiClient(config)
     if not client.is_valid:
         raise HTTPException(status_code=400, detail="Google Ads API client not configured.")

@@ -5,10 +5,11 @@ FastAPI application entry point.
 import os
 import logging
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routes import config, campaigns, search_terms, negatives, optimizations, logs, chat, auth, reports, accounts, audits, notifications, oauth
+from backend.routes import config, campaigns, search_terms, negatives, optimizations, logs, chat, auth, reports, accounts, audits, notifications, oauth, crm, revenueops, dsu_report
+
 from backend.db.database import init_db
 from backend.services.scheduler import start_scheduler, stop_scheduler
 
@@ -39,6 +40,10 @@ app.include_router(reports.router)
 app.include_router(audits.router)
 app.include_router(notifications.router)
 app.include_router(oauth.router)
+app.include_router(crm.router)
+app.include_router(dsu_report.router)
+app.include_router(revenueops.router)
+
 
 # Initialize database tables and scheduler
 init_db()
@@ -46,13 +51,53 @@ start_scheduler()
 
 
 @app.get("/", response_class=HTMLResponse)
+def get_landing(request: Request):
+    frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+    html_path = os.path.join(frontend_dir, "landing.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>ChlearSakhaaOps AI landing page not found.</h1>")
+
+
+@app.get("/adpulse", response_class=HTMLResponse)
 def get_ui(request: Request):
     frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
     html_path = os.path.join(frontend_dir, "index.html")
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>Frontend UI not found.</h1>")
+    return HTMLResponse(content="<h1>AdPulse UI not found.</h1>")
+
+
+@app.get("/insightdesk", response_class=HTMLResponse)
+def get_mis_ui(request: Request):
+    frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+    html_path = os.path.join(frontend_dir, "mis.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>InsightDesk UI not found.</h1>")
+
+
+@app.get("/revenueops", response_class=HTMLResponse)
+def get_revenueops_ui(request: Request):
+    frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+    html_path = os.path.join(frontend_dir, "revenueops.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>RevenueOps UI not found.</h1>")
+
+
+@app.get("/integrations", response_class=HTMLResponse)
+def get_integrations_ui(request: Request):
+    frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+    html_path = os.path.join(frontend_dir, "integrations.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Integrations UI not found.</h1>")
 
 
 if __name__ == "__main__":

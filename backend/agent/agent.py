@@ -7,7 +7,6 @@ import re
 import logging
 from typing import Dict, Any, List, Optional
 from backend.services.config import load_config
-from backend.services.mock_db import mock_db
 from backend.services.recommendations import build_audit_summary
 from backend.services.google_ads import GoogleAdsApiClient
 
@@ -55,15 +54,11 @@ def _run_gemini_agent(message: str, history: List[Dict[str, str]]) -> Dict[str, 
 
     def tool_list_campaigns() -> str:
         """List all Google Ads campaigns with spend, conversions, CPA, CTR, and status."""
-        if config.get("mock_mode", True):
-            return json.dumps(mock_db.campaigns)
         client = GoogleAdsApiClient(config)
         return json.dumps([_format_campaign_row(r) for r in client.run_gaql(_CAMPAIGN_QUERY)])
 
     def tool_list_search_terms(campaign_id: Optional[str] = None) -> str:
         """List search terms with cost, clicks, conversions, CTR, and flags."""
-        if config.get("mock_mode", True):
-            return json.dumps(mock_db.get_filtered_search_terms(campaign_id))
         client = GoogleAdsApiClient(config)
         query = _SEARCH_TERM_QUERY
         if campaign_id:
@@ -72,8 +67,6 @@ def _run_gemini_agent(message: str, history: List[Dict[str, str]]) -> Dict[str, 
 
     def tool_add_negative_keyword(campaign_id: str, keyword: str, match_type: str = "EXACT") -> str:
         """Add a negative keyword to a campaign. Match type must be EXACT, PHRASE, or BROAD."""
-        if config.get("mock_mode", True):
-            return json.dumps(mock_db.add_negative_keyword(campaign_id, keyword, match_type))
         client = GoogleAdsApiClient(config)
         return json.dumps(client.add_negative_keyword(campaign_id, keyword, match_type))
 
@@ -159,7 +152,14 @@ def _run_local_agent(message: str) -> Dict[str, Any]:
     # 2. List campaigns
     if any(k in lower for k in ["campaign", "show campaigns", "list campaigns"]):
         logs.append("🧠 Intent detected: LIST_CAMPAIGNS")
-        camps = mock_db.campaigns
+        config = load_config()
+        client = GoogleAdsApiClient(config)
+        camps = []
+        if client.is_valid:
+            try:
+                camps = [_format_campaign_row(r) for r in client.run_gaql(_CAMPAIGN_QUERY)]
+            except Exception as e:
+                logger.error(f"Agent: live campaigns query failed: {e}")
         reply = "### Google Ads Campaigns\n\n"
         for c in camps:
             reply += f"- **{c['name']}** (ID `{c['id']}`): Spend **${c['spend']:.2f}** | Clicks **{c['clicks']}** | Conversions **{c['conversions']}** | CPA **${c['cpa']:.2f}**\n"
@@ -208,14 +208,17 @@ def _run_local_agent(message: str) -> Dict[str, Any]:
             }
 
         logs.append(f"⚙️ Tool Invoked: add_negative_keyword(campaign_id={campaign_id}, keyword='{extracted}', match_type={match_type})")
-        res = mock_db.add_negative_keyword(campaign_id, extracted, match_type)
-        if not res["success"]:
-            return {"response": f"Could not add negative keyword: {res['message']}", "thoughts": thoughts, "logs": logs, "actions": actions}
+        config = load_config()
+        client = GoogleAdsApiClient(config)
+        try:
+            res = client.add_negative_keyword(campaign_id, extracted, match_type)
+        except Exception as e:
+            return {"response": f"Could not add negative keyword: {e}", "thoughts": thoughts, "logs": logs, "actions": actions}
 
-        c_name = next((c["name"] for c in mock_db.campaigns if c["id"] == campaign_id), "Campaign")
+        c_name = campaign_id
         actions.append({"type": "ADD_NEGATIVE", "campaign_id": campaign_id, "keyword": extracted, "match_type": match_type})
         reply = (
-            f"✅ Added negative keyword **\"{extracted}\"** ({match_type}) to **{c_name}**.\n\n"
+            f"✅ Added negative keyword **\"{extracted}\"** ({match_type}) to campaign **{c_name}**.\n\n"
             f"Future ad spend on this query has been halted."
         )
         return {"response": reply, "thoughts": thoughts, "logs": logs, "actions": actions}
@@ -226,13 +229,18 @@ def _run_local_agent(message: str) -> Dict[str, Any]:
         audit = build_audit_summary()
         applied = 0
         applied_items = []
+        config = load_config()
+        client = GoogleAdsApiClient(config)
         for rec in audit["recommendations"][:10]:
-            if rec["type"] == "ADD_NEGATIVE_KEYWORD":
-                res = mock_db.add_negative_keyword(rec["campaign_id"], rec["keyword"], rec["match_type"])
-                if res["success"]:
-                    applied += 1
-                    applied_items.append(f"\"{rec['keyword']}\" → {rec['campaign_name']}")
-                    actions.append({"type": "ADD_NEGATIVE", "campaign_id": rec["campaign_id"], "keyword": rec["keyword"], "match_type": rec["match_type"]})
+            if rec["type"] == "ADD_NEGATIVE_KEYWORD" and client.is_valid:
+                try:
+                    res = client.add_negative_keyword(rec["campaign_id"], rec["keyword"], rec["match_type"])
+                    if res.get("success"):
+                        applied += 1
+                        applied_items.append(f"\"{rec['keyword']}\" → {rec['campaign_name']}")
+                        actions.append({"type": "ADD_NEGATIVE", "campaign_id": rec["campaign_id"], "keyword": rec["keyword"], "match_type": rec["match_type"]})
+                except Exception as e:
+                    logger.error(f"Agent apply failed for '{rec['keyword']}': {e}")
         if applied == 0:
             reply = "I found no pending negative keyword recommendations to apply automatically. Run an audit first."
         else:

@@ -1,0 +1,1090 @@
+"""
+RevenueOps API routes: clients, billing models, invoices, payments,
+documents, reminders, followup notes, audit logs, dashboard, reports, settings, RBAC.
+"""
+import json
+from datetime import datetime, date
+from typing import Optional, List
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from sqlalchemy import func, and_, or_
+
+from backend.db.database import get_db
+from backend.db.models import User
+from backend.db.revenueops_models import (
+    RevClient, RevClientStatus, ClientBillingModel, BillingModelType, BillingFrequency,
+    RevInvoice, InvoiceStatus, PaymentStatus, PaymentMode,
+    RevPayment, RevDocument, DocType,
+    RevReminder, ReminderType, ReminderPriority, ReminderStatus,
+    FollowupNote, AuditLog, RevSetting, RevRole,
+)
+from backend.routes.auth import get_current_user_required
+
+router = APIRouter(prefix="/api/revenueops", tags=["revenueops"])
+
+
+def _audit(db: Session, user_id: int, action: str, entity_type: str, entity_id: int = None, old_val: str = None, new_val: str = None):
+    log = AuditLog(user_id=user_id, action=action, entity_type=entity_type, entity_id=entity_id, old_value=old_val, new_value=new_val)
+    db.add(log)
+    db.commit()
+
+
+def _check_rev_role(user: User, allowed_roles: list):
+    if user.role in ("admin", "superadmin"):
+        return True
+    if user.rev_role in allowed_roles:
+        return True
+    raise HTTPException(status_code=403, detail=f"Access denied. Required role: {allowed_roles}")
+
+
+def _bm_client_filter(query, user: User):
+    if user.role in ("admin", "superadmin"):
+        return query
+    if user.rev_role == "business_manager":
+        return query.filter(RevClient.business_manager_id == user.id)
+    return query
+
+
+def _bm_filter(query, user: User, bm_col):
+    if user.role in ("admin", "superadmin"):
+        return query
+    if user.rev_role == "business_manager":
+        return query.filter(bm_col == user.id)
+    return query
+
+
+def _generate_invoice_reminders(inv: RevInvoice, db: Session):
+    """Auto-create due-date reminders for an invoice."""
+    if not inv.due_date or inv.invoice_status in (InvoiceStatus.CANCELLED.value, InvoiceStatus.PAID.value):
+        return
+    try:
+        due = datetime.strptime(inv.due_date, "%Y-%m-%d").date()
+    except Exception:
+        return
+    today = date.today()
+    # Remove existing auto-generated reminders for this invoice
+    db.query(RevReminder).filter(
+        RevReminder.invoice_id == inv.id,
+        RevReminder.auto_generated == True,
+        RevReminder.reminder_status != ReminderStatus.DONE.value,
+    ).delete()
+    due_amount = inv.outstanding_amount or inv.invoice_amount or 0
+    reminders_to_create = []
+    for days_before, rtype in [(3, ReminderType.DUE_IN_3_DAYS.value), (2, ReminderType.DUE_IN_2_DAYS.value), (1, ReminderType.DUE_IN_1_DAY.value)]:
+        reminder_date = (due - __import__("datetime").timedelta(days=days_before)).isoformat()
+        if reminder_date >= today.isoformat():
+            reminders_to_create.append({
+                "client_id": inv.client_id,
+                "invoice_id": inv.id,
+                "business_manager_id": inv.business_manager_id,
+                "reminder_type": rtype,
+                "priority": ReminderPriority.MEDIUM.value,
+                "reminder_status": ReminderStatus.OPEN.value,
+                "due_amount": due_amount,
+                "due_date": inv.due_date,
+                "next_followup_date": reminder_date,
+                "auto_generated": True,
+                "notes": f"Auto-generated: {rtype.replace('_', ' ')}",
+            })
+    # Due today reminder
+    if due >= today:
+        reminders_to_create.append({
+            "client_id": inv.client_id,
+            "invoice_id": inv.id,
+            "business_manager_id": inv.business_manager_id,
+            "reminder_type": ReminderType.DUE_TODAY.value,
+            "priority": ReminderPriority.HIGH.value,
+            "reminder_status": ReminderStatus.OPEN.value,
+            "due_amount": due_amount,
+            "due_date": inv.due_date,
+            "next_followup_date": inv.due_date,
+            "auto_generated": True,
+            "notes": "Auto-generated: due today",
+        })
+    for r in reminders_to_create:
+        db.add(RevReminder(**r))
+    db.commit()
+
+
+# ============================================================
+# CLIENTS
+# ============================================================
+class ClientCreate(BaseModel):
+    client_name: str
+    brand_name: Optional[str] = None
+    company_name: Optional[str] = None
+    contact_person: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    business_manager_id: Optional[int] = None
+    client_status: str = RevClientStatus.ACTIVE.value
+    invoice_day: int = 1
+    default_due_days: int = 30
+    remarks: Optional[str] = None
+
+
+class ClientUpdate(BaseModel):
+    client_name: Optional[str] = None
+    brand_name: Optional[str] = None
+    company_name: Optional[str] = None
+    contact_person: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    business_manager_id: Optional[int] = None
+    client_status: Optional[str] = None
+    invoice_day: Optional[int] = None
+    default_due_days: Optional[int] = None
+    remarks: Optional[str] = None
+
+
+@router.get("/clients")
+def list_clients(search: Optional[str] = None, status: Optional[str] = None, bm: Optional[int] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    q = db.query(RevClient)
+    q = _bm_client_filter(q, user)
+    if search:
+        q = q.filter(RevClient.client_name.ilike(f"%{search}%"))
+    if status:
+        q = q.filter(RevClient.client_status == status)
+    if bm:
+        q = q.filter(RevClient.business_manager_id == bm)
+    return [c.to_dict() for c in q.order_by(RevClient.client_name).all()]
+
+
+@router.get("/clients/{client_id}")
+def get_client(client_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    c = db.query(RevClient).filter(RevClient.id == client_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if user.rev_role == "business_manager" and c.business_manager_id != user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return c.to_dict()
+
+
+@router.post("/clients")
+def create_client(req: ClientCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _check_rev_role(user, ["admin", "finance"])
+    c = RevClient(**req.model_dump())
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    _audit(db, user.id, "create_client", "client", c.id, new_val=json.dumps(c.to_dict()))
+    return c.to_dict()
+
+
+@router.put("/clients/{client_id}")
+def update_client(client_id: int, req: ClientUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _check_rev_role(user, ["admin", "finance"])
+    c = db.query(RevClient).filter(RevClient.id == client_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Client not found")
+    old = json.dumps(c.to_dict())
+    for k, v in req.model_dump(exclude_unset=True).items():
+        setattr(c, k, v)
+    db.commit()
+    db.refresh(c)
+    _audit(db, user.id, "update_client", "client", c.id, old_val=old, new_val=json.dumps(c.to_dict()))
+    return c.to_dict()
+
+
+@router.delete("/clients/{client_id}")
+def delete_client(client_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    if user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can delete clients")
+    c = db.query(RevClient).filter(RevClient.id == client_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Client not found")
+    old = json.dumps(c.to_dict())
+    db.delete(c)
+    db.commit()
+    _audit(db, user.id, "delete_client", "client", client_id, old_val=old)
+    return {"status": "success"}
+
+
+@router.get("/business-managers")
+def list_business_managers(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """List users with rev_role business_manager for dropdowns."""
+    bms = db.query(User).filter(User.rev_role == RevRole.BUSINESS_MANAGER.value, User.is_active == True).all()
+    return [{"id": b.id, "name": b.full_name or b.email, "email": b.email, "mobile": b.mobile} for b in bms]
+
+
+class BMCreate(BaseModel):
+    full_name: str
+    email: str
+    mobile: Optional[str] = None
+    password: Optional[str] = None
+
+
+@router.post("/business-managers")
+def create_business_manager(req: BMCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
+    if current_user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can create business managers")
+    existing = db.query(User).filter(User.email == req.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    from backend.routes.auth import get_password_hash
+    user = User(
+        email=req.email,
+        full_name=req.full_name,
+        mobile=req.mobile,
+        rev_role=RevRole.BUSINESS_MANAGER.value,
+        access_revenueops=True,
+        hashed_password=get_password_hash(req.password or "changeme123"),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user.to_dict()
+
+
+@router.delete("/business-managers/{bm_id}")
+def delete_business_manager(bm_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
+    if current_user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can delete business managers")
+    user = db.query(User).filter(User.id == bm_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+    return {"status": "success"}
+
+
+# ============================================================
+# BILLING MODELS
+# ============================================================
+class BillingModelCreate(BaseModel):
+    client_id: int
+    billing_model_type: str
+    amount: float = 0.0
+    percentage: Optional[float] = None
+    media_spend_linked: Optional[float] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    billing_frequency: str = BillingFrequency.MONTHLY.value
+    remarks: Optional[str] = None
+
+
+class BillingModelUpdate(BaseModel):
+    billing_model_type: Optional[str] = None
+    amount: Optional[float] = None
+    percentage: Optional[float] = None
+    media_spend_linked: Optional[float] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    billing_frequency: Optional[str] = None
+    remarks: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/billing-models")
+def list_billing_models(client_id: Optional[int] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    q = db.query(ClientBillingModel)
+    if client_id:
+        q = q.filter(ClientBillingModel.client_id == client_id)
+    return [bm.to_dict() for bm in q.all()]
+
+
+@router.post("/billing-models")
+def create_billing_model(req: BillingModelCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _check_rev_role(user, ["admin", "finance"])
+    bm = ClientBillingModel(**req.model_dump())
+    db.add(bm)
+    db.commit()
+    db.refresh(bm)
+    _audit(db, user.id, "create_billing_model", "billing_model", bm.id, new_val=json.dumps(bm.to_dict()))
+    return bm.to_dict()
+
+
+@router.put("/billing-models/{bm_id}")
+def update_billing_model(bm_id: int, req: BillingModelUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _check_rev_role(user, ["admin", "finance"])
+    bm = db.query(ClientBillingModel).filter(ClientBillingModel.id == bm_id).first()
+    if not bm:
+        raise HTTPException(status_code=404, detail="Billing model not found")
+    for k, v in req.model_dump(exclude_unset=True).items():
+        setattr(bm, k, v)
+    db.commit()
+    db.refresh(bm)
+    return bm.to_dict()
+
+
+@router.delete("/billing-models/{bm_id}")
+def delete_billing_model(bm_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    if user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can delete billing models")
+    bm = db.query(ClientBillingModel).filter(ClientBillingModel.id == bm_id).first()
+    if not bm:
+        raise HTTPException(status_code=404, detail="Billing model not found")
+    db.delete(bm)
+    db.commit()
+    return {"status": "success"}
+
+
+# ============================================================
+# INVOICES
+# ============================================================
+class InvoiceCreate(BaseModel):
+    client_id: int
+    business_manager_id: Optional[int] = None
+    billing_type: Optional[str] = None
+    invoice_number: str
+    invoice_date: str
+    invoice_period: Optional[str] = None
+    invoice_amount: float
+    due_date: Optional[str] = None
+    invoice_status: str = InvoiceStatus.NOT_RAISED.value
+    payment_status: str = PaymentStatus.UNPAID.value
+    remarks: Optional[str] = None
+
+
+class InvoiceUpdate(BaseModel):
+    client_id: Optional[int] = None
+    business_manager_id: Optional[int] = None
+    billing_type: Optional[str] = None
+    invoice_number: Optional[str] = None
+    invoice_date: Optional[str] = None
+    invoice_period: Optional[str] = None
+    invoice_amount: Optional[float] = None
+    due_date: Optional[str] = None
+    invoice_status: Optional[str] = None
+    payment_status: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+def _recalc_invoice(inv: RevInvoice, db: Session):
+    total_paid = sum(p.amount for p in inv.payments)
+    inv.amount_received = round(total_paid, 2)
+    inv.outstanding_amount = round(inv.invoice_amount - total_paid, 2)
+    today = date.today()
+    if inv.due_date:
+        try:
+            due = datetime.strptime(inv.due_date, "%Y-%m-%d").date()
+            if due < today and inv.outstanding_amount > 0:
+                inv.overdue_days = (today - due).days
+                if inv.payment_status not in (PaymentStatus.PAID.value, PaymentStatus.CANCELLED.value):
+                    inv.invoice_status = InvoiceStatus.OVERDUE.value
+                    inv.payment_status = PaymentStatus.OVERDUE.value
+            else:
+                inv.overdue_days = 0
+        except Exception:
+            pass
+    if inv.outstanding_amount <= 0 and inv.invoice_amount > 0:
+        inv.payment_status = PaymentStatus.PAID.value
+        if inv.invoice_status not in (InvoiceStatus.CANCELLED.value, InvoiceStatus.CREDIT_NOTE_ISSUED.value):
+            inv.invoice_status = InvoiceStatus.PAID.value
+    elif total_paid > 0 and inv.outstanding_amount > 0:
+        if inv.invoice_status not in (InvoiceStatus.OVERDUE.value, InvoiceStatus.CANCELLED.value, InvoiceStatus.DISPUTED.value, InvoiceStatus.CREDIT_NOTE_ISSUED.value):
+            inv.payment_status = PaymentStatus.PARTIALLY_PAID.value
+            inv.invoice_status = InvoiceStatus.PARTIALLY_PAID.value
+    elif total_paid == 0 and inv.invoice_amount > 0:
+        if inv.invoice_status not in (InvoiceStatus.OVERDUE.value, InvoiceStatus.CANCELLED.value, InvoiceStatus.DISPUTED.value, InvoiceStatus.CREDIT_NOTE_ISSUED.value):
+            inv.payment_status = PaymentStatus.UNPAID.value
+    db.commit()
+
+
+@router.get("/invoices")
+def list_invoices(
+    client_id: Optional[int] = None,
+    status: Optional[str] = None,
+    payment_status: Optional[str] = None,
+    bm: Optional[int] = None,
+    search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
+):
+    q = db.query(RevInvoice)
+    if user.rev_role == "business_manager":
+        bm_clients = db.query(RevClient.id).filter(RevClient.business_manager_id == user.id).subquery()
+        q = q.filter(RevInvoice.client_id.in_(bm_clients))
+    if client_id:
+        q = q.filter(RevInvoice.client_id == client_id)
+    if status:
+        q = q.filter(RevInvoice.invoice_status == status)
+    if payment_status:
+        q = q.filter(RevInvoice.payment_status == payment_status)
+    if bm:
+        q = q.filter(RevInvoice.business_manager_id == bm)
+    if search:
+        q = q.filter(RevInvoice.invoice_number.ilike(f"%{search}%"))
+    if date_from:
+        q = q.filter(RevInvoice.invoice_date >= date_from)
+    if date_to:
+        q = q.filter(RevInvoice.invoice_date <= date_to)
+    results = q.order_by(RevInvoice.invoice_date.desc()).all()
+    for inv in results:
+        _recalc_invoice(inv, db)
+    return [inv.to_dict() for inv in results]
+
+
+@router.get("/invoices/{invoice_id}")
+def get_invoice(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    inv = db.query(RevInvoice).filter(RevInvoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if user.rev_role == "business_manager" and inv.business_manager_id != user.id:
+        c = db.query(RevClient).filter(RevClient.id == inv.client_id).first()
+        if c and c.business_manager_id != user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    _recalc_invoice(inv, db)
+    return inv.to_dict()
+
+
+@router.post("/invoices")
+def create_invoice(req: InvoiceCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _check_rev_role(user, ["admin", "finance"])
+    existing = db.query(RevInvoice).filter(RevInvoice.invoice_number == req.invoice_number).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Invoice number already exists")
+    if req.invoice_amount <= 0:
+        raise HTTPException(status_code=400, detail="Invoice amount must be greater than 0")
+    bm_id = req.business_manager_id
+    if not bm_id:
+        c = db.query(RevClient).filter(RevClient.id == req.client_id).first()
+        bm_id = c.business_manager_id if c else None
+    inv = RevInvoice(
+        client_id=req.client_id,
+        business_manager_id=bm_id,
+        billing_type=req.billing_type,
+        invoice_number=req.invoice_number,
+        invoice_date=req.invoice_date,
+        invoice_period=req.invoice_period,
+        invoice_amount=req.invoice_amount,
+        due_date=req.due_date,
+        invoice_status=req.invoice_status,
+        payment_status=req.payment_status,
+        outstanding_amount=req.invoice_amount,
+        remarks=req.remarks,
+        created_by=user.id,
+    )
+    db.add(inv)
+    db.commit()
+    db.refresh(inv)
+    _recalc_invoice(inv, db)
+    _generate_invoice_reminders(inv, db)
+    _audit(db, user.id, "create_invoice", "invoice", inv.id, new_val=json.dumps(inv.to_dict()))
+    return inv.to_dict()
+
+
+@router.put("/invoices/{invoice_id}")
+def update_invoice(invoice_id: int, req: InvoiceUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _check_rev_role(user, ["admin", "finance"])
+    inv = db.query(RevInvoice).filter(RevInvoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    old = json.dumps(inv.to_dict())
+    for k, v in req.model_dump(exclude_unset=True).items():
+        setattr(inv, k, v)
+    db.commit()
+    db.refresh(inv)
+    _recalc_invoice(inv, db)
+    _generate_invoice_reminders(inv, db)
+    _audit(db, user.id, "update_invoice", "invoice", inv.id, old_val=old, new_val=json.dumps(inv.to_dict()))
+    return inv.to_dict()
+
+
+@router.delete("/invoices/{invoice_id}")
+def delete_invoice(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    if user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can delete invoices")
+    inv = db.query(RevInvoice).filter(RevInvoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    db.query(RevPayment).filter(RevPayment.invoice_id == invoice_id).delete()
+    db.delete(inv)
+    db.commit()
+    _audit(db, user.id, "delete_invoice", "invoice", invoice_id)
+    return {"status": "success"}
+
+
+# ============================================================
+# PAYMENTS
+# ============================================================
+class PaymentCreate(BaseModel):
+    invoice_id: int
+    client_id: int
+    payment_date: str
+    amount: float
+    payment_mode: str = PaymentMode.BANK_TRANSFER.value
+    reference_number: Optional[str] = None
+    payment_proof_url: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+class PaymentUpdate(BaseModel):
+    amount: Optional[float] = None
+    payment_date: Optional[str] = None
+    payment_mode: Optional[str] = None
+    reference_number: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+@router.get("/payments")
+def list_payments(
+    client_id: Optional[int] = None,
+    invoice_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
+):
+    q = db.query(RevPayment)
+    if user.rev_role == "business_manager":
+        bm_clients = db.query(RevClient.id).filter(RevClient.business_manager_id == user.id).subquery()
+        q = q.filter(RevPayment.client_id.in_(bm_clients))
+    if client_id:
+        q = q.filter(RevPayment.client_id == client_id)
+    if invoice_id:
+        q = q.filter(RevPayment.invoice_id == invoice_id)
+    if date_from:
+        q = q.filter(RevPayment.payment_date >= date_from)
+    if date_to:
+        q = q.filter(RevPayment.payment_date <= date_to)
+    return [p.to_dict() for p in q.order_by(RevPayment.payment_date.desc()).all()]
+
+
+@router.post("/payments")
+def create_payment(req: PaymentCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _check_rev_role(user, ["admin", "finance"])
+    inv = db.query(RevInvoice).filter(RevInvoice.id == req.invoice_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    total_paid = sum(p.amount for p in inv.payments)
+    outstanding = inv.invoice_amount - total_paid
+    if req.amount > outstanding + 0.01 and user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=400, detail=f"Payment ({req.amount}) exceeds outstanding amount ({round(outstanding, 2)})")
+    p = RevPayment(
+        invoice_id=req.invoice_id,
+        client_id=req.client_id,
+        payment_date=req.payment_date,
+        amount=req.amount,
+        payment_mode=req.payment_mode,
+        reference_number=req.reference_number,
+        payment_proof_url=req.payment_proof_url,
+        remarks=req.remarks,
+        created_by=user.id,
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    _recalc_invoice(inv, db)
+    _audit(db, user.id, "create_payment", "payment", p.id, new_val=json.dumps(p.to_dict()))
+    return p.to_dict()
+
+
+@router.put("/payments/{payment_id}")
+def update_payment(payment_id: int, req: PaymentUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _check_rev_role(user, ["admin", "finance"])
+    p = db.query(RevPayment).filter(RevPayment.id == payment_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    for k, v in req.model_dump(exclude_unset=True).items():
+        setattr(p, k, v)
+    db.commit()
+    db.refresh(p)
+    inv = db.query(RevInvoice).filter(RevInvoice.id == p.invoice_id).first()
+    if inv:
+        _recalc_invoice(inv, db)
+    return p.to_dict()
+
+
+@router.delete("/payments/{payment_id}")
+def delete_payment(payment_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    if user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can delete payments")
+    p = db.query(RevPayment).filter(RevPayment.id == payment_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    inv_id = p.invoice_id
+    db.delete(p)
+    db.commit()
+    inv = db.query(RevInvoice).filter(RevInvoice.id == inv_id).first()
+    if inv:
+        _recalc_invoice(inv, db)
+    return {"status": "success"}
+
+
+# ============================================================
+# DOCUMENTS
+# ============================================================
+class DocumentCreate(BaseModel):
+    client_id: int
+    invoice_id: Optional[int] = None
+    document_type: str = DocType.OTHER.value
+    document_name: str
+    file_url: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+@router.get("/documents")
+def list_documents(client_id: Optional[int] = None, invoice_id: Optional[int] = None, doc_type: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    q = db.query(RevDocument)
+    if user.rev_role == "business_manager":
+        bm_clients = db.query(RevClient.id).filter(RevClient.business_manager_id == user.id).subquery()
+        q = q.filter(RevDocument.client_id.in_(bm_clients))
+    if client_id:
+        q = q.filter(RevDocument.client_id == client_id)
+    if invoice_id:
+        q = q.filter(RevDocument.invoice_id == invoice_id)
+    if doc_type:
+        q = q.filter(RevDocument.document_type == doc_type)
+    return [d.to_dict() for d in q.order_by(RevDocument.created_at.desc()).all()]
+
+
+@router.post("/documents")
+def create_document(req: DocumentCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _check_rev_role(user, ["admin", "finance"])
+    d = RevDocument(**req.model_dump(), uploaded_by=user.id)
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+    _audit(db, user.id, "upload_document", "document", d.id, new_val=json.dumps(d.to_dict()))
+    return d.to_dict()
+
+
+@router.delete("/documents/{doc_id}")
+def delete_document(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    if user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can delete documents")
+    d = db.query(RevDocument).filter(RevDocument.id == doc_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Document not found")
+    db.delete(d)
+    db.commit()
+    return {"status": "success"}
+
+
+# ============================================================
+# REMINDERS
+# ============================================================
+class ReminderCreate(BaseModel):
+    client_id: int
+    invoice_id: Optional[int] = None
+    business_manager_id: Optional[int] = None
+    reminder_type: str
+    priority: str = ReminderPriority.MEDIUM.value
+    due_amount: float = 0.0
+    due_date: Optional[str] = None
+    next_followup_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ReminderUpdate(BaseModel):
+    reminder_status: Optional[str] = None
+    priority: Optional[str] = None
+    next_followup_date: Optional[str] = None
+    last_followup_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ReminderSnooze(BaseModel):
+    value: int
+    unit: str  # hour or day
+
+
+@router.get("/reminders")
+def list_reminders(status: Optional[str] = None, priority: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    q = db.query(RevReminder)
+    if user.rev_role == "business_manager":
+        q = q.filter(RevReminder.business_manager_id == user.id)
+    if status:
+        q = q.filter(RevReminder.reminder_status == status)
+    if priority:
+        q = q.filter(RevReminder.priority == priority)
+    return [r.to_dict() for r in q.order_by(RevReminder.created_at.desc()).all()]
+
+
+@router.get("/reminders/due-today")
+def due_reminders(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Return reminders whose next_followup_date is today or earlier and not snoozed/done."""
+    today = date.today().isoformat()
+    q = db.query(RevReminder).filter(
+        RevReminder.reminder_status != ReminderStatus.DONE.value,
+        RevReminder.next_followup_date <= today,
+        or_(RevReminder.snooze_until == None, RevReminder.snooze_until <= today),
+    )
+    if user.rev_role == "business_manager":
+        q = q.filter(RevReminder.business_manager_id == user.id)
+    return [r.to_dict() for r in q.order_by(RevReminder.priority.desc(), RevReminder.created_at.desc()).all()]
+
+
+@router.post("/reminders/{reminder_id}/snooze")
+def snooze_reminder(reminder_id: int, req: ReminderSnooze, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    r = db.query(RevReminder).filter(RevReminder.id == reminder_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    if user.rev_role == "business_manager" and r.business_manager_id != user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    now = datetime.utcnow()
+    delta = __import__("datetime").timedelta(hours=req.value) if req.unit == "hour" else __import__("datetime").timedelta(days=req.value)
+    snooze_until = (now + delta).isoformat()
+    r.snooze_until = snooze_until
+    r.reminder_status = ReminderStatus.SNOOZED.value
+    db.commit()
+    db.refresh(r)
+    return r.to_dict()
+
+
+@router.post("/reminders")
+def create_reminder(req: ReminderCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    bm_id = req.business_manager_id
+    if not bm_id and user.rev_role == "business_manager":
+        bm_id = user.id
+    r = RevReminder(**req.model_dump(), business_manager_id=bm_id)
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return r.to_dict()
+
+
+@router.put("/reminders/{reminder_id}")
+def update_reminder(reminder_id: int, req: ReminderUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    r = db.query(RevReminder).filter(RevReminder.id == reminder_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    if user.rev_role == "business_manager" and r.business_manager_id != user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    for k, v in req.model_dump(exclude_unset=True).items():
+        setattr(r, k, v)
+    db.commit()
+    db.refresh(r)
+    return r.to_dict()
+
+
+@router.delete("/reminders/{reminder_id}")
+def delete_reminder(reminder_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    if user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can delete reminders")
+    r = db.query(RevReminder).filter(RevReminder.id == reminder_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    db.delete(r)
+    db.commit()
+    return {"status": "success"}
+
+
+@router.post("/reminders/{reminder_id}/generate-text")
+def generate_reminder_text(reminder_id: int, channel: str = "whatsapp", db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    r = db.query(RevReminder).filter(RevReminder.id == reminder_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    client = db.query(RevClient).filter(RevClient.id == r.client_id).first()
+    inv = db.query(RevInvoice).filter(RevInvoice.id == r.invoice_id).first() if r.invoice_id else None
+    client_name = client.client_name if client else "Client"
+    inv_num = inv.invoice_number if inv else "N/A"
+    amount = r.due_amount or (inv.outstanding_amount if inv and inv.outstanding_amount else 0)
+    overdue = r.overdue_days if hasattr(r, 'overdue_days') else 0
+
+    if channel == "whatsapp":
+        if overdue and overdue > 15:
+            text = f"Hi {client_name}, invoice {inv_num} for INR {amount:,.2f} has been overdue for {overdue} days. Request you to please prioritize the payment or confirm the expected payment date today."
+        else:
+            text = f"Hi {client_name}, this is a gentle reminder that invoice {inv_num} for INR {amount:,.2f} is currently due. Request you to please share the payment update. Thank you."
+    else:
+        text = f"Dear {client_name},\n\nThis is to remind you that invoice {inv_num} for INR {amount:,.2f} is currently pending. Kindly arrange for payment at your earliest convenience.\n\nRegards,\nRevenue Team"
+
+    return {"text": text, "channel": channel, "client_name": client_name, "invoice_number": inv_num, "amount": amount}
+
+
+# ============================================================
+# FOLLOWUP NOTES
+# ============================================================
+class FollowupCreate(BaseModel):
+    client_id: int
+    invoice_id: Optional[int] = None
+    note: str
+    next_followup_date: Optional[str] = None
+
+
+@router.get("/followup-notes")
+def list_followup_notes(client_id: Optional[int] = None, invoice_id: Optional[int] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    q = db.query(FollowupNote)
+    if user.rev_role == "business_manager":
+        q = q.filter(FollowupNote.business_manager_id == user.id)
+    if client_id:
+        q = q.filter(FollowupNote.client_id == client_id)
+    if invoice_id:
+        q = q.filter(FollowupNote.invoice_id == invoice_id)
+    return [n.to_dict() for n in q.order_by(FollowupNote.created_at.desc()).all()]
+
+
+@router.post("/followup-notes")
+def create_followup_note(req: FollowupCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    n = FollowupNote(
+        client_id=req.client_id,
+        invoice_id=req.invoice_id,
+        note=req.note,
+        next_followup_date=req.next_followup_date,
+        business_manager_id=user.id if user.rev_role == "business_manager" else None,
+        created_by=user.id,
+    )
+    db.add(n)
+    db.commit()
+    db.refresh(n)
+    return n.to_dict()
+
+
+# ============================================================
+# OUTSTANDING
+# ============================================================
+@router.get("/outstanding")
+def list_outstanding(
+    client_id: Optional[int] = None,
+    bm: Optional[int] = None,
+    ageing: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
+):
+    q = db.query(RevInvoice).filter(RevInvoice.outstanding_amount > 0)
+    if user.rev_role == "business_manager":
+        bm_clients = db.query(RevClient.id).filter(RevClient.business_manager_id == user.id).subquery()
+        q = q.filter(RevInvoice.client_id.in_(bm_clients))
+    if client_id:
+        q = q.filter(RevInvoice.client_id == client_id)
+    if bm:
+        q = q.filter(RevInvoice.business_manager_id == bm)
+    results = q.all()
+    for inv in results:
+        _recalc_invoice(inv, db)
+    db.commit()
+
+    items = [inv.to_dict() for inv in results]
+    if ageing:
+        today = date.today()
+        filtered = []
+        for it in items:
+            od = it.get("overdue_days", 0)
+            if ageing == "due_in_3_days" and od <= 3 and od >= -3:
+                filtered.append(it)
+            elif ageing == "due_today" and od == 0:
+                filtered.append(it)
+            elif ageing == "1_7" and 1 <= od <= 7:
+                filtered.append(it)
+            elif ageing == "8_15" and 8 <= od <= 15:
+                filtered.append(it)
+            elif ageing == "16_30" and 16 <= od <= 30:
+                filtered.append(it)
+            elif ageing == "31_60" and 31 <= od <= 60:
+                filtered.append(it)
+            elif ageing == "60_plus" and od > 60:
+                filtered.append(it)
+        items = filtered
+    return items
+
+
+# ============================================================
+# DASHBOARD
+# ============================================================
+@router.get("/dashboard")
+def dashboard(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    client_id: Optional[int] = None,
+    bm: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
+):
+    q = db.query(RevInvoice)
+    if user.rev_role == "business_manager":
+        bm_clients = db.query(RevClient.id).filter(RevClient.business_manager_id == user.id).subquery()
+        q = q.filter(RevInvoice.client_id.in_(bm_clients))
+    if client_id:
+        q = q.filter(RevInvoice.client_id == client_id)
+    if bm:
+        q = q.filter(RevInvoice.business_manager_id == bm)
+    if date_from:
+        q = q.filter(RevInvoice.invoice_date >= date_from)
+    if date_to:
+        q = q.filter(RevInvoice.invoice_date <= date_to)
+
+    invoices = q.all()
+    for inv in invoices:
+        _recalc_invoice(inv, db)
+    db.commit()
+
+    total_billed = sum(inv.invoice_amount for inv in invoices if inv.invoice_status != InvoiceStatus.CANCELLED.value)
+    total_collected = sum(sum(p.amount for p in inv.payments) for inv in invoices if inv.invoice_status != InvoiceStatus.CANCELLED.value)
+    total_outstanding = round(total_billed - total_collected, 2)
+    collection_pct = round((total_collected / total_billed) * 100, 2) if total_billed else 0
+
+    today = date.today()
+    this_month_start = today.replace(day=1).isoformat()
+    this_month_invoices = [inv for inv in invoices if inv.invoice_date >= this_month_start and inv.invoice_status != InvoiceStatus.CANCELLED.value]
+    monthly_billed = sum(inv.invoice_amount for inv in this_month_invoices)
+    monthly_collected = sum(sum(p.amount for p in inv.payments) for inv in this_month_invoices)
+
+    week_end = (today + __import__("datetime").timedelta(days=7)).isoformat()
+    month_end = today.replace(day=28).isoformat()
+
+    overdue_invoices = [inv for inv in invoices if inv.invoice_status in (InvoiceStatus.OVERDUE.value,) or (inv.outstanding_amount and inv.outstanding_amount > 0 and inv.due_date and inv.due_date < today.isoformat())]
+    total_overdue = round(sum(inv.outstanding_amount for inv in overdue_invoices), 2)
+
+    clients = db.query(RevClient)
+    if user.rev_role == "business_manager":
+        clients = clients.filter(RevClient.business_manager_id == user.id)
+    all_clients = clients.all()
+    active_clients = [c for c in all_clients if c.client_status == RevClientStatus.ACTIVE.value]
+
+    client_ids_with_invoices = set(inv.client_id for inv in invoices if inv.invoice_status not in (InvoiceStatus.CANCELLED.value,))
+    clients_no_invoice = [c for c in active_clients if c.id not in client_ids_with_invoices]
+
+    partially_paid = [inv for inv in invoices if inv.invoice_status == InvoiceStatus.PARTIALLY_PAID.value]
+    disputed = [inv for inv in invoices if inv.invoice_status == InvoiceStatus.DISPUTED.value]
+    cancelled = [inv for inv in invoices if inv.invoice_status == InvoiceStatus.CANCELLED.value]
+    credit_notes = [inv for inv in invoices if inv.invoice_status == InvoiceStatus.CREDIT_NOTE_ISSUED.value]
+
+    bms = db.query(User).filter(User.rev_role == RevRole.BUSINESS_MANAGER.value).all()
+    bm_stats = []
+    for b in bms:
+        bm_invs = [inv for inv in invoices if inv.business_manager_id == b.id]
+        bm_billed = sum(inv.invoice_amount for inv in bm_invs)
+        bm_collected = sum(sum(p.amount for p in inv.payments) for inv in bm_invs)
+        bm_outstanding = round(bm_billed - bm_collected, 2)
+        bm_overdue = sum(inv.outstanding_amount for inv in bm_invs if inv.invoice_status in (InvoiceStatus.OVERDUE.value,) or (inv.due_date and inv.due_date < today.isoformat() and inv.outstanding_amount and inv.outstanding_amount > 0))
+        bm_stats.append({
+            "bm_id": b.id, "bm_name": b.full_name or b.email,
+            "total_billed": round(bm_billed, 2), "total_collected": round(bm_collected, 2),
+            "total_outstanding": bm_outstanding, "total_overdue": round(bm_overdue, 2),
+            "collection_pct": round((bm_collected / bm_billed) * 100, 2) if bm_billed else 0,
+            "client_count": len(set(inv.client_id for inv in bm_invs)),
+        })
+
+    billing_model_dist = {}
+    for inv in invoices:
+        bt = inv.billing_type or "unspecified"
+        billing_model_dist[bt] = billing_model_dist.get(bt, 0) + inv.invoice_amount
+
+    return {
+        "total_billed": round(total_billed, 2),
+        "total_collected": round(total_collected, 2),
+        "total_outstanding": total_outstanding,
+        "total_overdue": total_overdue,
+        "collection_percentage": collection_pct,
+        "monthly_billed": round(monthly_billed, 2),
+        "monthly_collected": round(monthly_collected, 2),
+        "invoice_count": len(invoices),
+        "active_client_count": len(active_clients),
+        "clients_no_invoice": len(clients_no_invoice),
+        "clients_overdue": len(set(inv.client_id for inv in overdue_invoices)),
+        "partially_paid_count": len(partially_paid),
+        "disputed_count": len(disputed),
+        "cancelled_count": len(cancelled),
+        "credit_note_count": len(credit_notes),
+        "overdue_invoices": len(overdue_invoices),
+        "top_overdue_clients": sorted(
+            [{"client_id": inv.client_id, "client_name": inv.client.client_name if inv.client else None, "outstanding": round(inv.outstanding_amount, 2)}
+             for inv in overdue_invoices[:10]],
+            key=lambda x: x["outstanding"], reverse=True
+        ),
+        "bm_stats": bm_stats,
+        "billing_model_dist": billing_model_dist,
+        "expected_collection_week": round(total_outstanding * 0.2, 2),
+        "expected_collection_month": round(total_outstanding * 0.5, 2),
+    }
+
+
+# ============================================================
+# REPORTS
+# ============================================================
+@router.get("/reports/monthly-billing")
+def report_monthly_billing(year: Optional[int] = None, month: Optional[int] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    q = db.query(RevInvoice)
+    if year and month:
+        prefix = f"{year}-{month:02d}"
+        q = q.filter(RevInvoice.invoice_date.startswith(prefix))
+    invoices = q.all()
+    for inv in invoices:
+        _recalc_invoice(inv, db)
+    return [inv.to_dict() for inv in invoices]
+
+
+@router.get("/reports/outstanding")
+def report_outstanding(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    return list_outstanding(db=db, user=user)
+
+
+@router.get("/reports/bm-wise")
+def report_bm_wise(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    bms = db.query(User).filter(User.rev_role == RevRole.BUSINESS_MANAGER.value).all()
+    result = []
+    for b in bms:
+        bm_clients = db.query(RevClient).filter(RevClient.business_manager_id == b.id).all()
+        client_ids = [c.id for c in bm_clients]
+        invs = db.query(RevInvoice).filter(RevInvoice.client_id.in_(client_ids)).all() if client_ids else []
+        for inv in invs:
+            _recalc_invoice(inv, db)
+        billed = sum(inv.invoice_amount for inv in invs)
+        collected = sum(sum(p.amount for p in inv.payments) for inv in invs)
+        result.append({
+            "bm_id": b.id, "bm_name": b.full_name or b.email,
+            "client_count": len(bm_clients),
+            "total_billed": round(billed, 2), "total_collected": round(collected, 2),
+            "total_outstanding": round(billed - collected, 2),
+            "overdue_count": len([inv for inv in invs if inv.invoice_status == InvoiceStatus.OVERDUE.value]),
+        })
+    return result
+
+
+@router.get("/reports/invoice-not-raised")
+def report_invoice_not_raised(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    clients = db.query(RevClient).filter(RevClient.client_status == RevClientStatus.ACTIVE.value)
+    if user.rev_role == "business_manager":
+        clients = clients.filter(RevClient.business_manager_id == user.id)
+    result = []
+    for c in clients.all():
+        has_invoice = db.query(RevInvoice).filter(RevInvoice.client_id == c.id, RevInvoice.invoice_status != InvoiceStatus.CANCELLED.value).first()
+        if not has_invoice:
+            result.append(c.to_dict())
+    return result
+
+
+# ============================================================
+# SETTINGS
+# ============================================================
+@router.get("/settings")
+def list_settings(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    settings = db.query(RevSetting).all()
+    return {s.key: s.value for s in settings}
+
+
+class SettingUpdate(BaseModel):
+    key: str
+    value: str
+
+
+@router.put("/settings")
+def update_setting(req: SettingUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    if user.role not in ("admin", "superadmin") and user.rev_role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can update settings")
+    s = db.query(RevSetting).filter(RevSetting.key == req.key).first()
+    if s:
+        s.value = req.value
+    else:
+        s = RevSetting(key=req.key, value=req.value)
+        db.add(s)
+    db.commit()
+    db.refresh(s)
+    return s.to_dict()
+
+
+# ============================================================
+# AUDIT LOGS
+# ============================================================
+@router.get("/audit-logs")
+def list_audit_logs(entity_type: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    if user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can view audit logs")
+    q = db.query(AuditLog)
+    if entity_type:
+        q = q.filter(AuditLog.entity_type == entity_type)
+    return [a.to_dict() for a in q.order_by(AuditLog.created_at.desc()).limit(200).all()]
+
+
+# ============================================================
+# SEED DEMO DATA
+# ============================================================
+@router.post("/seed-demo")
+def seed_demo_data(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Deprecated — demo seeding is disabled. Create clients manually via the UI."""
+    return {"status": "skipped", "message": "Demo data seeding is disabled. Create clients, invoices, and payments manually via the RevenueOps UI."}

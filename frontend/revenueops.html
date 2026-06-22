@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChlearSakhaaOps AI - RevenueOps</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root{--bg-base:#f3f4f6;--bg-surface:#fff;--bg-sidebar:#f9fafb;--border:#e5e7eb;--primary:#059669;--primary-light:#d1fae5;--primary-dark:#047857;--secondary:#0891b2;--success:#059669;--warning:#d97706;--danger:#dc2626;--info:#3b82f6;--text-main:#1f2937;--text-muted:#4b5563;--text-light:#6b7280}
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Inter',sans-serif;background:var(--bg-base);color:var(--text-main);height:100vh;overflow:hidden;display:flex}
+        h1,h2,h3,h4,.font-outfit{font-family:'Outfit',sans-serif}
+        ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:rgba(0,0,0,.03)}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px}
+        .sidebar{width:250px;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+        .sidebar-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem}
+        .brand{display:flex;align-items:center;gap:.5rem;font-size:1.1rem;font-weight:800;text-decoration:none;color:var(--text-main)}
+        .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#059669,#34d399);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem}
+        .nav{flex-grow:1;padding:.75rem 0;overflow-y:auto}
+        .nav-item{display:flex;align-items:center;gap:.55rem;padding:.6rem 1.25rem;cursor:pointer;font-size:.84rem;font-weight:500;color:var(--text-muted);transition:.15s;border-left:3px solid transparent;text-decoration:none}
+        .nav-item:hover{background:rgba(0,0,0,.03);color:var(--text-main)}
+        .nav-item.active{background:#fff;color:var(--primary);border-left-color:var(--primary);font-weight:600}
+        .nav-section{font-size:.65rem;text-transform:uppercase;font-weight:700;color:var(--text-light);letter-spacing:.08em;padding:.5rem 1.25rem .25rem}
+        .nav-back{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;font-size:.78rem;color:var(--text-light);text-decoration:none;cursor:pointer;border-top:1px solid var(--border);margin-top:auto}
+        .nav-back:hover{color:var(--primary)}
+        .main{flex-grow:1;display:flex;flex-direction:column;min-width:0}
+        .topbar{height:56px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem}
+        .topbar h1{font-size:1.05rem;font-weight:700}
+        .topbar-right{display:flex;align-items:center;gap:.75rem}
+        .user-badge{font-size:.78rem;color:var(--text-muted);padding:.3rem .6rem;background:var(--bg-base);border-radius:4px}
+        .btn{padding:.45rem .85rem;border-radius:6px;font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center;gap:.3rem;transition:.15s;text-decoration:none}
+        .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{filter:brightness(1.1)}
+        .btn-secondary{background:#fff;border-color:var(--border);color:var(--text-muted)}.btn-secondary:hover{background:var(--bg-base);color:var(--text-main)}
+        .btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{filter:brightness(1.1)}
+        .btn-sm{padding:.3rem .55rem;font-size:.78rem}
+        .content{flex-grow:1;overflow-y:auto;padding:1.5rem}
+        .panel{display:none}.panel.active{display:block}
+        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
+        .kpi-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.25rem}
+        .kpi-label{font-size:.7rem;text-transform:uppercase;font-weight:700;color:var(--text-light);letter-spacing:.04em}
+        .kpi-value{font-size:1.5rem;font-weight:800;font-family:'Outfit',sans-serif;margin-top:.2rem}
+        .kpi-sub{font-size:.72rem;color:var(--text-light);margin-top:.15rem}
+        .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem}
+        .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem}
+        .card-title{font-size:1rem;font-weight:700}
+        .filters{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+        .filter-input{padding:.4rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;font-family:'Inter',sans-serif}
+        .filter-select{padding:.4rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;font-family:'Inter',sans-serif;background:#fff}
+        table{width:100%;border-collapse:collapse;font-size:.82rem}
+        thead{background:var(--bg-base)}
+        th{padding:.65rem .75rem;text-align:left;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-base);z-index:1}
+        td{padding:.6rem .75rem;border-bottom:1px solid var(--border);vertical-align:middle}
+        tr:hover{background:rgba(5,150,105,.03)}
+        .badge{display:inline-block;padding:.2rem .55rem;border-radius:20px;font-size:.7rem;font-weight:600;white-space:nowrap}
+        .badge-green{background:#d1fae5;color:#065f46}.badge-yellow{background:#fef3c7;color:#92400e}.badge-orange{background:#ffedd5;color:#9a3412}
+        .badge-red{background:#fee2e2;color:#991b1b}.badge-dark-red{background:#7f1d1d;color:#fff}.badge-blue{background:#dbeafe;color:#1e40af}
+        .badge-gray{background:#f3f4f6;color:#4b5563}.badge-purple{background:#ede9fe;color:#6d28d9}
+        .table-wrap{overflow-x:auto;max-height:calc(100vh - 280px)}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100}
+        .modal{background:#fff;border-radius:12px;padding:1.5rem;width:560px;max-width:92vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 40px rgba(0,0,0,.2)}
+        .modal h2{font-size:1.1rem;margin-bottom:1rem}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem}
+        .form-row.full{grid-template-columns:1fr}
+        .form-group{margin-bottom:.75rem}
+        .form-group label{display:block;font-size:.75rem;font-weight:600;color:var(--text-muted);margin-bottom:.2rem}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:.5rem .7rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem;font-family:'Inter',sans-serif}
+        .form-group textarea{min-height:60px;resize:vertical}
+        .toast{position:fixed;top:1rem;right:1rem;padding:.75rem 1.25rem;border-radius:8px;font-size:.85rem;font-weight:500;z-index:200;animation:slideIn .3s ease}
+        .toast-success{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
+        .toast-error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+        @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        .empty-state{text-align:center;padding:3rem 1rem;color:var(--text-light)}
+        .empty-state h3{font-size:1.1rem;margin-bottom:.5rem;color:var(--text-muted)}
+        .empty-state p{font-size:.85rem}
+        .stat-bar{height:8px;background:var(--bg-base);border-radius:4px;overflow:hidden;margin-top:.35rem}
+        .stat-bar-fill{height:100%;border-radius:4px;transition:width .3s}
+        .actions-cell{display:flex;gap:.3rem}
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="brand"><div class="logo-icon">CS</div>RevenueOps</a>
+        </div>
+        <div class="nav">
+            <a class="nav-item" href="/" style="text-decoration:none;border-left:3px solid transparent;">🏠 ChlearSakhaaOps Home</a>
+            <div style="border-bottom:1px solid var(--border);margin:0.5rem 0;"></div>
+            <div class="nav-section">Overview</div>
+            <div class="nav-item active" onclick="showPanel('dashboard')">Dashboard</div>
+            <div class="nav-section">Management</div>
+            <div class="nav-item" onclick="showPanel('clients')">Clients</div>
+            <div class="nav-item" onclick="showPanel('invoices')">Invoices</div>
+            <div class="nav-item" onclick="showPanel('payments')">Payments</div>
+            <div class="nav-item" onclick="showPanel('outstanding')">Outstanding</div>
+            <div class="nav-section">Follow-up</div>
+            <div class="nav-item" onclick="showPanel('reminders')">Reminders</div>
+            <div class="nav-section">Records</div>
+            <div class="nav-item" onclick="showPanel('documents')">Documents</div>
+            <div class="nav-section">Analysis</div>
+            <div class="nav-item" onclick="showPanel('reports')">Reports</div>
+            <div class="nav-item" onclick="showPanel('bms')">BMs</div>
+            <div class="nav-item" onclick="showPanel('bm-view')">BM View</div>
+            <div class="nav-section">System</div>
+            <div class="nav-item" onclick="showPanel('settings')">Settings</div>
+            <div class="nav-item" onclick="showPanel('users')">Users</div>
+        </div>
+
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <h1 id="pageTitle">Dashboard</h1>
+            <div class="topbar-right">
+                <span class="user-badge" id="userBadge">Loading...</span>
+                <button class="btn btn-secondary btn-sm" onclick="seedDemo()">Seed Demo Data</button>
+            </div>
+        </div>
+        <div class="content" id="content">
+
+            <!-- DASHBOARD -->
+            <div class="panel active" id="panel-dashboard">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Date Range</span>
+                        <div class="filters">
+                            <input type="date" class="filter-input" id="dashDateFrom" onchange="loadDashboard()">
+                            <input type="date" class="filter-input" id="dashDateTo" onchange="loadDashboard()">
+                            <button class="btn btn-secondary btn-sm" onclick="clearDashDates()">Clear</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="kpi-grid" id="dashKpis"></div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Overdue Clients</span></div>
+                    <div class="table-wrap"><table id="dashOverdueTable"><thead><tr><th>Client</th><th>Outstanding</th></tr></thead><tbody></tbody></table></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Billing Model Revenue Split</span></div>
+                    <div class="table-wrap"><table id="dashBillingTable"><thead><tr><th>Billing Type</th><th>Revenue</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- CLIENTS -->
+            <div class="panel" id="panel-clients">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Clients</span>
+                        <div class="filters">
+                            <input class="filter-input" placeholder="Search..." id="clientSearch" oninput="loadClients()">
+                            <select class="filter-select" id="clientStatusFilter" onchange="loadClients()">
+                                <option value="">All Status</option><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option><option value="on_hold">On Hold</option>
+                            </select>
+                            <button class="btn btn-primary btn-sm" onclick="openClientModal()">+ Add Client</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap"><table id="clientsTable"><thead><tr><th>Name</th><th>Brand</th><th>BM</th><th>Status</th><th>Invoice Day</th><th>Due Days</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- INVOICES -->
+            <div class="panel" id="panel-invoices">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Invoices</span>
+                        <div class="filters">
+                            <input class="filter-input" placeholder="Search invoice..." id="invSearch" oninput="loadInvoices()">
+                            <select class="filter-select" id="invStatusFilter" onchange="loadInvoices()">
+                                <option value="">All Status</option><option value="not_raised">Not Raised</option><option value="invoice_raised">Raised</option><option value="sent_to_client">Sent</option><option value="partially_paid">Partially Paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="disputed">Disputed</option><option value="cancelled">Cancelled</option><option value="credit_note_issued">Credit Note</option>
+                            </select>
+                            <input type="date" class="filter-input" id="invDateFrom" onchange="loadInvoices()" placeholder="From">
+                            <input type="date" class="filter-input" id="invDateTo" onchange="loadInvoices()" placeholder="To">
+                            <button class="btn btn-secondary btn-sm" onclick="clearInvDates()">Clear Dates</button>
+                            <button class="btn btn-primary btn-sm" onclick="openInvoiceModal()">+ New Invoice</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap"><table id="invoicesTable"><thead><tr><th>Invoice #</th><th>Client</th><th>BM</th><th>Invoice raised Date</th><th>Invoice Amount</th><th>Received</th><th>Outstanding</th><th>Due Date</th><th>Overdue</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                    <div id="invPagination" style="margin-top:1rem;display:flex;align-items:center;justify-content:space-between;font-size:.82rem;color:var(--text-muted)">
+                        <div>
+                            Show:
+                            <button class="btn btn-sm btn-secondary" onclick="setInvPageSize(5)">5</button>
+                            <button class="btn btn-sm btn-secondary" onclick="setInvPageSize(10)">10</button>
+                            <button class="btn btn-sm btn-secondary" onclick="setInvPageSize(15)">15</button>
+                            <button class="btn btn-sm btn-secondary" onclick="setInvPageSize(20)">20</button>
+                            <button class="btn btn-sm btn-secondary" onclick="setInvPageSize(50)">50</button>
+                        </div>
+                        <div id="invPageInfo"></div>
+                        <div>
+                            <button class="btn btn-sm btn-secondary" onclick="changeInvPage(-1)">&#171; Prev</button>
+                            <button class="btn btn-sm btn-secondary" onclick="changeInvPage(1)">Next &#187;</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAYMENTS -->
+            <div class="panel" id="panel-payments">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Payments</span>
+                        <div class="filters">
+                            <button class="btn btn-primary btn-sm" onclick="openPaymentModal()">+ Record Payment</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap"><table id="paymentsTable"><thead><tr><th>Date</th><th>Client</th><th>Invoice</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- OUTSTANDING -->
+            <div class="panel" id="panel-outstanding">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Outstanding Receivables</span>
+                        <div class="filters">
+                            <select class="filter-select" id="outAgeingFilter" onchange="loadOutstanding()">
+                                <option value="">All</option><option value="due_in_3_days">Due in 3 days</option><option value="due_today">Due today</option><option value="1_7">1-7 days overdue</option><option value="8_15">8-15 days</option><option value="16_30">16-30 days</option><option value="31_60">31-60 days</option><option value="60_plus">60+ days</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-wrap"><table id="outstandingTable"><thead><tr><th>Client</th><th>Invoice</th><th>Amount</th><th>Received</th><th>Outstanding</th><th>Due Date</th><th>Overdue Days</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- REMINDERS -->
+            <div class="panel" id="panel-reminders">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Reminders</span>
+                        <button class="btn btn-primary btn-sm" onclick="openReminderModal()">+ Add Reminder</button>
+                    </div>
+                    <div class="table-wrap"><table id="remindersTable"><thead><tr><th>Client</th><th>Invoice</th><th>Type</th><th>Priority</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- DOCUMENTS -->
+            <div class="panel" id="panel-documents">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Documents</span>
+                        <button class="btn btn-primary btn-sm" onclick="openDocModal()">+ Upload Document</button>
+                    </div>
+                    <div class="table-wrap"><table id="docsTable"><thead><tr><th>Name</th><th>Type</th><th>Client</th><th>Invoice</th><th>Uploaded By</th><th>Date</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- REPORTS -->
+            <div class="panel" id="panel-reports">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Reports</span></div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;">
+                        <div class="card" style="cursor:pointer" onclick="runReport('monthly-billing')"><h4>Monthly Billing</h4><p style="font-size:.78rem;color:var(--text-light)">All invoices by month</p></div>
+                        <div class="card" style="cursor:pointer" onclick="runReport('outstanding')"><h4>Outstanding Report</h4><p style="font-size:.78rem;color:var(--text-light)">All outstanding receivables</p></div>
+                        <div class="card" style="cursor:pointer" onclick="runReport('bm-wise')"><h4>BM-Wise Report</h4><p style="font-size:.78rem;color:var(--text-light)">Business manager collection</p></div>
+                        <div class="card" style="cursor:pointer" onclick="runReport('invoice-not-raised')"><h4>Invoice Not Raised</h4><p style="font-size:.78rem;color:var(--text-light)">Active clients without invoices</p></div>
+                    </div>
+                </div>
+                <div class="card" id="reportResult" style="display:none">
+                    <div class="card-header"><span class="card-title" id="reportTitle">Report</span><button class="btn btn-secondary btn-sm" onclick="exportCSV()">Export CSV</button></div>
+                    <div class="table-wrap"><table id="reportTable"><thead></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- BMs -->
+            <div class="panel" id="panel-bms">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Business Managers</span>
+                        <button class="btn btn-primary btn-sm" onclick="openBMModal()">+ Add BM</button>
+                    </div>
+                    <div class="table-wrap"><table id="bmsTable"><thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- BM VIEW -->
+            <div class="panel" id="panel-bm-view">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Business Manager View</span></div>
+                    <div id="bmViewContent"></div>
+                </div>
+            </div>
+
+            <!-- SETTINGS -->
+            <div class="panel" id="panel-settings">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Settings</span></div>
+                    <div class="form-group"><label>Default Payment Due Days</label><input id="settDueDays" class="filter-input" value="30" style="max-width:120px"></div>
+                    <div class="form-group"><label>Company Name</label><input id="settCompany" class="filter-input" value="Chlear Digital" style="max-width:300px"></div>
+                    <div class="form-group"><label>Currency Format</label><input id="settCurrency" class="filter-input" value="INR" style="max-width:120px"></div>
+                    <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+                </div>
+            </div>
+
+            <!-- USERS -->
+            <div class="panel" id="panel-users">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Users</span></div>
+                    <div class="table-wrap"><table id="usersTable"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>RevOps Role</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <div id="modalOverlay" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h2 id="modalTitle">Add</h2>
+            <div id="modalBody"></div>
+            <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" id="modalSave" onclick="saveModal()">Save</button>
+            </div>
+        </div>
+    </div>
+    <!-- REMINDER POPUP -->
+    <div id="reminderPopup" style="display:none;position:fixed;top:1rem;right:1rem;width:360px;max-height:80vh;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 24px rgba(0,0,0,.12);z-index:150;padding:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+            <h3 style="font-size:1rem">⏰ Payment Reminders</h3>
+            <button class="btn btn-secondary btn-sm" onclick="closeReminderPopup()">✕</button>
+        </div>
+        <div id="reminderPopupList"></div>
+    </div>
+    <div id="toastContainer"></div>
+
+<script>
+const API='http://127.0.0.1:8000/api/revenueops';
+const AUTH='http://127.0.0.1:8000/api/auth';
+let token=localStorage.getItem('adoptima_token')||'';
+let currentUser=null;
+let clients=[],invoices=[],payments=[],outstanding=[],reminders=[],documents=[],bmStats=[],dashData={};
+let currentReportData=[],currentReportTitle='';
+let modalMode='',modalEditId=null;
+let invPageSize=10,invPage=1;
+
+function $(id){return document.getElementById(id)}
+function fmt(n){return n!=null?'INR '+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}
+function fmtDate(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}catch(e){return d}}
+function statusBadge(s){const m={paid:'badge-green',partially_paid:'badge-yellow',overdue:'badge-red',unpaid:'badge-gray',invoice_raised:'badge-blue',sent_to_client:'badge-blue',not_raised:'badge-gray',disputed:'badge-purple',cancelled:'badge-gray',credit_note_issued:'badge-orange',active:'badge-green',paused:'badge-yellow',closed:'badge-red',on_hold:'badge-orange',open:'badge-blue',snoozed:'badge-yellow',done:'badge-green',low:'badge-green',medium:'badge-yellow',high:'badge-orange',critical:'badge-red'};return `<span class="badge ${m[s]||'badge-gray'}">${s?s.replace(/_/g,' '):''}</span>`}
+function overdueBadge(days){if(days>60)return'<span class="badge badge-dark-red">60+ days</span>';if(days>30)return'<span class="badge badge-red">31-60d</span>';if(days>15)return'<span class="badge badge-orange">16-30d</span>';if(days>7)return'<span class="badge badge-yellow">8-15d</span>';if(days>0)return'<span class="badge badge-yellow">1-7d</span>';if(days>=-3&&days<=0)return'<span class="badge badge-blue">Due soon</span>';return'<span class="badge badge-green">On time</span>'}
+
+async function api(method,path,body){
+    const opts={method,headers:{}};if(token)opts.headers['Authorization']='Bearer '+token;
+    if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body)}
+    const res=await fetch(API+path,opts);if(res.status===401){token='';localStorage.removeItem('adoptima_token');window.location.href='/';throw new Error('Session expired')}
+    if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.detail||'Request failed')}
+    return res.status===204?null:res.json();
+}
+
+function toast(msg,type='success'){const d=document.createElement('div');d.className=`toast toast-${type}`;d.textContent=msg;$('toastContainer').appendChild(d);setTimeout(()=>d.remove(),3500)}
+
+function showPanel(name){
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    const panel=$('panel-'+name);if(panel)panel.classList.add('active');
+    const navItems=document.querySelectorAll('.nav-item');navItems.forEach(n=>{if(n.textContent.trim().toLowerCase().replace(/\s+/g,'-').includes(name))n.classList.add('active')});
+    const titles={dashboard:'Dashboard',clients:'Clients',invoices:'Invoices',payments:'Payments',outstanding:'Outstanding',reminders:'Reminders',documents:'Documents',reports:'Reports',bms:'Business Managers','bm-view':'BM View',settings:'Settings',users:'Users'};
+    $('pageTitle').textContent=titles[name]||name;
+    loadPanel(name);
+}
+
+function loadPanel(name){
+    switch(name){
+        case 'dashboard':loadDashboard();break;
+        case 'clients':loadClients();break;
+        case 'invoices':loadInvoices();break;
+        case 'payments':loadPayments();break;
+        case 'outstanding':loadOutstanding();break;
+        case 'reminders':loadReminders();break;
+        case 'documents':loadDocuments();break;
+        case 'bms':loadBMs();break;
+        case 'bm-view':loadBMView();break;
+        case 'users':loadUsers();break;
+        case 'settings':loadSettings();break;
+    }
+}
+
+async function checkAuth(){
+    if(!token){window.location.href='/';return}
+    try{currentUser=await fetch(AUTH+'/me',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json())}catch(e){window.location.href='/';return}
+    $('userBadge').textContent=(currentUser.full_name||currentUser.email)+(currentUser.rev_role?' ('+currentUser.rev_role+')':'');
+}
+
+// DASHBOARD
+async function loadDashboard(){
+    const from=$('dashDateFrom').value;const to=$('dashDateTo').value;
+    let url='/dashboard?';if(from)url+=`date_from=${from}&`;if(to)url+=`date_to=${to}&`;
+    try{dashData=await api('GET',url)}catch(e){return}
+    const k=dashData;
+    $('dashKpis').innerHTML=`
+        <div class="kpi-card"><div class="kpi-label">Total Billed</div><div class="kpi-value">${fmt(k.total_billed)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total Collected</div><div class="kpi-value" style="color:var(--success)">${fmt(k.total_collected)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Outstanding</div><div class="kpi-value" style="color:var(--warning)">${fmt(k.total_outstanding)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Overdue</div><div class="kpi-value" style="color:var(--danger)">${fmt(k.total_overdue)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Collection %</div><div class="kpi-value">${k.collection_percentage}%</div><div class="stat-bar"><div class="stat-bar-fill" style="width:${k.collection_percentage}%;background:var(--success)"></div></div></div>
+        <div class="kpi-card"><div class="kpi-label">Monthly Billed</div><div class="kpi-value">${fmt(k.monthly_billed)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Monthly Collected</div><div class="kpi-value">${fmt(k.monthly_collected)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Active Clients</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
+        <div class="kpi-card"><div class="kpi-label">Overdue Invoices</div><div class="kpi-value" style="color:var(--danger)">${k.overdue_invoices}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Partially Paid</div><div class="kpi-value">${k.partially_paid_count}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Disputed</div><div class="kpi-value">${k.disputed_count}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Expected This Week</div><div class="kpi-value">${fmt(k.expected_collection_week)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Expected This Month</div><div class="kpi-value">${fmt(k.expected_collection_month)}</div></div>
+    `;
+    $('dashOverdueTable').querySelector('tbody').innerHTML=(k.top_overdue_clients||[]).map(c=>`<tr><td>${c.client_name}</td><td style="color:var(--danger);font-weight:600">${fmt(c.outstanding)}</td></tr>`).join('');
+    $('dashBillingTable').querySelector('tbody').innerHTML=Object.entries(k.billing_model_dist||{}).map(([t,a])=>`<tr><td>${t.replace(/_/g,' ')}</td><td style="font-weight:600">${fmt(a)}</td></tr>`).join('');
+}
+
+// CLIENTS
+async function loadClients(){
+    const s=$('clientSearch').value;const st=$('clientStatusFilter').value;
+    let url='/clients?';if(s)url+=`search=${encodeURIComponent(s)}&`;if(st)url+=`status=${st}&`;
+    try{clients=await api('GET',url)}catch(e){return}
+    $('clientsTable').querySelector('tbody').innerHTML=clients.map(c=>`<tr>
+        <td style="font-weight:600">${c.client_name}</td><td>${c.brand_name||'—'}</td><td>${c.business_manager_name||'—'}</td>
+        <td>${statusBadge(c.client_status)}</td><td>${c.invoice_day||'—'}</td><td>${c.default_due_days||'—'}d</td>
+        <td class="actions-cell"><button class="btn btn-secondary btn-sm" onclick="editClient(${c.id})">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id})">Del</button></td>
+    </tr>`).join('');
+}
+
+async function openClientModal(edit=null){
+    modalMode=edit?'edit':'create';modalEditId=edit?edit.id:null;
+    $('modalTitle').textContent=edit?'Edit Client':'Add Client';
+    let bms=[];
+    try{bms=await api('GET','/business-managers')}catch(e){bms=[]}
+    const bmOptions='<option value="">Unassigned</option>'+bms.map(b=>`<option value="${b.id}" ${edit&&edit.business_manager_id===b.id?'selected':''}>${b.name}</option>`).join('');
+    $('modalBody').innerHTML=`
+        <div class="form-row"><div class="form-group"><label>Client Name *</label><input id="m_clientName" value="${edit?edit.client_name:''}"></div>
+        <div class="form-group"><label>Brand/Project</label><input id="m_brandName" value="${edit?edit.brand_name||'':''}"></div></div>
+        <div class="form-row"><div class="form-group"><label>Client SPOC</label><input id="m_contactPerson" value="${edit?edit.contact_person||'':''}"></div>
+        <div class="form-group"><label>Mobile Number</label><input id="m_contactPhone" value="${edit?edit.contact_phone||'':''}"></div></div>
+        <div class="form-row full"><div class="form-group"><label>Email</label><input id="m_contactEmail" value="${edit?edit.contact_email||'':''}"></div></div>
+        <div class="form-row"><div class="form-group"><label>Business Manager</label><select id="m_businessManager">${bmOptions}</select></div>
+        <div class="form-group"><label>Status</label><select id="m_clientStatus"><option value="active" ${edit&&edit.client_status==='active'?'selected':''}>Active</option><option value="paused" ${edit&&edit.client_status==='paused'?'selected':''}>Paused</option><option value="closed" ${edit&&edit.client_status==='closed'?'selected':''}>Closed</option><option value="on_hold" ${edit&&edit.client_status==='on_hold'?'selected':''}>On Hold</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label>Invoice Day <span style="font-size:.7rem;color:var(--text-light)">(Day of month to raise invoice)</span></label><input type="number" id="m_invoiceDay" value="${edit?edit.invoice_day:1}" min="1" max="28"></div>
+        <div class="form-group"><label>Default Due Days <span style="font-size:.7rem;color:var(--text-light)">(Payment credit period)</span></label><input type="number" id="m_dueDays" value="${edit?edit.default_due_days:30}"></div></div>
+        <div class="form-group"><label>Remarks</label><textarea id="m_remarks">${edit?edit.remarks||'':''}</textarea></div>
+    `;
+    $('modalOverlay').style.display='flex';
+}
+
+async function saveModal(){
+    try{
+        if($('m_clientName')){
+            const bm=$('m_businessManager').value;
+            const data={client_name:$('m_clientName').value,brand_name:$('m_brandName').value,contact_person:$('m_contactPerson').value,contact_email:$('m_contactEmail').value,contact_phone:$('m_contactPhone').value,business_manager_id:bm?parseInt(bm):null,client_status:$('m_clientStatus').value,invoice_day:parseInt($('m_invoiceDay').value)||1,default_due_days:parseInt($('m_dueDays').value)||30,remarks:$('m_remarks').value};
+            if(modalEditId)await api('PUT',`/clients/${modalEditId}`,data);else await api('POST','/clients',data);
+            toast(modalEditId?'Client updated':'Client added');loadClients();closeModal();return;
+        }
+    }catch(e){toast(e.message,'error');return}
+}
+
+function editClient(id){const c=clients.find(x=>x.id===id);if(c)openClientModal(c)}
+async function deleteClient(id){if(!confirm('Delete this client?'))return;try{await api('DELETE',`/clients/${id}`);toast('Client deleted');loadClients()}catch(e){toast(e.message,'error')}}
+
+// INVOICES
+async function loadInvoices(){
+    const s=$('invSearch').value;const st=$('invStatusFilter').value;const df=$('invDateFrom').value;const dt=$('invDateTo').value;
+    let url='/invoices?';if(s)url+=`search=${encodeURIComponent(s)}&`;if(st)url+=`status=${st}&`;if(df)url+=`date_from=${df}&`;if(dt)url+=`date_to=${dt}&`;url+=`limit=9999&`;
+    try{invoices=await api('GET',url)}catch(e){return}
+    invPage=1;
+    renderInvoices();
+}
+
+function renderInvoices(){
+    const start=(invPage-1)*invPageSize;const page=invoices.slice(start,start+invPageSize);
+    $('invoicesTable').querySelector('tbody').innerHTML=page.map(i=>`<tr>
+        <td style="font-weight:600">${i.invoice_number}</td><td>${i.client_name||'—'}</td><td>${i.business_manager_name||'—'}</td>
+        <td>${fmtDate(i.invoice_date)}</td><td>${fmt(i.invoice_amount)}</td><td style="color:var(--success)">${fmt(i.amount_received)}</td>
+        <td style="color:${i.outstanding_amount>0?'var(--danger)':'var(--success)'};font-weight:600">${fmt(i.outstanding_amount)}</td>
+        <td>${fmtDate(i.due_date)}</td><td>${overdueBadge(i.overdue_days)}</td><td>${statusBadge(i.invoice_status)}</td>
+        <td class="actions-cell"><button class="btn btn-secondary btn-sm" onclick="editInvoice(${i.id})">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteInvoice(${i.id})">Del</button></td>
+    </tr>`).join('');
+    $('invPageInfo').textContent=`Page ${invPage} of ${Math.ceil(invoices.length/invPageSize)||1} (${invoices.length} total)`;
+}
+
+function setInvPageSize(n){invPageSize=n;invPage=1;renderInvoices();}
+function changeInvPage(dir){const max=Math.ceil(invoices.length/invPageSize)||1;invPage=Math.max(1,Math.min(invPage+dir,max));renderInvoices();}
+function clearInvDates(){$('invDateFrom').value='';$('invDateTo').value='';loadInvoices();}
+
+function openInvoiceModal(edit=null){
+    modalMode=edit?'edit':'create';modalEditId=edit?edit.id:null;
+    $('modalTitle').textContent=edit?'Edit Invoice':'New Invoice';
+    const opts=clients.map(c=>`<option value="${c.id}" ${edit&&edit.client_id===c.id?'selected':''}>${c.client_name}</option>`).join('');
+    $('modalBody').innerHTML=`
+        <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_invClient"><option value="">Select</option>${opts}</select></div>
+        <div class="form-group"><label>Invoice # *</label><input id="m_invNumber" value="${edit?edit.invoice_number:''}"></div></div>
+        <div class="form-row"><div class="form-group"><label>Invoice Date</label><input type="date" id="m_invDate" value="${edit?edit.invoice_date:new Date().toISOString().split('T')[0]}"></div>
+        <div class="form-group"><label>Due Date</label><input type="date" id="m_invDue" value="${edit?edit.due_date||'':''}"></div></div>
+        <div class="form-row"><div class="form-group"><label>Amount *</label><input type="number" id="m_invAmount" value="${edit?edit.invoice_amount:''}"></div>
+        <div class="form-group"><label>Billing Type</label><select id="m_invBilling"><option value="">Select</option><option value="monthly_retainer" ${edit&&edit.billing_type==='monthly_retainer'?'selected':''}>Monthly Retainer</option><option value="one_time_project" ${edit&&edit.billing_type==='one_time_project'?'selected':''}>One-time Project</option><option value="percentage_media" ${edit&&edit.billing_type==='percentage_media'?'selected':''}>% on Media</option><option value="fixed_plus_percentage" ${edit&&edit.billing_type==='fixed_plus_percentage'?'selected':''}>Fixed + %</option><option value="creative_package" ${edit&&edit.billing_type==='creative_package'?'selected':''}>Creative Package</option><option value="website_milestone" ${edit&&edit.billing_type==='website_milestone'?'selected':''}>Website Milestone</option><option value="performance_incentive" ${edit&&edit.billing_type==='performance_incentive'?'selected':''}>Performance/Incentive</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label>Invoice Period From</label><input type="date" id="m_invPeriodFrom" value="${edit&&edit.invoice_period?edit.invoice_period.split(' to ')[0]:''}"></div>
+        <div class="form-group"><label>Invoice Period To</label><input type="date" id="m_invPeriodTo" value="${edit&&edit.invoice_period?edit.invoice_period.split(' to ')[1]:''}"></div></div>
+        <div class="form-row"><div class="form-group"><label>Status</label><select id="m_invStatus"><option value="not_raised" ${edit&&edit.invoice_status==='not_raised'?'selected':''}>Not Raised</option><option value="invoice_raised" ${edit&&edit.invoice_status==='invoice_raised'?'selected':''}>Raised</option><option value="sent_to_client" ${edit&&edit.invoice_status==='sent_to_client'?'selected':''}>Sent</option><option value="partially_paid" ${edit&&edit.invoice_status==='partially_paid'?'selected':''}>Partially Paid</option><option value="paid" ${edit&&edit.invoice_status==='paid'?'selected':''}>Paid</option><option value="overdue" ${edit&&edit.invoice_status==='overdue'?'selected':''}>Overdue</option><option value="disputed" ${edit&&edit.invoice_status==='disputed'?'selected':''}>Disputed</option><option value="cancelled" ${edit&&edit.invoice_status==='cancelled'?'selected':''}>Cancelled</option><option value="credit_note_issued" ${edit&&edit.invoice_status==='credit_note_issued'?'selected':''}>Credit Note</option></select></div></div>
+        <div class="form-group"><label>Remarks</label><textarea id="m_invRemarks">${edit?edit.remarks||'':''}</textarea></div>
+    `;
+    $('modalOverlay').style.display='flex';
+}
+
+async function saveModal(){
+    try{
+        if($('m_invClient')){
+            const from=$('m_invPeriodFrom').value;const to=$('m_invPeriodTo').value;
+            const period=(from||to)?`${from||''} to ${to||''}`:null;
+            const data={client_id:parseInt($('m_invClient').value),invoice_number:$('m_invNumber').value,invoice_date:$('m_invDate').value,due_date:$('m_invDue').value||null,invoice_amount:parseFloat($('m_invAmount').value)||0,billing_type:$('m_invBilling').value||null,invoice_period:period,invoice_status:$('m_invStatus').value,payment_status:$('m_invStatus').value==='paid'?'paid':$('m_invStatus').value==='partially_paid'?'partially_paid':'unpaid',remarks:$('m_invRemarks').value};
+            if(!data.client_id||!data.invoice_number||!data.invoice_amount){toast('Fill required fields','error');return}
+            if(modalEditId)await api('PUT',`/invoices/${modalEditId}`,data);else await api('POST','/invoices',data);
+            toast(modalEditId?'Invoice updated':'Invoice created');loadInvoices();closeModal();return;
+        }
+        if($('m_bmName')){await saveBMModal();return;}
+    }catch(e){toast(e.message,'error')}
+}
+
+function editInvoice(id){const i=invoices.find(x=>x.id===id);if(i)openInvoiceModal(i)}
+async function deleteInvoice(id){if(!confirm('Delete invoice and its payments?'))return;try{await api('DELETE',`/invoices/${id}`);toast('Invoice deleted');loadInvoices()}catch(e){toast(e.message,'error')}}
+
+// PAYMENTS
+async function loadPayments(){
+    try{payments=await api('GET','/payments')}catch(e){return}
+    $('paymentsTable').querySelector('tbody').innerHTML=payments.map(p=>`<tr>
+        <td>${fmtDate(p.payment_date)}</td><td>${p.client_name||'—'}</td><td>${p.invoice_number||'—'}</td>
+        <td style="color:var(--success);font-weight:600">${fmt(p.amount)}</td><td>${statusBadge(p.payment_mode)}</td><td>${p.reference_number||'—'}</td>
+        <td class="actions-cell"><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">Del</button></td>
+    </tr>`).join('');
+}
+
+function openPaymentModal(){
+    modalMode='create';modalEditId=null;
+    $('modalTitle').textContent='Record Payment';
+    const invOpts=invoices.filter(i=>i.outstanding_amount>0).map(i=>`<option value="${i.id}">${i.invoice_number} (${fmt(i.outstanding_amount)} due)</option>`).join('');
+    const clientOpts=clients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
+    $('modalBody').innerHTML=`
+        <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_payClient"><option value="">Select</option>${clientOpts}</select></div>
+        <div class="form-group"><label>Invoice *</label><select id="m_payInvoice"><option value="">Select</option>${invOpts}</select></div></div>
+        <div class="form-row"><div class="form-group"><label>Amount *</label><input type="number" id="m_payAmount"></div>
+        <div class="form-group"><label>Payment Date *</label><input type="date" id="m_payDate" value="${new Date().toISOString().split('T')[0]}"></div></div>
+        <div class="form-row"><div class="form-group"><label>Mode</label><select id="m_payMode"><option value="bank_transfer">Bank Transfer</option><option value="upi">UPI</option><option value="cheque">Cheque</option><option value="cash">Cash</option><option value="other">Other</option></select></div>
+        <div class="form-group"><label>Reference #</label><input id="m_payRef"></div></div>
+        <div class="form-group"><label>Remarks</label><textarea id="m_payRemarks"></textarea></div>
+    `;
+    $('modalOverlay').style.display='flex';
+}
+
+async function saveModal(){
+    try{
+        if($('m_payClient')){
+            const data={client_id:parseInt($('m_payClient').value),invoice_id:parseInt($('m_payInvoice').value),amount:parseFloat($('m_payAmount').value),payment_date:$('m_payDate').value,payment_mode:$('m_payMode').value,reference_number:$('m_payRef').value||null,remarks:$('m_payRemarks').value||null};
+            if(!data.client_id||!data.invoice_id||!data.amount){toast('Fill required fields','error');return}
+            await api('POST','/payments',data);toast('Payment recorded');loadPayments();closeModal();return;
+        }
+        if($('m_remClient')){await saveReminderModal();return;}
+        if($('m_docClient')){await saveDocModal();return;}
+    }catch(e){toast(e.message,'error')}
+}
+
+async function deletePayment(id){if(!confirm('Delete payment?'))return;try{await api('DELETE',`/payments/${id}`);toast('Payment deleted');loadPayments();loadInvoices()}catch(e){toast(e.message,'error')}}
+
+// OUTSTANDING
+async function loadOutstanding(){
+    const ageing=$('outAgeingFilter').value;
+    let url='/outstanding?';if(ageing)url+=`ageing=${ageing}&`;
+    try{outstanding=await api('GET',url)}catch(e){return}
+    $('outstandingTable').querySelector('tbody').innerHTML=outstanding.map(i=>`<tr>
+        <td>${i.client_name||'—'}</td><td style="font-weight:600">${i.invoice_number}</td><td>${fmt(i.invoice_amount)}</td>
+        <td style="color:var(--success)">${fmt(i.amount_received)}</td><td style="color:var(--danger);font-weight:600">${fmt(i.outstanding_amount)}</td>
+        <td>${fmtDate(i.due_date)}</td><td>${overdueBadge(i.overdue_days)}</td><td>${statusBadge(i.payment_status)}</td>
+    </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--text-light)">No outstanding invoices</td></tr>';
+}
+
+// REMINDERS
+async function loadReminders(){
+    try{reminders=await api('GET','/reminders')}catch(e){return}
+    $('remindersTable').querySelector('tbody').innerHTML=reminders.map(r=>`<tr>
+        <td>${r.client_name||'—'}</td><td>${r.invoice_number||'—'}</td><td>${r.reminder_type.replace(/_/g,' ')}</td>
+        <td>${statusBadge(r.priority)}</td><td>${fmt(r.due_amount)}</td><td>${fmtDate(r.due_date)}</td><td>${statusBadge(r.reminder_status)}</td>
+        <td class="actions-cell">
+            <button class="btn btn-secondary btn-sm" onclick="markReminder(${r.id},'done')">Done</button>
+            <button class="btn btn-secondary btn-sm" onclick="openSnoozeInline(${r.id})">Snooze</button>
+            <button class="btn btn-primary btn-sm" onclick="genReminderText(${r.id})">Copy Text</button>
+        </td>
+    </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--text-light)">No reminders</td></tr>';
+}
+
+async function checkDueReminders(){
+    try{
+        const due=await api('GET','/reminders/due-today');
+        if(due && due.length>0) showReminderPopup(due);
+    }catch(e){}
+}
+
+function showReminderPopup(list){
+    const container=$('reminderPopupList');
+    container.innerHTML=list.map(r=>`
+        <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.5rem">
+            <div style="font-weight:600;font-size:.9rem">${r.client_name} — ${r.invoice_number||'Invoice'}</div>
+            <div style="font-size:.78rem;color:var(--text-muted);margin:.25rem 0">${r.reminder_type.replace(/_/g,' ')} | Due: ${fmt(r.due_amount)}</div>
+            <div style="font-size:.75rem;color:var(--text-light);margin-bottom:.5rem">${r.notes||''}</div>
+            <div style="display:flex;gap:.4rem;align-items:flex-end;flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" onclick="genReminderText(${r.id})" style="margin-right:auto">Copy WhatsApp</button>
+                <button class="btn btn-secondary btn-sm" onclick="markReminder(${r.id},'done')">Done</button>
+                <div style="display:flex;gap:.25rem;align-items:center">
+                    <input type="number" id="snoozeVal_${r.id}" value="2" min="1" style="width:50px;padding:.3rem;border:1px solid var(--border);border-radius:4px;font-size:.78rem">
+                    <select id="snoozeUnit_${r.id}" style="padding:.3rem;border:1px solid var(--border);border-radius:4px;font-size:.78rem">
+                        <option value="hour">Hour(s)</option>
+                        <option value="day">Day(s)</option>
+                    </select>
+                    <button class="btn btn-secondary btn-sm" onclick="snoozeReminder(${r.id})">Snooze</button>
+                </div>
+            </div>
+        </div>`).join('');
+    $('reminderPopup').style.display='block';
+}
+
+function closeReminderPopup(){$('reminderPopup').style.display='none'}
+
+async function snoozeReminder(id){
+    const val=parseInt($('snoozeVal_'+id).value)||1;
+    const unit=$('snoozeUnit_'+id).value;
+    try{await api('POST',`/reminders/${id}/snooze`,{value:val,unit:unit});toast(`Snoozed for ${val} ${unit}(s)`);checkDueReminders();loadReminders();}catch(e){toast(e.message,'error')}
+}
+
+function openSnoozeInline(id){showReminderPopup([reminders.find(r=>r.id===id)].filter(Boolean))}
+
+function openReminderModal(){
+    modalMode='create';modalEditId=null;
+    $('modalTitle').textContent='Add Reminder';
+    const clientOpts=clients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
+    const invOpts=invoices.map(i=>`<option value="${i.id}">${i.invoice_number}</option>`).join('');
+    $('modalBody').innerHTML=`
+        <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_remClient"><option value="">Select</option>${clientOpts}</select></div>
+        <div class="form-group"><label>Invoice</label><select id="m_remInvoice"><option value="">None</option>${invOpts}</select></div></div>
+        <div class="form-row"><div class="form-group"><label>Type</label><select id="m_remType"><option value="due_in_3_days">Due in 3 days</option><option value="due_today">Due today</option><option value="overdue_7_days">Overdue 7 days</option><option value="overdue_15_days">Overdue 15 days</option><option value="overdue_30_days">Overdue 30+ days</option><option value="invoice_not_raised">Invoice not raised</option><option value="followup_pending">Follow-up pending</option><option value="payment_promised">Payment promised</option></select></div>
+        <div class="form-group"><label>Priority</label><select id="m_remPriority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label>Due Amount</label><input type="number" id="m_remAmount" value="0"></div>
+        <div class="form-group"><label>Due Date</label><input type="date" id="m_remDueDate"></div></div>
+        <div class="form-group"><label>Notes</label><textarea id="m_remNotes"></textarea></div>
+    `;
+    $('modalOverlay').style.display='flex';
+}
+
+async function saveReminderModal(){
+    const data={client_id:parseInt($('m_remClient').value),invoice_id:$('m_remInvoice').value?parseInt($('m_remInvoice').value):null,reminder_type:$('m_remType').value,priority:$('m_remPriority').value,due_amount:parseFloat($('m_remAmount').value)||0,due_date:$('m_remDueDate').value||null,notes:$('m_remNotes').value||null};
+    if(!data.client_id){toast('Select a client','error');return}
+    await api('POST','/reminders',data);toast('Reminder added');loadReminders();closeModal();
+}
+
+async function markReminder(id,status){try{await api('PUT',`/reminders/${id}`,{reminder_status:status});toast('Reminder updated');loadReminders()}catch(e){toast(e.message,'error')}}
+async function genReminderText(id){
+    try{const r=await api('POST',`/reminders/${id}/generate-text?channel=whatsapp`);navigator.clipboard.writeText(r.text).then(()=>toast('Reminder text copied!')).catch(()=>{prompt('Copy this:',r.text)})}catch(e){toast(e.message,'error')}
+}
+
+// DOCUMENTS
+async function loadDocuments(){
+    try{documents=await api('GET','/documents')}catch(e){return}
+    $('docsTable').querySelector('tbody').innerHTML=documents.map(d=>`<tr>
+        <td>${d.document_name}</td><td>${statusBadge(d.document_type)}</td><td>${d.client_name||'—'}</td><td>${d.invoice_id||'—'}</td>
+        <td>${d.uploaded_by_name||'—'}</td><td>${fmtDate(d.created_at)}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteDoc(${d.id})">Del</button></td>
+    </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--text-light)">No documents</td></tr>';
+}
+
+function openDocModal(){
+    modalMode='create';modalEditId=null;
+    $('modalTitle').textContent='Upload Document';
+    const clientOpts=clients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
+    const invOpts=invoices.map(i=>`<option value="${i.id}">${i.invoice_number}</option>`).join('');
+    $('modalBody').innerHTML=`
+        <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_docClient"><option value="">Select</option>${clientOpts}</select></div>
+        <div class="form-group"><label>Type</label><select id="m_docType"><option value="invoice_pdf">Invoice PDF</option><option value="po">PO</option><option value="sow">SOW</option><option value="agreement">Agreement</option><option value="payment_proof">Payment Proof</option><option value="credit_note">Credit Note</option><option value="client_communication">Communication</option><option value="other">Other</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label>Invoice</label><select id="m_docInvoice"><option value="">None</option>${invOpts}</select></div>
+        <div class="form-group"><label>Document Name *</label><input id="m_docName"></div></div>
+        <div class="form-group"><label>File URL</label><input id="m_docUrl" placeholder="Paste file URL or path"></div>
+        <div class="form-group"><label>Remarks</label><textarea id="m_docRemarks"></textarea></div>
+    `;
+    $('modalOverlay').style.display='flex';
+}
+
+async function saveDocModal(){
+    const data={client_id:parseInt($('m_docClient').value),invoice_id:$('m_docInvoice').value?parseInt($('m_docInvoice').value):null,document_type:$('m_docType').value,document_name:$('m_docName').value,file_url:$('m_docUrl').value||null,remarks:$('m_docRemarks').value||null};
+    if(!data.client_id||!data.document_name){toast('Fill required fields','error');return}
+    await api('POST','/documents',data);toast('Document added');loadDocuments();closeModal();
+}
+
+async function deleteDoc(id){if(!confirm('Delete document?'))return;try{await api('DELETE',`/documents/${id}`);toast('Document deleted');loadDocuments()}catch(e){toast(e.message,'error')}}
+
+// REPORTS
+async function runReport(type){
+    try{
+        let data;let title;
+        switch(type){
+            case 'monthly-billing':data=await api('GET','/invoices');title='Monthly Billing Report';break;
+            case 'outstanding':data=await api('GET','/outstanding');title='Outstanding Report';break;
+            case 'bm-wise':data=await api('GET','/reports/bm-wise');title='BM-Wise Report';break;
+            case 'invoice-not-raised':data=await api('GET','/reports/invoice-not-raised');title='Invoice Not Raised';break;
+        }
+        currentReportData=data;currentReportTitle=title;
+        $('reportTitle').textContent=title;
+        $('reportResult').style.display='block';
+        if(data.length===0){$('reportTable').querySelector('thead').innerHTML='';$('reportTable').querySelector('tbody').innerHTML='<tr><td style="text-align:center;padding:2rem;color:var(--text-light)">No data</td></tr>';return}
+        const keys=Object.keys(data[0]);
+        $('reportTable').querySelector('thead').innerHTML='<tr>'+keys.map(k=>`<th>${k.replace(/_/g,' ')}</th>`).join('')+'</tr>';
+        $('reportTable').querySelector('tbody').innerHTML=data.map(row=>'<tr>'+keys.map(k=>`<td>${typeof row[k]==='number'?fmt(row[k]):(row[k]||'—')}</td>`).join('')+'</tr>').join('');
+    }catch(e){toast(e.message,'error')}
+}
+
+function exportCSV(){
+    if(!currentReportData.length)return;
+    const keys=Object.keys(currentReportData[0]);
+    const csv=[keys.join(','),...currentReportData.map(r=>keys.map(k=>`"${(r[k]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
+    const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=currentReportTitle.replace(/ /g,'_')+'.csv';a.click();toast('Exported CSV');
+}
+
+// BMs
+let bmsList=[];
+async function loadBMs(){
+    try{bmsList=await api('GET','/business-managers')}catch(e){bmsList=[]}
+    $('bmsTable').querySelector('tbody').innerHTML=bmsList.map(b=>`<tr>
+        <td style="font-weight:600">${b.name}</td><td>${b.email}</td><td>${b.mobile||'—'}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteBM(${b.id})">Del</button></td>
+    </tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--text-light)">No business managers</td></tr>';
+}
+
+function openBMModal(){
+    modalMode='create';modalEditId=null;
+    $('modalTitle').textContent='Add Business Manager';
+    $('modalBody').innerHTML=`
+        <div class="form-row"><div class="form-group"><label>Name *</label><input id="m_bmName"></div></div>
+        <div class="form-row"><div class="form-group"><label>Email ID *</label><input type="email" id="m_bmEmail"></div></div>
+        <div class="form-row"><div class="form-group"><label>Mobile Number</label><input type="tel" id="m_bmMobile"></div></div>
+        <div class="form-row"><div class="form-group"><label>Password</label><input type="password" id="m_bmPassword" placeholder="Leave blank for changeme123"></div></div>
+    `;
+    $('modalOverlay').style.display='flex';
+}
+
+async function saveBMModal(){
+    const data={full_name:$('m_bmName').value,email:$('m_bmEmail').value,mobile:$('m_bmMobile').value||null,password:$('m_bmPassword').value||null};
+    if(!data.full_name||!data.email){toast('Name and Email are required','error');return}
+    await api('POST','/business-managers',data);toast('Business Manager added');loadBMs();closeModal();
+}
+
+async function deleteBM(id){if(!confirm('Delete this business manager?'))return;try{await api('DELETE',`/business-managers/${id}`);toast('BM deleted');loadBMs()}catch(e){toast(e.message,'error')}}
+
+// BM VIEW
+async function loadBMView(){
+    try{bmStats=await api('GET','/reports/bm-wise')}catch(e){bmStats=[]}
+    let html='';
+    if(bmStats.length===0)html='<div class="empty-state"><h3>No Business Manager Data</h3><p>Assign rev_role as business_manager to users and assign them to clients.</p></div>';
+    else bmStats.forEach(bm=>{html+=`<div class="card"><div class="card-header"><span class="card-title">${bm.bm_name}</span><span class="badge badge-blue">${bm.client_count} clients</span></div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">
+        <div class="kpi-card"><div class="kpi-label">Billed</div><div class="kpi-value">${fmt(bm.total_billed)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Collected</div><div class="kpi-value" style="color:var(--success)">${fmt(bm.total_collected)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Outstanding</div><div class="kpi-value" style="color:var(--warning)">${fmt(bm.total_outstanding)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Overdue</div><div class="kpi-value" style="color:var(--danger)">${fmt(bm.overdue_count)}</div></div>
+        </div></div>`;
+    });
+    $('bmViewContent').innerHTML=html;
+}
+
+// USERS
+async function loadUsers(){
+    try{const users=await fetch(AUTH+'/users',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json());
+    $('usersTable').querySelector('tbody').innerHTML=users.map(u=>`<tr>
+        <td>${u.full_name||'—'}</td><td>${u.email}</td><td>${u.role}</td><td>${statusBadge(u.rev_role||'none')}</td><td>${u.is_active?'Active':'Inactive'}</td>
+        <td><select onchange="updateRevRole(${u.id},this.value)" style="font-size:.78rem;padding:.2rem"><option value="">None</option><option value="admin" ${u.rev_role==='admin'?'selected':''}>Admin</option><option value="finance" ${u.rev_role==='finance'?'selected':''}>Finance</option><option value="business_manager" ${u.rev_role==='business_manager'?'selected':''}>BM</option></select></td>
+    </tr>`).join('');
+    }catch(e){}
+}
+
+async function updateRevRole(userId,role){
+    try{await fetch(AUTH+`/users/${userId}`,{method:'PUT',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({rev_role:role})});toast('Role updated');loadUsers()}catch(e){toast(e.message,'error')}
+}
+
+// SETTINGS
+async function loadSettings(){
+    try{const s=await api('GET','/settings');$('settDueDays').value=s.default_due_days||30;$('settCompany').value=s.company_name||'Chlear Digital';$('settCurrency').value=s.currency||'INR'}catch(e){}
+}
+async function saveSettings(){
+    try{
+        await api('PUT','/settings',{key:'default_due_days',value:$('settDueDays').value});
+        await api('PUT','/settings',{key:'company_name',value:$('settCompany').value});
+        await api('PUT','/settings',{key:'currency',value:$('settCurrency').value});
+        toast('Settings saved');
+    }catch(e){toast(e.message,'error')}
+}
+
+// SEED
+async function seedDemo(){try{const r=await api('POST','/seed-demo');toast(`Seeded: ${r.clients} clients, ${r.invoices} invoices, ${r.payments} payments`);loadDashboard()}catch(e){toast(e.message,'error')}}
+
+function closeModal(){$('modalOverlay').style.display='none'}
+
+window.addEventListener('DOMContentLoaded',async()=>{
+    await checkAuth();
+    try{clients=await api('GET','/clients');invoices=await api('GET','/invoices')}catch(e){}
+    loadDashboard();
+    setInterval(checkDueReminders,60000); // check every minute
+});
+</script>
+</body>
+</html>

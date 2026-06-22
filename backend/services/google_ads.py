@@ -15,9 +15,6 @@ class GoogleAdsApiClient:
         self.client = None
         self.is_valid = False
 
-        if config.get("mock_mode", True):
-            return
-
         if not config.get("developer_token"):
             logger.warning("Developer token missing; cannot initialize live Google Ads client.")
             return
@@ -49,7 +46,7 @@ class GoogleAdsApiClient:
 
     def run_gaql(self, query: str) -> List[Dict[str, Any]]:
         if not self.is_valid or not self.client:
-            raise HTTPException(status_code=400, detail="Google Ads client not configured or in mock mode.")
+            raise HTTPException(status_code=400, detail="Google Ads client not configured.")
 
         customer_id = self._customer_id()
         try:

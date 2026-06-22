@@ -57,7 +57,7 @@ class Account(Base):
     google_external_id = Column(String, nullable=True)
     meta_external_id = Column(String, nullable=True)
 
-    # Per-platform live/mock flags
+    # Per-platform live flags
     google_is_live = Column(Boolean, default=False)
     meta_is_live = Column(Boolean, default=False)
 
@@ -68,6 +68,11 @@ class Account(Base):
     meta_app_id = Column(String, nullable=True)
     meta_app_secret = Column(String, nullable=True)
     redirect_base_url = Column(String, nullable=True)
+
+    # Per-account CRM (LeadSquared) credentials
+    lsq_access_key = Column(String, nullable=True)
+    lsq_secret_key = Column(String, nullable=True)
+    lsq_base_url = Column(String, nullable=True)
 
     # Credentials (encrypted at rest via app-level encryption) - legacy fallback
     credentials = Column(Text, nullable=True)
@@ -120,11 +125,14 @@ class Account(Base):
             "meta_app_id": self.meta_app_id,
             "meta_app_secret": self.meta_app_secret,
             "redirect_base_url": self.redirect_base_url,
+            "lsq_access_key": self.lsq_access_key,
+            "lsq_secret_key_masked": bool(self.lsq_secret_key),
+            "lsq_base_url": self.lsq_base_url,
             "refresh_interval_minutes": self.refresh_interval_minutes,
             "audit_interval_minutes": self.audit_interval_minutes,
             "is_active": self.is_active,
             "is_live": self.is_live,
-            "last_sync_at": self.last_sync_at.isoformat() if self.last_sync_at else None,
+            "last_sync_at": self.last_sync_at.isoformat() + "Z" if self.last_sync_at else None,
             "last_sync_error": self.last_sync_error,
             "status": self.status.value,
             "spend": self.spend,
@@ -253,8 +261,13 @@ class User(Base):
     email = Column(String, nullable=False, unique=True)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
-    role = Column(String, default="user")  # user, admin
+    role = Column(String, default="user")  # user, admin, superadmin
+    rev_role = Column(String, nullable=True)  # admin, finance, business_manager
+    mobile = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    access_adpulse = Column(Boolean, default=True)
+    access_insightdesk = Column(Boolean, default=False)
+    access_revenueops = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -264,7 +277,12 @@ class User(Base):
             "email": self.email,
             "full_name": self.full_name,
             "role": self.role,
+            "rev_role": self.rev_role,
+            "mobile": self.mobile,
             "is_active": self.is_active,
+            "access_adpulse": self.access_adpulse,
+            "access_insightdesk": self.access_insightdesk,
+            "access_revenueops": self.access_revenueops,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

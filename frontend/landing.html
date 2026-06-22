@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChlearSakhaaOps AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #f3f4f6;
+            --bg-surface: #ffffff;
+            --color-primary: #4f46e5;
+            --color-secondary: #0891b2;
+            --color-success: #059669;
+            --color-warning: #d97706;
+            --color-danger: #dc2626;
+            --text-main: #1f2937;
+            --text-muted: #4b5563;
+            --text-light: #6b7280;
+            --border-color: #e5e7eb;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-base); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+        h1,h2,h3,h4,.font-outfit { font-family: 'Outfit', sans-serif; }
+
+        .topbar { height: 64px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; }
+        .brand { display: flex; align-items: center; gap: 0.75rem; font-size: 1.35rem; font-weight: 800; }
+        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; }
+        .topbar-right { display: flex; align-items: center; gap: 1rem; }
+        .user-info { font-size: 0.85rem; color: var(--text-muted); }
+        .btn { padding: 0.55rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 0.35rem; transition: 0.15s; text-decoration: none; }
+        .btn-primary { background: var(--color-primary); color: white; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-secondary { background: white; border-color: var(--border-color); color: var(--text-muted); }
+        .btn-secondary:hover { background: var(--bg-base); color: var(--text-main); }
+
+        .hero { padding: 3rem 2rem; text-align: center; background: linear-gradient(135deg, #f5f3ff, #ecfeff); border-bottom: 1px solid var(--border-color); }
+        .hero h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .hero p { color: var(--text-muted); font-size: 1rem; max-width: 600px; margin: 0 auto; }
+
+        .modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; padding: 2rem; max-width: 1200px; margin: 0 auto; width: 100%; }
+        .module-card { background: white; border: 1px solid var(--border-color); border-radius: 16px; padding: 1.75rem; transition: 0.2s; cursor: pointer; position: relative; overflow: hidden; }
+        .module-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(0,0,0,0.08); }
+        .module-card.disabled { opacity: 0.55; cursor: not-allowed; filter: grayscale(0.4); }
+        .module-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin-bottom: 1rem; }
+        .adpulse .module-icon { background: #ede9fe; color: #6d28d9; }
+        .insightdesk .module-icon { background: #e0f2fe; color: #0369a1; }
+        .revenueops .module-icon { background: #d1fae5; color: #065f46; }
+        .module-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.4rem; }
+        .module-desc { color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; }
+        .module-status { position: absolute; top: 1.25rem; right: 1.25rem; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.25rem 0.6rem; border-radius: 4px; }
+        .status-active { background: #d1fae5; color: #065f46; }
+        .status-locked { background: #fee2e2; color: #991b1b; }
+
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .modal { background: white; border-radius: 12px; padding: 2rem; width: 360px; max-width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        .modal h2 { margin-bottom: 1rem; font-size: 1.25rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.35rem; }
+        .form-group input { width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; }
+        .hidden { display: none !important; }
+        .footer { margin-top: auto; text-align: center; padding: 1.5rem; color: var(--text-light); font-size: 0.8rem; border-top: 1px solid var(--border-color); }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand"><div class="logo-icon">CS</div>ChlearSakhaaOps AI</div>
+        <div class="topbar-right">
+            <span class="user-info" id="userInfo">Checking session...</span>
+            <a class="btn btn-secondary" id="integrationsBtn" href="/integrations" style="display:none">Integrations</a>
+            <button class="btn btn-secondary" id="loginBtn" onclick="showAuth()">Login</button>
+            <button class="btn btn-secondary hidden" id="logoutBtn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="hero">
+        <h1>Operations Command Center</h1>
+        <p>One platform to track ads, measure client insights, and manage revenue operations.</p>
+    </div>
+
+    <div class="modules" id="modules">
+        <div class="module-card adpulse" id="cardAdPulse" onclick="openModule('/adpulse')">
+            <span class="module-status status-active" id="statusAdPulse">Active</span>
+            <div class="module-icon">📢</div>
+            <div class="module-title">AdPulse</div>
+            <div class="module-desc">Live Google & Meta Ads tracker with AI audits, approval queue, and OAuth integrations.</div>
+        </div>
+
+        <div class="module-card insightdesk" id="cardInsightDesk" onclick="openModule('/insightdesk')">
+            <span class="module-status status-active" id="statusInsightDesk">Active</span>
+            <div class="module-icon">📊</div>
+            <div class="module-title">InsightDesk</div>
+            <div class="module-desc">MIS reports with Salesforce & LeadSquared CRM data, source breakdowns, and export tools.</div>
+        </div>
+
+        <div class="module-card revenueops" id="cardRevenueOps" onclick="openModule('/revenueops')">
+            <span class="module-status status-active" id="statusRevenueOps">Active</span>
+            <div class="module-icon">💰</div>
+            <div class="module-title">RevenueOps</div>
+            <div class="module-desc">Invoice tracker, payment records, and commercials management for every client.</div>
+        </div>
+    </div>
+
+    <div id="authOverlay" class="overlay hidden" onclick="hideAuth(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h2>Login to ChlearSakhaaOps AI</h2>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="loginEmail" placeholder="admin@adoptima.ai">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" placeholder="••••••">
+            </div>
+            <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="login()">Login</button>
+            <p style="color:var(--text-muted); font-size:0.8rem; margin-top:0.75rem; text-align:center;">Super admin can assign module access to users.</p>
+        </div>
+    </div>
+
+    <div class="footer">© 2026 ChlearSakhaaOps AI. Built for Chlear Digital.</div>
+
+    <script>
+    const API = 'http://127.0.0.1:8000/api';
+    let token = localStorage.getItem('adoptima_token') || '';
+    let currentUser = null;
+
+    function $(id) { return document.getElementById(id); }
+
+    async function api(method, path, body) {
+        const opts = { method, headers: {} };
+        if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+        if (body) {
+            opts.headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(body);
+        }
+        const res = await fetch(API + path, opts);
+        if (res.status === 401) {
+            token = '';
+            localStorage.removeItem('adoptima_token');
+            showAuth();
+            throw new Error('Session expired.');
+        }
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.detail || `Request failed (${res.status})`);
+        }
+        return res.status === 204 ? null : res.json();
+    }
+
+    async function checkAuth() {
+        if (!token) { updateUI(null); return; }
+        try {
+            currentUser = await api('GET', '/auth/me');
+            updateUI(currentUser);
+        } catch (e) {
+            updateUI(null);
+        }
+    }
+
+        function updateUI(user) {
+            if (user) {
+                $('userInfo').textContent = user.full_name || user.email;
+                $('loginBtn').classList.add('hidden');
+                $('logoutBtn').classList.remove('hidden');
+                if (user.role === 'admin' || user.role === 'superadmin' || user.rev_role === 'admin' || user.rev_role === 'finance') {
+                    $('integrationsBtn').style.display = 'inline-flex';
+                }
+                const isAdmin = user.role === 'admin' || user.role === 'superadmin';
+                setCardAccess('AdPulse', isAdmin || user.access_adpulse);
+                setCardAccess('InsightDesk', isAdmin || user.access_insightdesk);
+                setCardAccess('RevenueOps', isAdmin || user.access_revenueops);
+            } else {
+            $('userInfo').textContent = 'Not logged in';
+            $('loginBtn').classList.remove('hidden');
+            $('logoutBtn').classList.add('hidden');
+            setCardAccess('AdPulse', false);
+            setCardAccess('InsightDesk', false);
+            setCardAccess('RevenueOps', false);
+        }
+    }
+
+    function setCardAccess(name, allowed) {
+        const card = $('card' + name);
+        const status = $('status' + name);
+        if (allowed) {
+            card.classList.remove('disabled');
+            status.textContent = 'Open';
+            status.className = 'module-status status-active';
+        } else {
+            card.classList.add('disabled');
+            status.textContent = 'Locked';
+            status.className = 'module-status status-locked';
+        }
+    }
+
+    function openModule(url) {
+        const card = document.querySelector(`.module-card${url.replace('/', '.')}`);
+        if (card && card.classList.contains('disabled')) {
+            alert('You do not have access to this module. Contact super admin.');
+            return;
+        }
+        window.location.href = url;
+    }
+
+    function showAuth() { $('authOverlay').classList.remove('hidden'); }
+    function hideAuth(e) {
+        if (e && e.target !== $('authOverlay')) return;
+        $('authOverlay').classList.add('hidden');
+    }
+
+    async function login() {
+        const email = $('loginEmail').value.trim();
+        const password = $('loginPassword').value;
+        if (!email || !password) { alert('Enter email and password'); return; }
+        try {
+            const body = new URLSearchParams({ username: email, password });
+            const res = await fetch(API + '/auth/login', { method: 'POST', body });
+            if (!res.ok) throw new Error('Invalid credentials');
+            const data = await res.json();
+            token = data.access_token;
+            currentUser = data.user;
+            localStorage.setItem('adoptima_token', token);
+            $('authOverlay').classList.add('hidden');
+            updateUI(currentUser);
+        } catch (e) { alert(e.message); }
+    }
+
+    function logout() {
+        token = '';
+        localStorage.removeItem('adoptima_token');
+        currentUser = null;
+        updateUI(null);
+    }
+
+    window.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
+</body>
+</html>

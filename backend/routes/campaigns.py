@@ -2,7 +2,6 @@ from typing import Optional
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from backend.services.config import load_config
-from backend.services.mock_db import mock_db
 from backend.services.google_ads import GoogleAdsApiClient
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
@@ -46,12 +45,9 @@ def _format_campaign_row(row):
 @router.get("/campaigns")
 def get_campaigns():
     config = load_config()
-    if config.get("mock_mode", True):
-        return mock_db.campaigns
-
     client = GoogleAdsApiClient(config)
     if not client.is_valid:
-        return JSONResponse(status_code=400, content={"error": "Invalid Google Ads credentials. Please check settings or enable Mock Mode."})
+        return JSONResponse(status_code=400, content={"error": "Invalid Google Ads credentials. Please check settings."})
 
     try:
         rows = client.run_gaql(_CAMPAIGN_QUERY)
@@ -63,14 +59,6 @@ def get_campaigns():
 @router.get("/campaign/{campaign_id}/details")
 def get_campaign_details(campaign_id: str):
     config = load_config()
-    if config.get("mock_mode", True):
-        campaign = next((c for c in mock_db.campaigns if c["id"] == campaign_id), None)
-        if not campaign:
-            return JSONResponse(status_code=404, content={"error": "Campaign not found"})
-        terms = mock_db.get_filtered_search_terms(campaign_id)
-        negatives = mock_db.negatives.get(campaign_id, [])
-        return {"campaign": campaign, "search_terms": terms, "negatives": negatives}
-
     client = GoogleAdsApiClient(config)
     if not client.is_valid:
         return JSONResponse(status_code=400, content={"error": "Google Ads client not configured."})

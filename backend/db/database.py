@@ -23,4 +23,6 @@ def get_db():
 
 
 def init_db():
+    import backend.db.models  # noqa: F401
+    import backend.db.revenueops_models  # noqa: F401
     Base.metadata.create_all(bind=engine)

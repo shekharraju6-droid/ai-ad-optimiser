@@ -21,7 +21,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "customer_id": "",
         "login_customer_id": "",
         "gemini_api_key": "",
-        "mock_mode": True,
         "safe_mode": True,
         # OAuth app credentials
         "google_client_id": "",
@@ -31,6 +30,14 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "meta_app_secret": "",
         # Base URL for OAuth redirects; defaults to local dev server
         "redirect_base_url": "http://127.0.0.1:8000",
+        # CRM / lead integrations
+        "salesforce_url": "",
+        "salesforce_client_id": "",
+        "salesforce_client_secret": "",
+        "salesforce_refresh_token": "",
+        "leadsquared_access_key": "",
+        "leadsquared_secret_key": "",
+        "leadsquared_base_url": "",
         # Global auto-audit interval in minutes (0 = disabled)
         "global_audit_interval_minutes": 60,
     }
@@ -85,13 +92,18 @@ def load_config() -> Dict[str, Any]:
         ("meta_app_id", "META_APP_ID"),
         ("meta_app_secret", "META_APP_SECRET"),
         ("redirect_base_url", "REDIRECT_BASE_URL"),
+        ("salesforce_url", "SALESFORCE_URL"),
+        ("salesforce_client_id", "SALESFORCE_CLIENT_ID"),
+        ("salesforce_client_secret", "SALESFORCE_CLIENT_SECRET"),
+        ("salesforce_refresh_token", "SALESFORCE_REFRESH_TOKEN"),
+        ("leadsquared_access_key", "LEADSQUARED_ACCESS_KEY"),
+        ("leadsquared_secret_key", "LEADSQUARED_SECRET_KEY"),
+        ("leadsquared_base_url", "LEADSQUARED_BASE_URL"),
     ]
     for cfg_key, env_key in env_mappings:
         if env.get(env_key):
             config[cfg_key] = env[env_key]
 
-    if "MOCK_MODE" in env:
-        config["mock_mode"] = env["MOCK_MODE"].lower() in ("true", "1", "yes")
     if "SAFE_MODE" in env:
         config["safe_mode"] = env["SAFE_MODE"].lower() in ("true", "1", "yes")
 
@@ -111,7 +123,8 @@ def get_config_for_client() -> Dict[str, Any]:
     config = load_config()
     masked = config.copy()
     for key in ["client_secret", "refresh_token", "gemini_api_key", "developer_token",
-                "google_client_secret", "google_developer_token", "meta_app_secret"]:
+                "google_client_secret", "google_developer_token", "meta_app_secret",
+                "salesforce_client_secret", "salesforce_refresh_token", "leadsquared_secret_key"]:
         val = masked.get(key, "")
         if val and len(val) > 4:
             masked[key] = "●●●●●●●●" + val[-4:]

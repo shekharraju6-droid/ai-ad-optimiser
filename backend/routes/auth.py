@@ -101,18 +101,100 @@ def me(user: User = Depends(get_current_user_required)):
     return user.to_dict()
 
 
+def require_module_access(module: str):
+    def checker(user: User = Depends(get_current_user_required)) -> User:
+        if user.role in ("admin", "superadmin"):
+            return user
+        if module == "adpulse" and user.access_adpulse:
+            return user
+        if module == "insightdesk" and user.access_insightdesk:
+            return user
+        if module == "revenueops" and user.access_revenueops:
+            return user
+        raise HTTPException(status_code=403, detail=f"Access denied to {module}")
+    return checker
+
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    rev_role: Optional[str] = None
+    mobile: Optional[str] = None
+    is_active: Optional[bool] = None
+    access_adpulse: Optional[bool] = None
+    access_insightdesk: Optional[bool] = None
+    access_revenueops: Optional[bool] = None
+
+
+@router.put("/users/{user_id}")
+def update_user(user_id: int, req: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
+    if current_user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can update users")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if req.full_name is not None:
+        user.full_name = req.full_name
+    if req.role is not None:
+        user.role = req.role
+    if req.rev_role is not None:
+        user.rev_role = req.rev_role
+    if req.mobile is not None:
+        user.mobile = req.mobile
+    if req.is_active is not None:
+        user.is_active = req.is_active
+    if req.access_adpulse is not None:
+        user.access_adpulse = req.access_adpulse
+    if req.access_insightdesk is not None:
+        user.access_insightdesk = req.access_insightdesk
+    if req.access_revenueops is not None:
+        user.access_revenueops = req.access_revenueops
+    db.commit()
+    db.refresh(user)
+    return user.to_dict()
+
+
+@router.get("/users")
+def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
+    if current_user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can list users")
+    users = db.query(User).all()
+    return [u.to_dict() for u in users]
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
+    if current_user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only admin can delete users")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+    return {"status": "success"}
+
+
 @router.post("/seed-admin")
 def seed_admin_user(password: str, db: Session = Depends(get_db)):
     """Convenience endpoint to create the first admin user. Disable or protect in production."""
     email = "admin@adoptima.ai"
     existing = db.query(User).filter(User.email == email).first()
     if existing:
-        return {"message": "Admin already exists", "user": existing.to_dict()}
+        existing.role = "superadmin"
+        existing.access_adpulse = True
+        existing.access_insightdesk = True
+        existing.access_revenueops = True
+        db.commit()
+        db.refresh(existing)
+        return {"message": "Admin already exists, ensured superadmin access", "user": existing.to_dict()}
     user = User(
         email=email,
         hashed_password=get_password_hash(password),
         full_name="Admin",
-        role="admin",
+        role="superadmin",
+        access_adpulse=True,
+        access_insightdesk=True,
+        access_revenueops=True,
     )
     db.add(user)
     db.commit()

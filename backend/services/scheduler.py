@@ -1,12 +1,13 @@
 """
-Background scheduler for running automatic audits.
+Background scheduler for running automatic audits and metric refreshes.
 Reads global and per-account audit intervals.
 """
 import logging
+from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from backend.services.auditor import audit_account, audit_all_accounts
 from backend.db.database import SessionLocal
-from backend.db.models import Account
+from backend.db.models import Account, AccountStatus
 from backend.services.config import load_config
 
 logger = logging.getLogger("AdOptima")
@@ -20,6 +21,8 @@ def start_scheduler():
     _scheduler = BackgroundScheduler()
     # Recalculate schedules every minute
     _scheduler.add_job(_reschedule_all, 'interval', minutes=1, id='schedule_refresher', replace_existing=True)
+    # Auto-refresh live account metrics every 15 minutes
+    _scheduler.add_job(_auto_refresh_live_metrics, 'interval', minutes=15, id='auto_metrics_refresh', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(seconds=30))
     _scheduler.start()
     logger.info("Background scheduler started")
 
@@ -30,6 +33,56 @@ def stop_scheduler():
         _scheduler.shutdown()
         _scheduler = None
         logger.info("Background scheduler stopped")
+
+
+def _auto_refresh_live_metrics():
+    """Refresh metrics for all live accounts from Google Ads API."""
+    logger.info("Auto-refreshing live account metrics")
+    from backend.services.connectors import get_connector
+    db = SessionLocal()
+    try:
+        accounts = db.query(Account).filter(Account.is_active == True, Account.is_live == True).all()
+        today = (datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d")
+        for account in accounts:
+            for platform in ["google", "meta"]:
+                if platform == "google" and not account.has_google:
+                    continue
+                if platform == "meta" and not account.has_meta:
+                    continue
+                platform_live = account.google_is_live if platform == "google" else account.meta_is_live
+                platform_creds = account.google_credentials if platform == "google" else account.meta_credentials
+                if not (platform_live and platform_creds):
+                    continue
+                try:
+                    connector = get_connector(account, platform=platform, start_date=today, end_date=today)
+                    if connector and connector.is_valid:
+                        metrics = connector.fetch_account_metrics()
+                        if "error" not in metrics:
+                            if not (account.has_google and account.has_meta):
+                                account.spend = metrics.get("spend", 0.0)
+                                account.clicks = metrics.get("clicks", 0)
+                                account.impressions = metrics.get("impressions", 0)
+                                account.conversions = metrics.get("conversions", 0)
+                            else:
+                                account.spend = (account.spend or 0.0) + metrics.get("spend", 0.0)
+                                account.clicks = (account.clicks or 0) + metrics.get("clicks", 0)
+                                account.impressions = (account.impressions or 0) + metrics.get("impressions", 0)
+                                account.conversions = (account.conversions or 0) + metrics.get("conversions", 0)
+                            account.ctr = round((account.clicks / account.impressions) * 100, 2) if account.impressions else 0.0
+                            account.cpa = round(account.spend / account.conversions, 2) if account.conversions else 0.0
+                            account.status = AccountStatus.HEALTHY
+                            account.last_sync_at = datetime.utcnow()
+                            account.last_sync_error = None
+                            db.commit()
+                            logger.info(f"Auto-refreshed {account.name} ({platform}): spend={account.spend}, clicks={account.clicks}")
+                        else:
+                            logger.warning(f"Auto-refresh {account.name} ({platform}) returned error: {metrics.get('error')}")
+                except Exception as e:
+                    logger.error(f"Auto-refresh failed for {account.name} ({platform}): {e}")
+    except Exception as e:
+        logger.error(f"Auto-refresh metrics failed: {e}")
+    finally:
+        db.close()
 
 
 def _reschedule_all():

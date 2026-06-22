@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChlearSakhaaOps AI - InsightDesk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #f3f4f6;
+            --bg-surface: #ffffff;
+            --bg-sidebar: #f9fafb;
+            --border-color: #e5e7eb;
+            --color-primary: #4f46e5;
+            --color-primary-glow: rgba(79, 70, 229, 0.08);
+            --color-secondary: #0891b2;
+            --color-success: #059669;
+            --color-warning: #d97706;
+            --color-danger: #dc2626;
+            --text-main: #1f2937;
+            --text-muted: #4b5563;
+            --text-light: #6b7280;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-base); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; }
+        h1,h2,h3,h4,.font-outfit { font-family: 'Outfit', sans-serif; }
+
+        .app-layout { display: flex; width: 100vw; height: 100vh; }
+        .sidebar { width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.75rem; }
+        .app-logo { font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.6rem; }
+        .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; }
+        .sidebar-section-title { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.08em; padding: 1rem 1.25rem 0.5rem; }
+        .account-list { flex-grow: 1; overflow-y: auto; padding: 0.5rem 0; }
+        .account-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.25rem; cursor: pointer; font-size: 0.9rem; font-weight: 500; color: var(--text-muted); transition: 0.15s; border-left: 3px solid transparent; }
+        .account-item:hover { background: rgba(0,0,0,0.03); color: var(--text-main); }
+        .account-item.active { background: white; color: var(--color-primary); border-left: 3px solid var(--color-primary); }
+        .account-icon { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #e0e7ff, #c7d2fe); color: var(--color-primary); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+        .home-btn { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.25rem; cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--text-main); transition: 0.15s; border-bottom: 1px solid var(--border-color); }
+        .home-btn:hover { background: rgba(0,0,0,0.03); }
+        .home-btn.active { background: white; color: var(--color-primary); border-left: 3px solid var(--color-primary); }
+
+        .main { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-base); }
+        .topbar { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; }
+        .topbar h1 { font-size: 1.1rem; font-weight: 700; }
+        .btn { padding: 0.5rem 0.9rem; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 0.35rem; transition: 0.15s; text-decoration: none; }
+        .btn-primary { background: var(--color-primary); color: white; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-secondary { background: white; border-color: var(--border-color); color: var(--text-muted); }
+        .btn-secondary:hover { background: var(--bg-sidebar); color: var(--text-main); }
+        .btn-success { background: var(--color-success); color: white; }
+        .btn-success:hover { filter: brightness(1.1); }
+
+        .content { flex-grow: 1; overflow-y: auto; padding: 1.5rem; }
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem; }
+        .card-title { font-size: 1rem; font-weight: 700; }
+        .empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 0.9rem; }
+
+        .form-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; gap: 0.35rem; min-width: 160px; flex: 1; }
+        .form-group label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+        .form-group input, .form-group select, .form-group textarea { padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-glow); }
+        .form-group textarea { resize: vertical; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        th, td { text-align: left; padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border-color); }
+        th { background: var(--bg-sidebar); font-weight: 600; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        tr:hover td { background: rgba(0,0,0,0.015); }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+        .badge-google { background: #e0f2fe; color: #0369a1; }
+        .badge-meta { background: #f3e8ff; color: #7e22ce; }
+        .badge-crm { background: #fef3c7; color: #92400e; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-neutral { background: var(--bg-sidebar); color: var(--text-muted); }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+        .metric-box { background: var(--bg-sidebar); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem; }
+        .metric-box .label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.35rem; }
+        .metric-box .value { font-size: 1.25rem; font-weight: 700; color: var(--text-main); }
+        .metric-box .sub { font-size: 0.72rem; color: var(--text-light); margin-top: 0.2rem; }
+
+        .status-badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; background: var(--bg-sidebar); color: var(--text-muted); border: 1px solid var(--border-color); }
+        .status-badge.live { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+        .status-badge.offline { background: #f3f4f6; color: #6b7280; border-color: #e5e7eb; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+        .notes-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 0.75rem 1rem; }
+        .spinner { border: 3px solid var(--border-color); border-top-color: var(--color-primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-wrap { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 3rem; color: var(--text-muted); }
+
+        .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--text-main); color: white; padding: 0.8rem 1.2rem; border-radius: 8px; font-size: 0.85rem; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; opacity: 0; transform: translateY(10px); transition: 0.3s; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background: var(--color-danger); }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="app-logo"><div class="logo-icon">ID</div>InsightDesk</div>
+            </div>
+            <div class="home-btn active" id="homeBtn" onclick="goHome()">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                Home
+            </div>
+            <div style="border-bottom:1px solid var(--border-color); padding:0.5rem 0;">
+                <a class="home-btn" href="/" style="text-decoration:none; border-bottom:none;">🏠 ChlearSakhaaOps Home</a>
+            </div>
+            <div class="sidebar-section-title">Accounts</div>
+            <div id="accountList" class="account-list"></div>
+        </aside>
+
+        <main class="main">
+            <div class="topbar">
+                <h1 id="reportTitle">MIS Reports</h1>
+                <a href="/" class="btn btn-secondary">Back to Dashboard</a>
+            </div>
+            <div class="content">
+                <div id="reportContainer" class="card">
+                    <div class="empty-state" id="welcomeState">
+                        <div style="text-align:center;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:64px; height:64px; color:var(--text-light); margin-bottom:1rem;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                            <div style="font-size:1.1rem; font-weight:600; color:var(--text-main);">Welcome to MIS Reports</div>
+                            <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">Select an account from the left panel to view its reports.</div>
+                        </div>
+                    </div>
+                    <div id="reportContent" class="hidden"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    const API = 'http://127.0.0.1:8000/api';
+    let token = localStorage.getItem('adoptima_token') || '';
+    let allAccounts = [];
+    let selectedAccountId = null;
+    let reportDateRange = { preset: 'last30', start: '', end: '' };
+
+    function $(id) { return document.getElementById(id); }
+
+    async function api(method, path, body) {
+        const opts = { method, headers: {} };
+        if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+        if (body) {
+            opts.headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(body);
+        }
+        const res = await fetch(API + path, opts);
+        if (res.status === 401) {
+            localStorage.removeItem('adoptima_token');
+            window.location.href = '/';
+            throw new Error('Session expired.');
+        }
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.detail || `Request failed (${res.status})`);
+        }
+        return res.status === 204 ? null : res.json();
+    }
+
+    function toast(msg, error) {
+        let t = $('toast');
+        if (!t) {
+            t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t);
+        }
+        t.className = 'toast' + (error ? ' error' : '');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function today() {
+        const d = new Date();
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    function fmtDate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+    function formatMoney(n) {
+        if (n === undefined || n === null) return 'Rs 0';
+        return 'Rs ' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    }
+    function formatNum(n) { return Number(n || 0).toLocaleString('en-IN'); }
+    function formatPct(n) { return Number(n || 0).toFixed(2) + '%'; }
+
+    function computeDateRange(preset) {
+        const end = today();
+        let start = new Date(end);
+        switch (preset) {
+            case 'today': break;
+            case 'yesterday': start.setDate(end.getDate() - 1); end.setDate(end.getDate() - 1); break;
+            case 'last7': start.setDate(end.getDate() - 6); break;
+            case 'last15': start.setDate(end.getDate() - 14); break;
+            case 'last30': start.setDate(end.getDate() - 29); break;
+            case 'thisMonth': start.setDate(1); break;
+            case 'lastMonth': start.setMonth(end.getMonth() - 1, 1); end.setMonth(end.getMonth(), 0); break;
+            case 'allTime': start = new Date('2020-01-01'); break;
+            case 'custom': return;
+        }
+        reportDateRange = { preset, start: fmtDate(start), end: fmtDate(end) };
+    }
+
+    function getReportParams() {
+        const r = reportDateRange;
+        const params = [];
+        if (r.start) params.push('start_date=' + encodeURIComponent(r.start));
+        if (r.end) params.push('end_date=' + encodeURIComponent(r.end));
+        return params.length ? '?' + params.join('&') : '';
+    }
+
+    async function loadAccounts() {
+        try {
+            allAccounts = await api('GET', '/accounts');
+            renderAccountList();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function renderAccountList() {
+        const container = $('accountList');
+        container.innerHTML = '';
+        if (!allAccounts.length) {
+            container.innerHTML = '<div style="padding:1rem 1.25rem; color:var(--text-muted); font-size:0.85rem;">No accounts found.</div>';
+            return;
+        }
+        allAccounts.forEach(a => {
+            const el = document.createElement('div');
+            el.className = 'account-item';
+            el.onclick = () => selectAccount(a.id);
+            el.innerHTML = `
+                <div class="account-icon">${getInitials(a.name)}</div>
+                <div>${escapeHtml(a.name)}</div>
+            `;
+            container.appendChild(el);
+        });
+    }
+
+    function getInitials(name) {
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    }
+
+    function goHome() {
+        selectedAccountId = null;
+        $('homeBtn').classList.add('active');
+        document.querySelectorAll('.account-item').forEach(el => el.classList.remove('active'));
+        $('reportTitle').textContent = 'MIS Reports';
+        $('welcomeState').classList.remove('hidden');
+        $('reportContent').classList.add('hidden');
+        $('reportContent').innerHTML = '';
+    }
+
+    async function selectAccount(id) {
+        selectedAccountId = id;
+        $('homeBtn').classList.remove('active');
+        document.querySelectorAll('.account-item').forEach(el => el.classList.remove('active'));
+        const items = $('accountList').children;
+        const idx = allAccounts.findIndex(a => a.id === id);
+        if (items[idx]) items[idx].classList.add('active');
+        const a = allAccounts.find(x => x.id === id);
+        $('reportTitle').textContent = 'MIS Report - ' + (a ? a.name : '');
+        $('welcomeState').classList.add('hidden');
+        $('reportContent').classList.remove('hidden');
+        $('reportContent').innerHTML = '<div class="loading-wrap"><div class="spinner"></div> Loading report...</div>';
+        if (a && a.name === 'DSU') {
+            await renderDSUReport();
+            return;
+        }
+        computeDateRange(reportDateRange.preset || 'last30');
+        await renderReport(a);
+    }
+
+    async function renderDSUReport() {
+        try {
+            const data = await api('GET', '/reports/dsu-performance');
+            buildDSUReport(data);
+        } catch (e) {
+            toast(e.message, true);
+            $('reportContent').innerHTML = '<div class="empty-state">Failed to load DSU report: ' + escapeHtml(e.message) + '</div>';
+        }
+    }
+
+    function buildDSUReport(data) {
+        const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
+        const renderTable = (title, subtitle, rows, total) => {
+            const body = rows.map(r => {
+                const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
+                const spend = fmtMoney(r.spend);
+                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td><td class="text-right">${cpl}</td><td class="text-right">${spend}</td></tr>`;
+            }).join('');
+            const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
+            return `
+                <div style="background:#c7d2fe;border:1px solid #a5b4fc;border-radius:8px;padding:0.75rem;text-align:center;margin-bottom:0.75rem">
+                    <div style="font-size:.75rem;font-weight:700;letter-spacing:.04em">${subtitle}</div>
+                    <div style="font-size:.95rem;font-weight:700;margin-top:.25rem">${title}</div>
+                    <div style="font-size:.8rem;color:#4338ca;margin-top:.25rem">MIS</div>
+                </div>
+                <table>
+                    <thead><tr><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend ↓</th></tr></thead>
+                    <tbody>${body}
+                        <tr style="background:#c7d2fe;font-weight:700">
+                            <td>TOTAL</td><td class="text-right">${fmtNum(total.leads)}</td><td class="text-right">${totalCpl}</td><td class="text-right">${fmtMoney(total.spend)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        };
+
+        const d = data.daily;
+        const c = data.cumulative;
+
+        $('reportContent').innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">DSU Course Performance Report</div>
+                    <div style="font-size:.8rem;color:var(--text-muted)">${data.gst_note}</div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem">
+                    <div class="card" style="padding:0">${renderTable(d.title, d.subtitle, d.rows, d.total)}</div>
+                    <div class="card" style="padding:0">${renderTable(c.title, c.subtitle, c.rows, c.total)}</div>
+                </div>
+                <div style="margin-top:1rem;display:flex;gap:.75rem;justify-content:flex-end">
+                    <button class="btn btn-primary" onclick="downloadDSUPDF('daily')">Download Table 1 PDF (Daily)</button>
+                    <button class="btn btn-success" onclick="downloadDSUPDF('cumulative')">Download Table 2 PDF (Cumulative)</button>
+                </div>
+            </div>
+        `;
+    }
+
+    async function downloadDSUPDF(table) {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(API_BASE + '/reports/dsu-performance/pdf?table=' + encodeURIComponent(table), {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!res.ok) throw new Error(await res.text() || 'PDF download failed');
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const disp = res.headers.get('content-disposition') || '';
+            const fn = (disp.match(/filename="?([^"]+)"?/) || [null, 'DSU_' + table + '.pdf'])[1];
+            a.download = fn;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            toast(e.message, true);
+        }
+    }
+
+    async function renderReport(account) {
+        try {
+            const data = await api('GET', '/accounts/' + account.id + '/crm-summary' + getReportParams());
+            buildReport(data, account);
+        } catch (e) {
+            toast(e.message, true);
+            $('reportContent').innerHTML = '<div class="empty-state">Failed to load report: ' + escapeHtml(e.message) + '</div>';
+        }
+    }
+
+    function buildReport(data, account) {
+        const sf = data.salesforce || {};
+        const ls = data.leadsquared || {};
+        const acc = data.account || {};
+        const sfLeads = sf.leads || [];
+        const lsLeads = ls.leads || [];
+        const sfOpps = sf.opportunities || [];
+        const lsOpps = ls.opportunities || [];
+        const allLeads = [...sfLeads, ...lsLeads];
+        const allOpps = [...sfOpps, ...lsOpps];
+        const sources = ['Google Ads', 'Meta Ads', 'Organic', 'Direct', 'Referral'];
+
+        const sourceCounts = {};
+        sources.forEach(s => sourceCounts[s] = { leads: 0, opps: 0, wonValue: 0, openValue: 0 });
+        allLeads.forEach(l => { const s = l.source || 'Direct'; if (sourceCounts[s] !== undefined) sourceCounts[s].leads++; });
+        allOpps.forEach(o => {
+            const s = o.source || 'Direct';
+            if (sourceCounts[s] !== undefined) {
+                sourceCounts[s].opps++;
+                const amt = Number(o.amount || 0);
+                if ((o.stage || '').toLowerCase().includes('won')) sourceCounts[s].wonValue += amt;
+                else sourceCounts[s].openValue += amt;
+            }
+        });
+
+        const googleSpend = account.has_google ? acc.spend : 0;
+        const metaSpend = account.has_meta ? 0 : 0; // placeholder until meta split stored
+        const totalSpend = googleSpend + metaSpend;
+        const totalLeads = allLeads.length;
+        const totalOpps = allOpps.length;
+        const wonValue = allOpps.filter(o => (o.stage || '').toLowerCase().includes('won')).reduce((sum, o) => sum + Number(o.amount || 0), 0);
+        const pipelineValue = allOpps.reduce((sum, o) => sum + Number(o.amount || 0), 0);
+        const cpl = totalLeads ? totalSpend / totalLeads : 0;
+        const leadToOppRate = totalLeads ? (totalOpps / totalLeads) * 100 : 0;
+
+        $('reportContent').innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Report Controls</div>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn btn-success" onclick="exportExcel()">Export Excel</button>
+                        <button class="btn btn-primary" onclick="exportPDF()">Export PDF</button>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Period</label>
+                        <select id="misPeriod" onchange="onPeriodChange(this.value)">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="fortnightly">Fortnightly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date Range</label>
+                        <select id="misDatePreset" onchange="onDatePresetChange(this.value)">
+                            <option value="last30">Last 30 Days</option>
+                            <option value="last7">Last 7 Days</option>
+                            <option value="last15">Last 15 Days</option>
+                            <option value="thisMonth">This Month</option>
+                            <option value="lastMonth">Last Month</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="customStartWrap">
+                        <label>Start Date</label>
+                        <input type="date" id="misStartDate" onchange="onCustomDate()">
+                    </div>
+                    <div class="form-group" id="customEndWrap">
+                        <label>End Date</label>
+                        <input type="date" id="misEndDate" onchange="onCustomDate()">
+                    </div>
+                    <div class="form-group" style="flex:0; min-width:auto;">
+                        <button class="btn btn-primary" onclick="reloadReport()">Refresh</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Executive Summary</div>
+                    <div class="status-badge ${(sf.connected || ls.connected) ? 'live' : 'offline'}"><span class="status-dot"></span>${(sf.connected || ls.connected) ? 'Live CRM' : 'No CRM Connected'}</div>
+                </div>
+                <div class="metric-grid">
+                    <div class="metric-box"><div class="label">Ad Spend</div><div class="value">${formatMoney(totalSpend)}</div><div class="sub">Google + Meta</div></div>
+                    <div class="metric-box"><div class="label">Total Leads</div><div class="value">${formatNum(totalLeads)}</div><div class="sub">CPL ${formatMoney(cpl)}</div></div>
+                    <div class="metric-box"><div class="label">Opportunities</div><div class="value">${formatNum(totalOpps)}</div><div class="sub">Lead→Opp ${formatPct(leadToOppRate)}</div></div>
+                    <div class="metric-box"><div class="label">Pipeline Value</div><div class="value">${formatMoney(pipelineValue)}</div><div class="sub">Won ${formatMoney(wonValue)}</div></div>
+                    <div class="metric-box"><div class="label">CTR</div><div class="value">${formatPct(acc.ctr)}</div><div class="sub">${formatNum(acc.clicks)} clicks</div></div>
+                    <div class="metric-box"><div class="label">CPA</div><div class="value">${formatMoney(acc.cpa)}</div><div class="sub">${formatNum(acc.conversions)} conversions</div></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Source-wise Breakdown</div></div>
+                <table id="sourceTable">
+                    <thead><tr><th>Source</th><th class="text-right">Leads</th><th class="text-right">Opportunities</th><th class="text-right">Pipeline Value</th><th class="text-right">Won Value</th><th class="text-right">Est. Spend</th><th>Notes</th></tr></thead>
+                    <tbody>
+                        ${sources.map(s => {
+                            const v = sourceCounts[s];
+                            const estSpend = (v.leads / (totalLeads || 1)) * totalSpend;
+                            return `<tr>
+                                <td><span class="badge ${s === 'Google Ads' ? 'badge-google' : s === 'Meta Ads' ? 'badge-meta' : 'badge-crm'}">${s}</span></td>
+                                <td class="text-right">${formatNum(v.leads)}</td>
+                                <td class="text-right">${formatNum(v.opps)}</td>
+                                <td class="text-right">${formatMoney(v.openValue + v.wonValue)}</td>
+                                <td class="text-right">${formatMoney(v.wonValue)}</td>
+                                <td class="text-right">${formatMoney(estSpend)}</td>
+                                <td><input type="text" class="note-input" data-source="${escapeHtml(s)}" placeholder="Remarks" style="width:100%; border:none; background:transparent; font-size:0.82rem;"></td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">CRM Leads Detail</div></div>
+                ${allLeads.length ? `
+                <div style="max-height:400px; overflow:auto;">
+                <table>
+                    <thead><tr><th>Date</th><th>Platform</th><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Status</th><th>Source</th><th>Owner</th></tr></thead>
+                    <tbody>
+                        ${allLeads.slice(0, 50).map(l => `<tr>
+                            <td>${escapeHtml(l.created_at || '-')}</td>
+                            <td><span class="badge badge-neutral">${escapeHtml(l.platform)}</span></td>
+                            <td>${escapeHtml((l.first_name || '') + ' ' + (l.last_name || ''))}</td>
+                            <td>${escapeHtml(l.email || '-')}</td>
+                            <td>${escapeHtml(l.phone || '-')}</td>
+                            <td>${escapeHtml(l.company || '-')}</td>
+                            <td><span class="badge ${statusBadge(l.status)}">${escapeHtml(l.status || 'New')}</span></td>
+                            <td>${escapeHtml(l.source || '-')}</td>
+                            <td>${escapeHtml(l.owner || '-')}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+                </div>` : '<p style="color:var(--text-muted);">No leads found for this period.</p>'}
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Opportunities / Pipeline</div></div>
+                ${allOpps.length ? `
+                <div style="max-height:400px; overflow:auto;">
+                <table>
+                    <thead><tr><th>Date</th><th>Platform</th><th>Name</th><th>Amount</th><th>Stage</th><th>Probability</th><th>Close Date</th><th>Source</th></tr></thead>
+                    <tbody>
+                        ${allOpps.slice(0, 50).map(o => `<tr>
+                            <td>${escapeHtml(o.created_at || '-')}</td>
+                            <td><span class="badge badge-neutral">${escapeHtml(o.platform)}</span></td>
+                            <td>${escapeHtml(o.name || '-')}</td>
+                            <td class="text-right">${formatMoney(o.amount)}</td>
+                            <td><span class="badge ${stageBadge(o.stage)}">${escapeHtml(o.stage || '-')}</span></td>
+                            <td class="text-right">${formatPct(o.probability)}</td>
+                            <td>${escapeHtml(o.close_date || '-')}</td>
+                            <td>${escapeHtml(o.source || '-')}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+                </div>` : '<p style="color:var(--text-muted);">No opportunities found for this period.</p>'}
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Manager Remarks</div></div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;">
+                        <label>Overall Notes</label>
+                        <textarea id="misRemarks" rows="3" placeholder="Add overall remarks / action items for this MIS period..."></textarea>
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:160px;">
+                        <label>Status</label>
+                        <select id="misStatus"><option value="On Track">On Track</option><option value="Needs Attention">Needs Attention</option><option value="At Risk">At Risk</option></select>
+                    </div>
+                </div>
+                <div style="margin-top:0.75rem;">
+                    <button class="btn btn-primary" onclick="saveRemarks()">Save Remarks</button>
+                </div>
+                <div id="savedRemarks" class="notes-box hidden" style="margin-top:0.75rem;"></div>
+            </div>
+        `;
+
+        // Restore controls state
+        $('misDatePreset').value = reportDateRange.preset;
+        $('misStartDate').value = reportDateRange.start;
+        $('misEndDate').value = reportDateRange.end;
+        toggleCustomDateInputs(reportDateRange.preset === 'custom');
+    }
+
+    function statusBadge(status) {
+        const s = (status || '').toLowerCase();
+        if (['qualified', 'closed won'].includes(s)) return 'badge-success';
+        if (['unqualified', 'closed lost'].includes(s)) return 'badge-danger';
+        return 'badge-warning';
+    }
+    function stageBadge(stage) {
+        const s = (stage || '').toLowerCase();
+        if (s.includes('won')) return 'badge-success';
+        if (s.includes('lost')) return 'badge-danger';
+        return 'badge-warning';
+    }
+
+    function onPeriodChange(val) { /* Period aggregation handled on export; UI shows raw detail */ }
+    function onDatePresetChange(val) {
+        computeDateRange(val);
+        $('misDatePreset').value = val;
+        $('misStartDate').value = reportDateRange.start;
+        $('misEndDate').value = reportDateRange.end;
+        toggleCustomDateInputs(val === 'custom');
+        if (val !== 'custom') reloadReport();
+    }
+    function onCustomDate() {
+        reportDateRange = { preset: 'custom', start: $('misStartDate').value, end: $('misEndDate').value };
+        $('misDatePreset').value = 'custom';
+        reloadReport();
+    }
+    function toggleCustomDateInputs(show) {
+        $('customStartWrap').classList.toggle('hidden', !show);
+        $('customEndWrap').classList.toggle('hidden', !show);
+    }
+    async function reloadReport() {
+        if (!selectedAccountId) return;
+        const a = allAccounts.find(x => x.id === selectedAccountId);
+        if (!a) return;
+        $('reportContent').innerHTML = '<div class="loading-wrap"><div class="spinner"></div> Loading report...</div>';
+        await renderReport(a);
+    }
+
+    function saveRemarks() {
+        const remarks = $('misRemarks').value.trim();
+        const status = $('misStatus').value;
+        if (!remarks) { toast('Enter remarks before saving', true); return; }
+        const box = $('savedRemarks');
+        box.classList.remove('hidden');
+        const ts = new Date().toLocaleString('en-IN');
+        box.innerHTML = `<strong>${status}</strong> — ${escapeHtml(remarks)}<br><span style="font-size:0.75rem; color:var(--text-light);">Saved ${ts}</span>`;
+        toast('Remarks saved');
+    }
+
+    function exportExcel() {
+        toast('Excel export: building file from current tables...');
+        const rows = [['Source', 'Leads', 'Opportunities', 'Pipeline Value', 'Won Value', 'Est. Spend', 'Notes']];
+        const table = $('sourceTable');
+        if (table) {
+            table.querySelectorAll('tbody tr').forEach(tr => {
+                const cells = tr.querySelectorAll('td');
+                const noteInput = cells[6]?.querySelector('input');
+                rows.push([
+                    cells[0]?.innerText || '',
+                    cells[1]?.innerText || '',
+                    cells[2]?.innerText || '',
+                    cells[3]?.innerText || '',
+                    cells[4]?.innerText || '',
+                    cells[5]?.innerText || '',
+                    noteInput ? noteInput.value : ''
+                ]);
+            });
+        }
+        let csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'mis_report.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    function exportPDF() {
+        toast('PDF export: use browser print → Save as PDF for best formatting');
+        window.print();
+    }
+
+    function escapeHtml(str) {
+        if (str === undefined || str === null) return '';
+        return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        computeDateRange('last30');
+        loadAccounts();
+    });
+    </script>
+</body>
+</html>
