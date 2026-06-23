@@ -359,7 +359,8 @@ def fetch_dsu_cumulative(start_date: str, end_date: str) -> List[Dict[str, Any]]
 
 def fetch_dsu_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch course performance for a date range (Table 1).
-    Returns list of {course, leads, cpl, spend} sorted by spend desc."""
+    Returns list of {course, leads, cpl, spend} sorted by spend desc.
+    Only courses with leads > 0 or spend > 0 are included."""
     spend_data = _fetch_google_ads_spend(start_date, end_date)
     lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
 
@@ -367,6 +368,8 @@ def fetch_dsu_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]
     for course in DSU_COURSES:
         spend = round(spend_data.get(course, 0))
         leads = lead_data.get(course, 0)
+        if spend <= 0 and leads <= 0:
+            continue
         cpl = round(spend / leads) if leads else None
         rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
 

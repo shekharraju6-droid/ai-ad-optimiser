@@ -405,8 +405,42 @@ def _fetch_dsi_google_ads_monthly_spend(start_date: str, end_date: str) -> Dict[
 # ============================================================================
 
 def _fetch_dsi_lsq_leads(start_date: str, end_date: str) -> List[Dict[str, Any]]:
-    """Fetch full lead details from LeadSquared for DSI.
-    Returns list of lead dicts with source, stage, application_status, course, department."""
+    """Fetch DSI lead details from the local LeadSquared mirror.
+
+    The mirror stores stage, application_status, resolved course, and department.
+    Falls back to direct API only if the mirror is empty.
+    """
+    from backend.db.database import SessionLocal
+    from backend.db.models import LeadSquaredLead
+    from backend.services.lsq_mirror import get_lead_details
+
+    db = SessionLocal()
+    try:
+        existing = (
+            db.query(LeadSquaredLead)
+            .filter(LeadSquaredLead.account_id == DSI_ACCOUNT_ID)
+            .first()
+        )
+        if not existing:
+            logger.warning("DSI LSQ mirror empty, falling back to direct API")
+            return _fetch_dsi_lsq_leads_direct(start_date, end_date)
+
+        leads = get_lead_details(db, DSI_ACCOUNT_ID, start_date, end_date)
+        # Enrich with department for callers that expect it
+        for lead in leads:
+            lead["department"] = _get_dsi_dept(lead["course"])
+            lead["raw_course"] = lead.get("course", "")
+        logger.info(f"DSI LSQ mirror query for {start_date}-{end_date}: {len(leads)} leads")
+        return leads
+    except Exception as e:
+        logger.exception(f"DSI LSQ mirror query failed: {e}")
+        return _fetch_dsi_lsq_leads_direct(start_date, end_date)
+    finally:
+        db.close()
+
+
+def _fetch_dsi_lsq_leads_direct(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """Direct API fallback for DSI leads (cold-start / mirror rebuild)."""
     import requests
     from backend.services.config import load_config
 
@@ -501,31 +535,26 @@ def _fetch_dsi_lsq_leads(start_date: str, end_date: str) -> List[Dict[str, Any]]
             stage = (props.get("mx_Student_Stage") or "")
             application_status = (props.get("mx_Application_Status") or "")
 
-            # DSI: check 5 course columns in priority order
             app_course = (props.get("mx_Application_Course") or "").strip()
             dsit_diploma = (props.get("mx_Course_DSIT_Diploma") or "").strip()
             dsca_course = (props.get("mx_DSCA_Course") or "").strip()
             dscasc_course = (props.get("mx_DSCASC_Course") or "").strip()
             dsce_course = (props.get("mx_DSCE_Course") or "").strip()
 
-            # Priority: DSCA > DSCASC > DSIT > DSCE > Application
             raw_course = ""
             for val in [dsca_course, dscasc_course, dsit_diploma, dsce_course, app_course]:
                 if val and val != "--":
                     raw_course = val
                     break
 
-            # If no course column, try mapping from source
             if not raw_course:
                 mapped = _map_dsi_campaign_to_course(source)
                 raw_course = mapped or source
 
-            # Apply normalization
             low_course = raw_course.lower().strip()
             if low_course in DSI_COURSE_NORMALISE:
                 raw_course = DSI_COURSE_NORMALISE[low_course]
 
-            # Department rollup
             clean_course = _rollup_to_dept(raw_course)
             department = _get_dsi_dept(clean_course) or _get_dsi_dept(raw_course)
 
@@ -544,7 +573,7 @@ def _fetch_dsi_lsq_leads(start_date: str, end_date: str) -> List[Dict[str, Any]]
             break
         page += 1
 
-    logger.info(f"DSI LSQ fetch complete: {len(all_leads)} GGL/Programmatic leads for {start_date} to {end_date}")
+    logger.info(f"DSI LSQ direct fetch complete: {len(all_leads)} GGL/Programmatic leads for {start_date} to {end_date}")
     return all_leads
 
 

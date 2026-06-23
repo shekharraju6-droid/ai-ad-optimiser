@@ -51,6 +51,16 @@ init_db()
 start_scheduler()
 
 
+@app.get("/favicon.ico")
+def get_favicon():
+    frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+    favicon_path = os.path.join(frontend_dir, "favicon.ico")
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path)
+    # Return a 1x1 transparent GIF if no favicon exists to avoid 404 noise
+    return HTMLResponse(content=b"GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;", media_type="image/gif")
+
+
 @app.get("/", response_class=HTMLResponse)
 def get_landing(request: Request):
     frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")

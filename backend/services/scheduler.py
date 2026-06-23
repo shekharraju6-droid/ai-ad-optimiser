@@ -23,6 +23,8 @@ def start_scheduler():
     _scheduler.add_job(_reschedule_all, 'interval', minutes=1, id='schedule_refresher', replace_existing=True)
     # Auto-refresh live account metrics every 15 minutes
     _scheduler.add_job(_auto_refresh_live_metrics, 'interval', minutes=15, id='auto_metrics_refresh', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(seconds=30))
+    # Incremental LeadSquared lead mirror sync every 3 hours (and once at startup)
+    _scheduler.add_job(_sync_lsq_leads, 'interval', hours=3, id='lsq_lead_mirror_sync', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(minutes=2))
     _scheduler.start()
     logger.info("Background scheduler started")
 
@@ -173,6 +175,25 @@ def _run_account_audit(account_id: int, platform: str):
         audit_account(account_id, platform=platform)
     except Exception as e:
         logger.error(f"Account audit failed: {e}")
+
+
+def _sync_lsq_leads():
+    """Daily incremental sync of LeadSquared leads for DSU and DSI accounts."""
+    logger.info("Running scheduled LSQ lead mirror sync")
+    from backend.services.lsq_mirror import sync_account_leads
+    db = SessionLocal()
+    try:
+        for name in ["DSU", "DSI"]:
+            account = db.query(Account).filter(Account.name == name).first()
+            if not account:
+                continue
+            result = sync_account_leads(account.id, db=db)
+            logger.info(f"LSQ sync {name}: {result}")
+        db.commit()
+    except Exception as e:
+        logger.error(f"Scheduled LSQ sync failed: {e}")
+    finally:
+        db.close()
 
 
 def schedule_account_audit(account_id: int, interval_minutes: int):

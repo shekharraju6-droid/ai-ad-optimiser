@@ -365,8 +365,8 @@
         return `${day}${suffix} ${months[d.getMonth()]} ${d.getFullYear()}`;
     };
     const t1RangeLabel = (rangeObj) => {
-        if (rangeObj.preset === 'today') return 'Today';
-        if (rangeObj.preset === 'yesterday') return 'Yesterday';
+        if (rangeObj.preset === 'today') return `Today: ${formatHeaderDate(rangeObj.start)}`;
+        if (rangeObj.preset === 'yesterday') return formatHeaderDate(rangeObj.start);
         if (rangeObj.preset === 'custom' && rangeObj.start && rangeObj.end) {
             return `${formatHeaderDate(rangeObj.start)} - ${formatHeaderDate(rangeObj.end)}`;
         }
@@ -436,7 +436,8 @@
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
         const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
         const renderDSUTable = (title, rows, total, headerRows) => {
-            const body = rows.map(r => {
+            const activeRows = rows.filter(r => (r.leads || 0) > 0 || (r.spend || 0) > 0);
+            const body = activeRows.map(r => {
                 const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
                 const spend = fmtMoney(r.spend);
                 return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td><td class="text-right">${cpl}</td><td class="text-right">${spend}</td></tr>`;
