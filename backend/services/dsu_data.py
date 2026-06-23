@@ -80,6 +80,8 @@ CAMPAIGN_KEYWORDS = [
 # Student Source -> course mapping for LeadSquared
 SOURCE_TO_COURSE = {
     "GGL-BTech": "B.Tech",
+    "GGL-B.tech": "B.Tech",
+    "GGL-DSAT": "B.Tech",
     "GGL-MBA": "MBA",
     "GGL-BCA": "BCA",
     "GGL-Law": "School of Law",
@@ -90,7 +92,6 @@ SOURCE_TO_COURSE = {
     "GGL_Cyber_Security_MSc": "M.Sc Cyber Security",
     "GGL_Data_Science_MSc": "M.Sc Data Science",
     "GGL_Data_Science_BSc": "B.Sc Data Science",
-    "GGL-DSAT": "DSAT",
     "GGL-B.Pharm": "B.Pharm",
     "GGL-B.Design": "B.Design",
     "GGL-JMC": "JMC",
@@ -98,6 +99,9 @@ SOURCE_TO_COURSE = {
     "GGL_B.Com": "B.Com",
     "GGL-MSC.Biological.Science": "M.Sc Biological Sciences",
 }
+
+# Sources that should be excluded from lead counts entirely
+EXCLUDED_SOURCES = {"DSPS-GGL"}
 
 
 def _map_campaign_to_course(name: str) -> Optional[str]:
@@ -122,6 +126,7 @@ def _get_dsu_account_creds() -> Dict[str, Any]:
 
 def _fetch_google_ads_spend(start_date: str, end_date: str) -> Dict[str, float]:
     """Fetch campaign-level spend from Google Ads, mapped to courses.
+    GST (18%) is applied per-day on spend from 19-Jun-2026 onwards.
     Returns {course: spend_float}."""
     creds = _get_dsu_account_creds()
     from google.ads.googleads.client import GoogleAdsClient
@@ -144,6 +149,7 @@ def _fetch_google_ads_spend(start_date: str, end_date: str) -> Dict[str, float]:
         SELECT
           campaign.id,
           campaign.name,
+          segments.date,
           metrics.cost_micros
         FROM campaign
         WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
@@ -154,6 +160,9 @@ def _fetch_google_ads_spend(start_date: str, end_date: str) -> Dict[str, float]:
         cost = (row.metrics.cost_micros or 0) / 1_000_000.0
         if cost == 0:
             continue
+        spend_date = str(row.segments.date)
+        if spend_date >= DSU_GST_TRANSITION_DATE:
+            cost = cost * GST_MULTIPLIER
         course = _map_campaign_to_course(row.campaign.name)
         if course:
             course_spend[course] += cost
@@ -1054,20 +1063,84 @@ def fetch_dsu_monthly_summary(db_session=None) -> Dict[str, Any]:
     }
 
 
+def _fetch_legacy_spend(start_date: str, end_date: str) -> Dict[str, float]:
+    """Fetch hardcoded legacy spend (old Google Ads account, Nov-25 to Mar-26).
+    Returns {course: spend_float}."""
+    from backend.db.database import SessionLocal
+    from backend.db.models import DsuLegacySpend
+
+    db = SessionLocal()
+    try:
+        entries = db.query(DsuLegacySpend).all()
+        course_spend = defaultdict(float)
+        for entry in entries:
+            # Month is stored as "2025-11" format; check if it overlaps with requested range
+            entry_month_start = entry.month + "-01"
+            # Simple check: if the month falls within [start_date, end_date]
+            if entry.month >= start_date[:7] and entry.month <= end_date[:7]:
+                course_spend[entry.course] += entry.spend
+        return dict(course_spend)
+    except Exception as e:
+        logger.warning(f"Legacy spend fetch failed: {e}")
+        return {}
+    finally:
+        db.close()
+
+
 def fetch_dsu_cumulative_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch cumulative course performance for a date range (Table 2).
+    
+    For the default "from inception to yesterday" range, the exact historical
+    raw data is used so the report matches the client's shared report.
+    
+    For custom ranges, spend = legacy spend (old account, Nov-25 to Mar-26) +
+    live Google Ads spend (current account, Apr-26 onwards) with GST applied
+    from 19-Jun-2026.
+    
     Returns list of {course, leads, cpl, spend} sorted by spend desc."""
-    spend_data = _fetch_google_ads_spend(start_date, end_date)
+    from datetime import date as date_type
+
+    yesterday = (date_type.today() - __import__('datetime').timedelta(days=1)).isoformat()
+    is_default_range = (start_date == DSU_INCEPTION_DATE and end_date == yesterday)
+
+    if is_default_range:
+        from backend.db.database import SessionLocal
+        from backend.db.models import DsuTable2Historical
+        db = SessionLocal()
+        try:
+            historical = db.query(DsuTable2Historical).all()
+            rows = []
+            for h in historical:
+                if h.spend <= 0 and h.leads <= 0:
+                    continue
+                cpl = round(h.spend / h.leads) if h.leads else None
+                rows.append({"course": h.course, "leads": h.leads, "cpl": cpl, "spend": round(h.spend)})
+            rows.sort(key=lambda r: -r["spend"])
+            return rows
+        finally:
+            db.close()
+
+    # Custom range: compute from legacy + live API
+    live_spend = _fetch_google_ads_spend(start_date, end_date)
+    legacy_spend = _fetch_legacy_spend(start_date, end_date)
+    
+    merged_spend = defaultdict(float)
+    for course, spend in legacy_spend.items():
+        merged_spend[course] += spend
+    for course, spend in live_spend.items():
+        merged_spend[course] += spend
+    
     lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
 
     rows = []
-    all_courses = set(DSU_COURSES) | set(spend_data.keys()) | set(lead_data.keys())
+    all_courses = set(DSU_COURSES) | set(merged_spend.keys()) | set(lead_data.keys())
     for course in all_courses:
-        spend = round(spend_data.get(course, 0))
+        spend = round(merged_spend.get(course, 0))
         leads = lead_data.get(course, 0)
+        if spend <= 0 and leads <= 0:
+            continue
         cpl = round(spend / leads) if leads else None
-        if spend > 0 or leads > 0:
-            rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
+        rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
 
     rows.sort(key=lambda r: -r["spend"])
     return rows

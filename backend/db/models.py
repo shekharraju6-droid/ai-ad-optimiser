@@ -354,6 +354,56 @@ class DsiBudgetEntry(Base):
         }
 
 
+class DsuLegacySpend(Base):
+    """Hardcoded spend from the old Google Ads account (Nov-25 to Mar-26).
+    
+    The old account is no longer accessible via API, so course-wise monthly
+    spend is stored here and merged with live API data for Table 2.
+    """
+    __tablename__ = "dsu_legacy_spend"
+
+    id = Column(Integer, primary_key=True, index=True)
+    month = Column(String, nullable=False, index=True)  # "2025-11", "2025-12", etc.
+    course = Column(String, nullable=False)  # "B.Tech", "MBA", etc.
+    spend = Column(Float, nullable=False, default=0.0)
+    leads = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "month": self.month,
+            "course": self.course,
+            "spend": self.spend,
+            "leads": self.leads,
+        }
+
+
+class DsuTable2Historical(Base):
+    """Exact historical figures for DSU Table 2 (from inception to yesterday).
+    
+    This stores the user's raw data so that the default Table 2 view matches
+    the shared client report exactly. Custom date ranges still compute from
+    live + legacy data.
+    """
+    __tablename__ = "dsu_table2_historical"
+
+    id = Column(Integer, primary_key=True, index=True)
+    course = Column(String, nullable=False, unique=True)
+    leads = Column(Integer, nullable=False, default=0)
+    spend = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "course": self.course,
+            "leads": self.leads,
+            "spend": self.spend,
+        }
+
+
 class LeadSquaredLead(Base):
     """Local mirror of LeadSquared leads for fast MIS reporting.
     

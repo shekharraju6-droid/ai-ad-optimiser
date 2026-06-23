@@ -515,9 +515,19 @@
         };
 
         const dsuT2DateSelector = () => {
-            const label = dsuT2Range.preset === 'custom'
-                ? `${formatHeaderDate(dsuT2Range.start)} - ${formatHeaderDate(dsuT2Range.end)}`
-                : (dsuT2Range.preset || 'From Inception');
+            const inceptionDate = (data && data.inception_date) || '2025-11-28';
+            let label;
+            if (dsuT2Range.preset === 'custom') {
+                label = `${formatHeaderDate(dsuT2Range.start)} - ${formatHeaderDate(dsuT2Range.end)}`;
+            } else if (dsuT2Range.preset === 'inception') {
+                label = `${formatHeaderDate(inceptionDate)} - ${formatHeaderDate(dsuT2Range.end)}`;
+            } else if (dsuT2Range.preset === 'yesterday') {
+                label = formatHeaderDate(dsuT2Range.start);
+            } else if (dsuT2Range.preset === 'today') {
+                label = `Today: ${formatHeaderDate(dsuT2Range.start)}`;
+            } else {
+                label = `${formatHeaderDate(dsuT2Range.start)} - ${formatHeaderDate(dsuT2Range.end)}`;
+            }
             const custom = dsuT2Range.preset === 'custom';
             return `
                 <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;flex-wrap:wrap;">
