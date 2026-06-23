@@ -6,9 +6,9 @@ Maps both to the DSI department/course taxonomy with department rollup.
 import json
 import sqlite3
 import logging
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from collections import defaultdict
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from backend.services.crypto import decrypt
 
@@ -16,7 +16,7 @@ logger = logging.getLogger("AdOptima")
 
 DSI_ACCOUNT_ID = 2
 DSI_CUSTOMER_ID = "1917462211"
-DSI_INCEPTION = "2025-11-28"
+DSI_INCEPTION = "2026-01-08"
 DSI_GST_TRANSITION = "2026-06-19"
 DSI_NEW_ACCOUNT_START = "2026-04-01"  # new Google Ads account goes live
 GST_MULTIPLIER = 1.18
@@ -57,8 +57,11 @@ DSI_CAMPAIGN_KEYWORDS = [
     ("civil", "Civil Engineering"),
     ("chemical", "Chemical Engineering"),
     ("biotech", "Biotechnology"),
-    # Architecture
+    # Architecture (before generic dsca/dsce/dsit fallbacks)
+    ("b.arch", "B. Arch"),
+    ("barch", "B. Arch"),
     ("arch", "B. Arch"),
+    ("m.arch", "M.Arch"),
     ("march", "M.Arch"),
     # Degree courses
     ("bcaeve", "BCA Evening"),
@@ -67,7 +70,11 @@ DSI_CAMPAIGN_KEYWORDS = [
     ("bcomeve", "B.Com Evening"),
     ("bcom", "B.Com"),
     ("b.com", "B.Com"),
+    ("b.com evening", "B.Com Evening"),
     ("bba", "BBA"),
+    ("bba1", "BBA"),
+    ("bba2", "BBA"),
+    ("bba3", "BBA"),
     ("mba", "MBA"),
     ("mca", "MCA"),
     ("mcom", "M.Com"),
@@ -75,6 +82,10 @@ DSI_CAMPAIGN_KEYWORDS = [
     ("bsc(pcm)", "B.Sc (PCM)"),
     ("pcm", "B.Sc (PCM)"),
     ("bsc", "B.Sc"),
+    # DSIT Diploma must be detected before generic DSIT
+    ("dsit-diploma", "DSIT - Diploma"),
+    ("dsit diploma", "DSIT - Diploma"),
+    ("diploma", "DSIT - Diploma"),
     # Department-level fallbacks
     ("dscasc", "DSCASC - UG"),
     ("dscads", "DSCA"),
@@ -84,7 +95,6 @@ DSI_CAMPAIGN_KEYWORDS = [
     ("dsce", "DSCE"),
     ("engg", "DSCE"),
     ("dsit", "DSIT"),
-    ("diploma", "DSIT"),
 ]
 
 # DSI Source -> course mapping for LeadSquared Student Source
@@ -145,6 +155,8 @@ DSI_FALLBACK_DEPT = {
     "mba": "DSCASC - Masters",
     "mca": "DSCASC - Masters",
     "m.com": "DSCASC - Masters",
+    "dscasc - ug": "DSCASC - UG",
+    "dscasc - masters": "DSCASC - Masters",
 }
 
 # DSI course normalization
@@ -164,44 +176,75 @@ DSI_COURSE_NORMALISE = {
 
 
 def _map_dsi_campaign_to_course(name: str) -> Optional[str]:
-    """Map a DSI campaign name to a course using keyword matching."""
-    low = name.lower().strip()
-    if not low:
+    """Map a DSI campaign name to a course using word-aware keyword matching.
+
+    Campaign names are tokenized (split on |, -, _, spaces, dots where they act
+    as separators) so that a keyword like 'arch' does not match inside the word
+    'search'.  Multi-word keywords (e.g. 'b.com evening', 'dsit diploma') are
+    matched as contiguous token sequences.
+    """
+    name = (name or "").strip()
+    if not name:
         return None
 
     # Check exact source mapping first
     if name in DSI_SOURCE_TO_COURSE:
         return DSI_SOURCE_TO_COURSE[name]
 
-    # Remove 'search' for arch detection
-    c_no_search = low.replace("search", "")
+    # Normalize to tokens: lowercase, treat separators as spaces, strip
+    # surrounding punctuation like parentheses and quotes.
+    import re
+    norm = re.sub(r"[\|\-_\s]+", " ", name.lower())
+    tokens = [re.sub(r"^[^a-z0-9]+|[^a-z0-9]+$", "", t) for t in norm.split() if t]
 
+    def _tokens_for_kw(kw: str) -> List[str]:
+        return [re.sub(r"^[^a-z0-9]+|[^a-z0-9]+$", "", t)
+                for t in re.sub(r"[\|\-_\s]+", " ", kw.lower()).split() if t]
+
+    # Try each keyword as a contiguous token sequence
     for kw, course in DSI_CAMPAIGN_KEYWORDS:
-        if kw in low:
-            return course
+        kw_tokens = _tokens_for_kw(kw)
+        if not kw_tokens:
+            continue
+        for i in range(len(tokens) - len(kw_tokens) + 1):
+            if tokens[i:i + len(kw_tokens)] == kw_tokens:
+                return course
 
-    # Check arch after removing 'search'
-    if "arch" in c_no_search:
+    # Final fallback: standalone 'arch' token
+    if "arch" in tokens:
         return "B. Arch"
 
     return None
 
 
 def _get_dsi_dept(course: str) -> str:
-    """Get the department for a DSI course name."""
+    """Get the department for a DSI course name.
+
+    Department-level course labels (DSCE, DSIT) return themselves.
+    """
     if not course:
         return ""
     low = course.lower().strip()
+    if low in ("dsce", "dsit"):
+        return course.upper()
     if low in DSI_FALLBACK_DEPT:
         return DSI_FALLBACK_DEPT[low]
     return ""
 
 
 def _rollup_to_dept(course: str) -> str:
-    """For DSI, if course maps to DSCE or DSIT department, return the department name."""
+    """For DSI, roll up generic DSCE courses to the department label.
+
+    DSIT generic and diploma campaigns all roll up to the course label
+    'DSIT - Diploma' while keeping department DSIT.
+    """
+    if not course:
+        return course
     dept = _get_dsi_dept(course)
-    if dept in ("DSCE", "DSIT"):
-        return dept
+    if dept == "DSCE":
+        return "DSCE"
+    if dept == "DSIT":
+        return "DSIT - Diploma"
     return course
 
 
@@ -497,7 +540,7 @@ def _fetch_dsi_lsq_leads_direct(start_date: str, end_date: str) -> List[Dict[str
                 "ToDate": f"{today_str} 23:59:59",
             },
             "Columns": {
-                "Include_CSV": "ProspectID,Source,SourceCampaign,CreatedOn,mx_Student_Source,mx_Student_Stage,mx_Application_Status,mx_Latest_Source,mx_Secondary_Source,mx_Application_Course,mx_Course_DSIT_Diploma,mx_DSCA_Course,mx_DSCASC_Course,mx_DSCE_Course"
+                "Include_CSV": "ProspectID,Source,SourceCampaign,CreatedOn,ModifiedOn,mx_Student_Source,mx_Student_Stage,mx_Application_Status,mx_Latest_Source,mx_Secondary_Source,mx_Application_Course,mx_Application_Program"
             },
             "Paging": {"PageIndex": page, "PageSize": 1000},
             "Sorting": {"ColumnName": "ProspectAutoId", "Direction": "1"},
@@ -531,31 +574,41 @@ def _fetch_dsi_lsq_leads_direct(start_date: str, end_date: str) -> List[Dict[str
                 props[item.get("Attribute", "")] = item.get("Value", "")
             created = (props.get("CreatedOn") or "")
             source = (props.get("Source") or "")
-            created_day = created[:10]
+            # DSI CreatedOn format: DD-MM-YYYY HH:MM
+            created_day = ""
+            if created:
+                try:
+                    created_day = datetime.strptime(created.strip(), "%d-%m-%Y %H:%M").strftime("%Y-%m-%d")
+                except ValueError:
+                    created_day = created[:10]
             if not (start_date <= created_day <= end_date):
                 continue
 
             student_source = (props.get("mx_Student_Source") or "")
             latest_source = (props.get("mx_Latest_Source") or "")
             secondary_source = (props.get("mx_Secondary_Source") or "")
+            source_campaign = (props.get("SourceCampaign") or "").strip()
             source_combined = " ".join([source, student_source, latest_source, secondary_source]).upper()
             if "GGL" not in source_combined and "PROGRAMMATIC" not in source_combined:
                 continue
 
             stage = (props.get("mx_Student_Stage") or "")
             application_status = (props.get("mx_Application_Status") or "")
-
             app_course = (props.get("mx_Application_Course") or "").strip()
-            dsit_diploma = (props.get("mx_Course_DSIT_Diploma") or "").strip()
-            dsca_course = (props.get("mx_DSCA_Course") or "").strip()
-            dscasc_course = (props.get("mx_DSCASC_Course") or "").strip()
-            dsce_course = (props.get("mx_DSCE_Course") or "").strip()
+            app_program = (props.get("mx_Application_Program") or "").strip()
 
+            # DSI primary classification: Source Campaign encodes the department/course.
+            # Fallback to Application Course / Program only when source campaign is absent.
             raw_course = ""
-            for val in [dsca_course, dscasc_course, dsit_diploma, dsce_course, app_course]:
-                if val and val != "--":
-                    raw_course = val
-                    break
+            if source_campaign:
+                mapped = _map_dsi_campaign_to_course(source_campaign)
+                if mapped:
+                    raw_course = mapped
+
+            if not raw_course and app_course and app_course != "--":
+                raw_course = app_course
+            elif not raw_course and app_program and app_program != "--":
+                raw_course = app_program
 
             if not raw_course:
                 mapped = _map_dsi_campaign_to_course(source)
@@ -594,7 +647,9 @@ def _fetch_dsi_lsq_leads_direct(start_date: str, end_date: str) -> List[Dict[str
 def _dept_sort_key(course):
     """Sort key for DSI courses using DEPT_ORDER."""
     low = course.lower().strip()
-    return (DEPT_ORDER.get(low, 99), course)
+    # Match department prefix for rolled-up labels like "DSIT - Diploma"
+    dept_key = low.split(" - ")[0] if " - " in low else low
+    return (DEPT_ORDER.get(dept_key, 99), course)
 
 
 def fetch_dsi_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
@@ -606,12 +661,18 @@ def fetch_dsi_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]
 
     leads_by_course = defaultdict(int)
     for lead in leads:
-        leads_by_course[lead["course"]] += 1
+        normalized = _rollup_to_dept(lead["course"])
+        leads_by_course[normalized] += 1
 
-    all_courses = set(spend_data.keys()) | set(leads_by_course.keys())
+    normalized_spend = {}
+    for course, spend in spend_data.items():
+        normalized = _rollup_to_dept(course)
+        normalized_spend[normalized] = normalized_spend.get(normalized, 0) + spend
+
+    all_courses = set(normalized_spend.keys()) | set(leads_by_course.keys())
     rows = []
     for course in all_courses:
-        spend = round(spend_data.get(course, 0))
+        spend = round(normalized_spend.get(course, 0))
         leads_count = leads_by_course.get(course, 0)
         cpl = round(spend / leads_count) if leads_count else None
         dept = _get_dsi_dept(course)
@@ -647,18 +708,21 @@ def fetch_dsi_cumulative_range(start_date: str, end_date: str) -> List[Dict[str,
     # Old-account legacy spend (from Excel, Jan-26 to Mar-26, no GST)
     legacy_spend = _fetch_dsi_legacy_spend(start_date, end_date)
 
-    # Merge spend
+    # Merge spend — normalize all course labels through _rollup_to_dept
     merged_spend = defaultdict(float)
     for course, spend in legacy_spend.items():
-        merged_spend[course] += spend
+        normalized = _rollup_to_dept(course)
+        merged_spend[normalized] += spend
     for course, spend in live_spend.items():
-        merged_spend[course] += spend
+        normalized = _rollup_to_dept(course)
+        merged_spend[normalized] += spend
 
     # Leads from LSQ mirror
     leads = _fetch_dsi_lsq_leads(start_date, end_date)
     leads_by_course = defaultdict(int)
     for lead in leads:
-        leads_by_course[lead["course"]] += 1
+        normalized = _rollup_to_dept(lead["course"])
+        leads_by_course[normalized] += 1
 
     # Build rows
     all_courses = set(merged_spend.keys()) | set(leads_by_course.keys())

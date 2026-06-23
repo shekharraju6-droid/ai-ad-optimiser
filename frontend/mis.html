@@ -1035,7 +1035,7 @@
             case 'last15': start.setDate(end.getDate() - 14); break;
             case 'last30': start.setDate(end.getDate() - 29); break;
             case 'thisMonth': start.setDate(1); break;
-            case 'inception': start = new Date('2025-11-28'); break;
+            case 'inception': start = new Date('2026-01-08'); break;
             case 'custom': return;
         }
         rangeObj.preset = preset;
@@ -1095,14 +1095,44 @@
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
         const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
 
+        // Format a YYYY-MM-DD date as "22nd June"
+        const fmtDayMonth = (dateStr) => {
+            if (!dateStr) return '';
+            const d = new Date(dateStr + 'T00:00:00');
+            if (isNaN(d)) return '';
+            const day = d.getDate();
+            const suffix = (n) => {
+                if (n > 3 && n < 21) return 'th';
+                switch (n % 10) {
+                    case 1: return 'st';
+                    case 2: return 'nd';
+                    case 3: return 'rd';
+                    default: return 'th';
+                }
+            };
+            const month = d.toLocaleString('en-GB', { month: 'long' });
+            return `${day}${suffix(day)} ${month}`;
+        };
+
         const renderDSITable = (title, rows, total, headerRows) => {
-            // Group by department for rowSpan
-            let prevDept = '';
-            const body = rows.map(r => {
+            // Group by department for rowspan: blank department cells merge visually
+            const deptRuns = [];
+            for (let i = 0; i < rows.length; i++) {
+                if (i === 0 || rows[i].department !== rows[i - 1].department) {
+                    deptRuns.push({ start: i, count: 1, dept: rows[i].department });
+                } else {
+                    deptRuns[deptRuns.length - 1].count++;
+                }
+            }
+            const deptRowSpan = {};
+            deptRuns.forEach(run => { deptRowSpan[run.start] = run.count; });
+
+            const body = rows.map((r, i) => {
                 const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
                 const spend = fmtMoney(r.spend);
-                const deptCell = r.department !== prevDept ? `<td style="font-weight:700;vertical-align:top">${escapeHtml(r.department || '')}</td>` : `<td></td>`;
-                prevDept = r.department;
+                const deptCell = deptRowSpan[i]
+                    ? `<td style="font-weight:700;vertical-align:top;text-align:center" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
+                    : '';
                 return `<tr>${deptCell}<td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td><td class="text-right">${cpl}</td><td class="text-right">${spend}</td></tr>`;
             }).join('');
             const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
@@ -1125,11 +1155,11 @@
 
         const t1Header = `
             <tr><th colspan="5" class="dsu-banner">${data.gst_note || 'MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026'}</th></tr>
-            <tr><th colspan="5" class="dsu-mis-row">MIS</th></tr>
+            <tr><th colspan="5" class="dsu-mis-row">MIS - ${fmtDayMonth(dsiT1Range.end)}</th></tr>
         `;
         const t2Header = `
             <tr><th colspan="5" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
-            <tr><th colspan="5" class="dsu-mis-row">MIS</th></tr>
+            <tr><th colspan="5" class="dsu-mis-row">MIS - ${fmtDayMonth(dsiT2Range.start)} to ${fmtDayMonth(dsiT2Range.end)}</th></tr>
         `;
 
         $('reportContent').innerHTML = `

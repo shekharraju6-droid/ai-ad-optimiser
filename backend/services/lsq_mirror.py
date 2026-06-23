@@ -16,7 +16,7 @@ Strategy:
 import json
 import logging
 import time as time_module
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from typing import Dict, Any, List, Optional, Set
 
 import requests
@@ -37,20 +37,66 @@ logger = logging.getLogger("AdOptima")
 # in the mirror for traceability and post-filtered by _is_ggl_or_programmatic.
 _SOURCE_FIELDS = [
     ("Source", False),
+    ("mx_Student_Source", True),  # custom field: may fail on some tenants, so tolerate errors
 ]
+
+
+# DSI-specific: the CRM view only shows Programmatic leads from these campaigns
+# (all other Programmatic leads are excluded from the DSI report view)
+DSI_PROGRAMMATIC_CAMPAIGN_WHITELIST = {
+    "chlear_dns_dsce_search",
+    "chlear_dns_dsca_arch_search",
+    "chlear_dns_dsit_se",
+    "chlear_dns_dscasc_search_bcom",
+    "chlear_dns_bba",
+    "chlear_dns_dscasc_search_bca",
+    "Diploma_DSIT_ads_capital_g2",
+    "chlear_dns_dscasc_search_ds_sitelink_1",
+    "chlear_dns_bba3",
+    "chlear_dns_dscasc_search_ds_sitelink_4",
+    "chlear_dns_dsit2",
+}
 
 
 def _resolve_dsi_course(raw_course: str) -> str:
     """Normalize and roll up a DSI course value to a department/course label."""
     from backend.services.dsi_data import (
         DSI_COURSE_NORMALISE,
+        _map_dsi_campaign_to_course,
         _rollup_to_dept,
     )
     low = (raw_course or "").lower().strip()
     if low in DSI_COURSE_NORMALISE:
         raw_course = DSI_COURSE_NORMALISE[low]
+    mapped = _map_dsi_campaign_to_course(raw_course)
+    if mapped:
+        raw_course = mapped
     clean = _rollup_to_dept(raw_course)
     return clean or raw_course
+
+
+def _parse_lsq_date(value: str) -> str:
+    """Parse LeadSquared date (DD-MM-YYYY HH:MM or ISO) into YYYY-MM-DD in IST.
+
+    LeadSquared returns CreatedOn in UTC. InsightDesk reports use IST dates,
+    so we add +5:30 before extracting the calendar date.
+    """
+    if not value:
+        return ""
+    value = value.strip()
+    dt = None
+    for fmt in ("%d-%m-%Y %H:%M", "%d-%m-%Y", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(value, fmt)
+            break
+        except ValueError:
+            continue
+    if dt is None:
+        return value[:10]
+    # Convert UTC to IST (+5:30)
+    dt_ist = dt + timedelta(hours=5, minutes=30)
+    return dt_ist.strftime("%Y-%m-%d")
+
 
 
 def _resolve_course(source: str) -> Optional[str]:
@@ -103,27 +149,41 @@ def _parse_lsq_record(rec: Dict[str, Any], include_dsi_course_columns: bool = Fa
             if attr:
                 props[attr] = item.get("Value", "")
 
-    created = (props.get("CreatedOn") or "")[:10]
-    modified = (props.get("ModifiedOn") or props.get("LastModifiedOn") or "")[:10]
+    created_raw = (props.get("CreatedOn") or "")
+    modified_raw = (props.get("ModifiedOn") or props.get("LastModifiedOn") or "")
+    # DSI uses DD-MM-YYYY HH:MM; DSU uses ISO. Try DSI format first, then fallback.
+    created = _parse_lsq_date(created_raw)
+    modified = _parse_lsq_date(modified_raw) if modified_raw else ""
     source = props.get("Source", "")
 
-    # Resolve course. For DSI we also inspect the course-specific columns.
+    # Resolve course. For DSI use SourceCampaign, then Application Course / Program.
     course = _resolve_course(source)
     if include_dsi_course_columns:
+        source_campaign = (props.get("SourceCampaign") or "").strip()
         app_course = (props.get("mx_Application_Course") or "").strip()
-        dsit_diploma = (props.get("mx_Course_DSIT_Diploma") or "").strip()
-        dsca_course = (props.get("mx_DSCA_Course") or "").strip()
-        dscasc_course = (props.get("mx_DSCASC_Course") or "").strip()
-        dsce_course = (props.get("mx_DSCE_Course") or "").strip()
+        app_program = (props.get("mx_Application_Program") or "").strip()
+
         raw_course = ""
-        for val in [dsca_course, dscasc_course, dsit_diploma, dsce_course, app_course]:
-            if val and val != "--":
-                raw_course = val
-                break
-        if raw_course:
-            course = _resolve_dsi_course(raw_course)
-        elif not course:
-            course = _resolve_dsi_course(source)
+        # Generic DSCASC sitelink campaigns don't encode the course; use Application Course first
+        if source_campaign in ("chlear_dns_dscasc_search_ds_sitelink_1", "chlear_dns_dscasc_search_ds_sitelink_4"):
+            if app_course and app_course != "--":
+                raw_course = app_course
+
+        if not raw_course and source_campaign:
+            from backend.services.dsi_data import _map_dsi_campaign_to_course
+            mapped = _map_dsi_campaign_to_course(source_campaign)
+            if mapped:
+                raw_course = mapped
+
+        if not raw_course and app_course and app_course != "--":
+            raw_course = app_course
+        elif not raw_course and app_program and app_program != "--":
+            raw_course = app_program
+
+        if not raw_course:
+            raw_course = source
+
+        course = _resolve_dsi_course(raw_course)
 
     return {
         "prospect_id": props.get("ProspectID", "") or rec.get("ProspectID", ""),
@@ -155,6 +215,40 @@ def _is_ggl_or_programmatic(props_or_record: Dict[str, Any]) -> bool:
     return "GGL" in combined or "PROGRAMMATIC" in combined
 
 
+def _is_dsi_source(props_or_record: Dict[str, Any]) -> bool:
+    """Check if this lead matches the DSI CRM view source filter.
+
+    The DSI report view filters on Student Source (Source field) being one of
+    GGL-DSI, Programmatic or CHL_DISPLAY.
+    """
+    source = (props_or_record.get("source") or "").strip()
+    student_source = (props_or_record.get("student_source") or "").strip()
+    combined = {source, student_source}
+    return bool(combined & {"GGL-DSI", "Programmatic", "CHL_DISPLAY"})
+
+
+def _is_dsi_included_lead(props_or_record: Dict[str, Any]) -> bool:
+    """Apply DSI-specific inclusion filter matching the CRM view.
+
+    The CRM view includes:
+      - GGL-DSI leads from all campaigns
+      - CHL_DISPLAY leads from all campaigns
+      - Programmatic leads ONLY from approved campaigns in the whitelist
+    """
+    source = (props_or_record.get("source") or "").strip()
+    source_campaign = (props_or_record.get("source_campaign") or "").strip()
+
+    if source in ("GGL-DSI", "CHL_DISPLAY"):
+        return True
+    if source == "Programmatic":
+        return source_campaign in DSI_PROGRAMMATIC_CAMPAIGN_WHITELIST
+    return False
+
+
+# Deprecated alias kept for compatibility with DSU paths
+_is_ggl_or_programmatic_dsi = _is_ggl_or_programmatic
+
+
 def _fetch_lsq_get_page(
     base_url: str,
     access_key: str,
@@ -183,7 +277,7 @@ def _fetch_lsq_get_page(
             "Logic": "AND",
         },
         "Columns": {
-            "Include_CSV": "ProspectID,Source,SourceCampaign,CreatedOn,ModifiedOn,LastModifiedOn,mx_Student_Source,mx_Student_Stage,mx_Application_Status,mx_Latest_Source,mx_Secondary_Source"
+            "Include_CSV": "ProspectID,Source,SourceCampaign,CreatedOn,ModifiedOn,LastModifiedOn,mx_Student_Source,mx_Student_Stage,mx_Application_Status,mx_Latest_Source,mx_Secondary_Source,mx_Application_Course,mx_Application_Program"
         },
         "Paging": {"PageIndex": page, "PageSize": page_size},
         "Sorting": {"ColumnName": "ProspectAutoId", "Direction": "1"},
@@ -198,6 +292,10 @@ def _fetch_lsq_get_page(
                 return data
             return data.get("Leads", [])
         except Exception as e:
+            # Custom fields like mx_Student_Source may not support LIKE+CreatedOn combo.
+            if "mx_" in lookup_name:
+                logger.warning(f"LeadSquared Leads.Get custom field {lookup_name} search failed; skipping: {e}")
+                return []
             logger.warning(f"LeadSquared Leads.Get page {page} attempt {attempt + 1} failed: {e}")
             time_module.sleep(min(2 ** attempt, 30))
     logger.error(f"LeadSquared Leads.Get page {page} failed after 5 retries")
@@ -238,8 +336,14 @@ def _search_lsq_by_source_field(
             created = parsed.get("created_on") or ""
             if created and created < since_date:
                 continue
-            if not _is_ggl_or_programmatic(parsed):
-                continue
+            if include_dsi_course_columns:
+                if not _is_dsi_source(parsed):
+                    continue
+                if not _is_dsi_included_lead(parsed):
+                    continue
+            else:
+                if not _is_ggl_or_programmatic(parsed):
+                    continue
             prospect_id = parsed["prospect_id"]
             # If duplicate from another search, prefer the one with a resolved course
             existing = results.get(prospect_id)
@@ -268,7 +372,8 @@ def _full_sync_by_source(
 
     include_dsi = account.name == "DSI"
     all_leads: Dict[str, Dict[str, Any]] = {}
-    search_terms = ["GGL", "Programmatic"]
+    # DSI CRM view includes CHL_DISPLAY in addition to GGL/Programmatic sources
+    search_terms = ["GGL", "Programmatic", "CHL_DISPLAY"] if include_dsi else ["GGL", "Programmatic"]
 
     for field_name, _ in _SOURCE_FIELDS:
         for term in search_terms:
@@ -278,6 +383,23 @@ def _full_sync_by_source(
                 if existing and existing.get("course") and not lead.get("course"):
                     continue
                 all_leads[prospect_id] = lead
+
+    # Fallback: RecentlyModified catches leads with empty Source but GGL/Programmatic in Student Source.
+    # Use a 30-day window ending today to keep the API call small.
+    try:
+        to_dt = date.today()
+        from_dt = to_dt - timedelta(days=30)
+        recent = _fetch_recently_modified_window(
+            base_url, access_key, secret_key,
+            from_dt.isoformat(), to_dt.isoformat(),
+            include_dsi_course_columns=include_dsi,
+        )
+        for prospect_id, lead in recent.items():
+            if prospect_id in all_leads:
+                continue
+            all_leads[prospect_id] = lead
+    except Exception as e:
+        logger.warning(f"RecentlyModified fallback during full sync failed: {e}")
 
     logger.info(f"LSQ mirror full sync: {len(all_leads)} unique GGL/Programmatic leads found")
 
@@ -314,7 +436,8 @@ def _incremental_sync(
 
     include_dsi = account.name == "DSI"
     all_leads: Dict[str, Dict[str, Any]] = {}
-    search_terms = ["GGL", "Programmatic"]
+    # DSI CRM view includes CHL_DISPLAY in addition to GGL/Programmatic sources
+    search_terms = ["GGL", "Programmatic", "CHL_DISPLAY"] if include_dsi else ["GGL", "Programmatic"]
 
     for field_name, _ in _SOURCE_FIELDS:
         for term in search_terms:
@@ -325,11 +448,36 @@ def _incremental_sync(
                     continue
                 all_leads[prospect_id] = lead
 
+    # Fallback: RecentlyModified catches leads with empty Source but GGL/Programmatic in Student Source.
+    try:
+        to_dt = date.today()
+        from_dt = to_dt - timedelta(days=7)
+        recent = _fetch_recently_modified_window(
+            base_url, access_key, secret_key,
+            from_dt.isoformat(), to_dt.isoformat(),
+            include_dsi_course_columns=include_dsi,
+        )
+        for prospect_id, lead in recent.items():
+            if prospect_id in all_leads:
+                continue
+            all_leads[prospect_id] = lead
+    except Exception as e:
+        logger.warning(f"RecentlyModified fallback during incremental sync failed: {e}")
+
     # Delete leads in mirror that were created >= since_date (they will be re-upserted)
     db.query(LeadSquaredLead).filter(
         LeadSquaredLead.account_id == account.id,
         LeadSquaredLead.created_on >= since_date,
     ).delete(synchronize_session=False)
+
+    # Also delete any existing leads that overlap with the RecentlyModified fallback
+    # to prevent duplicates (leads created before since_date but modified recently)
+    prospect_ids = list(all_leads.keys())
+    if prospect_ids:
+        db.query(LeadSquaredLead).filter(
+            LeadSquaredLead.account_id == account.id,
+            LeadSquaredLead.prospect_id.in_(prospect_ids),
+        ).delete(synchronize_session=False)
 
     for lead in all_leads.values():
         db.add(
@@ -403,6 +551,85 @@ def sync_account_leads(account_id: int, db: Session = None, full_window_from: st
 
 from datetime import datetime
 
+
+def _fetch_recently_modified_window(
+    base_url: str,
+    access_key: str,
+    secret_key: str,
+    from_date: str,
+    to_date: str,
+    include_dsi_course_columns: bool = False,
+) -> Dict[str, Dict[str, Any]]:
+    """Fetch leads via Leads.RecentlyModified and filter GGL/Programmatic locally.
+
+    This catches leads where the Source field is empty but mx_Student_Source
+    contains GGL/Programmatic, which Leads.Get with custom-field LIKE often
+    fails to return (500 error).
+    """
+    url = f"{base_url}/LeadManagement.svc/Leads.RecentlyModified"
+    all_results: Dict[str, Dict[str, Any]] = {}
+    page = 1
+    max_pages = 100
+    total_records = None
+
+    while page <= max_pages:
+        payload = {
+            "Parameter": {
+                "FromDate": f"{from_date} 00:00:00",
+                "ToDate": f"{to_date} 23:59:59",
+            },
+            "Columns": {
+                "Include_CSV": "ProspectID,Source,SourceCampaign,CreatedOn,ModifiedOn,LastModifiedOn,mx_Student_Source,mx_Student_Stage,mx_Application_Status,mx_Latest_Source,mx_Secondary_Source,mx_Application_Course,mx_Application_Program"
+            },
+            "Paging": {"PageIndex": page, "PageSize": 1000},
+            "Sorting": {"ColumnName": "ProspectAutoId", "Direction": "1"},
+        }
+
+        success = False
+        for attempt in range(3):
+            try:
+                r = requests.post(url, params={"accessKey": access_key, "secretKey": secret_key}, json=payload, timeout=120)
+                r.raise_for_status()
+                resp = r.json()
+                success = True
+                break
+            except Exception as e:
+                logger.warning(f"Leads.RecentlyModified page {page} attempt {attempt + 1} failed: {e}")
+                time_module.sleep(5)
+        if not success:
+            logger.error(f"Leads.RecentlyModified page {page} failed after retries")
+            break
+
+        if total_records is None:
+            total_records = resp.get("RecordCount", 0)
+            logger.info(f"Leads.RecentlyModified total: {total_records}")
+
+        records = resp.get("Leads", [])
+        if not records:
+            break
+
+        for rec in records:
+            parsed = _parse_lsq_record(rec, include_dsi_course_columns=include_dsi_course_columns)
+            if include_dsi_course_columns:
+                if not _is_dsi_source(parsed):
+                    continue
+                if not _is_dsi_included_lead(parsed):
+                    continue
+            else:
+                if not _is_ggl_or_programmatic(parsed):
+                    continue
+            prospect_id = parsed["prospect_id"]
+            existing = all_results.get(prospect_id)
+            if existing and existing.get("course") and not parsed.get("course"):
+                continue
+            all_results[prospect_id] = parsed
+
+        if len(records) < 1000:
+            break
+        page += 1
+
+    logger.info(f"Leads.RecentlyModified window {from_date} to {to_date}: {len(all_results)} GGL/Programmatic leads")
+    return all_results
 
 def count_leads_by_course(
     db: Session,
