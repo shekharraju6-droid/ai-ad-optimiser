@@ -85,9 +85,22 @@ def dsu_performance(
     t2_end_date = t2_end or yesterday
 
     daily_raw = fetch_dsu_daily_range(t1_start_date, t1_end_date)
-    daily = _apply_gst(daily_raw, t1_end_date)
+    # GST is already applied per-day inside _fetch_google_ads_spend.
+    # No additional GST application needed here.
+    daily = [
+        {
+            "course": r["course"],
+            "leads": r["leads"],
+            "cpl": r["cpl"],
+            "spend": r["spend"],
+            "has_gst": t1_end_date >= DSU_GST_TRANSITION,
+        }
+        for r in daily_raw
+    ]
 
     cumulative_raw = fetch_dsu_cumulative_range(t2_start_date, t2_end_date)
+    # GST is already applied per-day inside _fetch_google_ads_spend for the live
+    # portion, and legacy spend has no GST. So we do NOT apply GST again here.
     cumulative = [
         {
             "course": r["course"],

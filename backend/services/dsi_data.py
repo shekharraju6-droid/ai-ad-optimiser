@@ -18,6 +18,7 @@ DSI_ACCOUNT_ID = 2
 DSI_CUSTOMER_ID = "1917462211"
 DSI_INCEPTION = "2025-11-28"
 DSI_GST_TRANSITION = "2026-06-19"
+DSI_NEW_ACCOUNT_START = "2026-04-01"  # new Google Ads account goes live
 GST_MULTIPLIER = 1.18
 
 # DSI Department Sort Order
@@ -236,8 +237,13 @@ def _apply_gst(raw_cost: float, date_str: str) -> float:
 # Google Ads spend fetch
 # ============================================================================
 
-def _fetch_dsi_google_ads_spend(start_date: str, end_date: str) -> Dict[str, float]:
+def _fetch_dsi_google_ads_spend(start_date: str, end_date: str, live_only: bool = False) -> Dict[str, float]:
     """Fetch campaign-level spend from Google Ads for DSI, mapped to courses with dept rollup.
+
+    Args:
+        live_only: if True, only include enabled/live/active campaigns (Table 1).
+                   if False, include all campaigns regardless of status (Table 2).
+
     Returns {course: spend_float}."""
     creds = _get_dsi_account_creds()
     from google.ads.googleads.client import GoogleAdsClient
@@ -260,6 +266,7 @@ def _fetch_dsi_google_ads_spend(start_date: str, end_date: str) -> Dict[str, flo
         SELECT
           campaign.id,
           campaign.name,
+          campaign.status,
           segments.date,
           metrics.cost_micros
         FROM campaign
@@ -272,6 +279,10 @@ def _fetch_dsi_google_ads_spend(start_date: str, end_date: str) -> Dict[str, flo
         cost = (row.metrics.cost_micros or 0) / 1_000_000.0
         if cost == 0:
             continue
+        if live_only:
+            status_str = str(row.campaign.status).lower() if row.campaign.status else ""
+            if status_str not in ("enabled", "live", "active", "campaignstatus.enabled", "2"):
+                continue
         day_str = str(row.segments.date) if row.segments.date else ""
         cost_with_gst = _apply_gst(cost, day_str)
         campaign_name = row.campaign.name
@@ -280,7 +291,6 @@ def _fetch_dsi_google_ads_spend(start_date: str, end_date: str) -> Dict[str, flo
             rolled_up = _rollup_to_dept(course)
             course_spend[rolled_up] += cost_with_gst
         else:
-            # Try keyword-based fallback on the campaign name
             course_spend[campaign_name] += cost_with_gst
 
     return dict(course_spend)
@@ -589,8 +599,9 @@ def _dept_sort_key(course):
 
 def fetch_dsi_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch DSI course performance for a date range (Table 1).
+    Only enabled/live/active campaigns are included in spend (per AI_The_MIS rules).
     Returns list of {department, course, leads, cpl, spend} sorted by dept order."""
-    spend_data = _fetch_dsi_google_ads_spend(start_date, end_date)
+    spend_data = _fetch_dsi_google_ads_spend(start_date, end_date, live_only=True)
     leads = _fetch_dsi_lsq_leads(start_date, end_date)
 
     leads_by_course = defaultdict(int)
@@ -619,8 +630,78 @@ def fetch_dsi_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]
 
 def fetch_dsi_cumulative_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch DSI cumulative course performance for a date range (Table 2).
+
+    For the default "from inception to yesterday" range, old-account historical
+    spend (from Excel-seeded dsi_legacy_spend) is merged with new-account live
+    API spend. Leads come from the LSQ mirror.
+
     Returns list of {department, course, leads, cpl, spend} sorted by dept order."""
-    return fetch_dsi_daily_range(start_date, end_date)
+    from datetime import date as date_type
+
+    yesterday = (date_type.today() - __import__('datetime').timedelta(days=1)).isoformat()
+    is_default_range = (start_date == DSI_INCEPTION and end_date == yesterday)
+
+    # Live API spend (new account, Apr-26 onwards, GST-adjusted)
+    live_spend = _fetch_dsi_google_ads_spend(DSI_NEW_ACCOUNT_START, end_date)
+
+    # Old-account legacy spend (from Excel, Jan-26 to Mar-26, no GST)
+    legacy_spend = _fetch_dsi_legacy_spend(start_date, end_date)
+
+    # Merge spend
+    merged_spend = defaultdict(float)
+    for course, spend in legacy_spend.items():
+        merged_spend[course] += spend
+    for course, spend in live_spend.items():
+        merged_spend[course] += spend
+
+    # Leads from LSQ mirror
+    leads = _fetch_dsi_lsq_leads(start_date, end_date)
+    leads_by_course = defaultdict(int)
+    for lead in leads:
+        leads_by_course[lead["course"]] += 1
+
+    # Build rows
+    all_courses = set(merged_spend.keys()) | set(leads_by_course.keys())
+    rows = []
+    for course in all_courses:
+        spend = round(merged_spend.get(course, 0))
+        leads_count = leads_by_course.get(course, 0)
+        if spend <= 0 and leads_count <= 0:
+            continue
+        cpl = round(spend / leads_count) if leads_count else None
+        dept = _get_dsi_dept(course)
+        rows.append({
+            "department": dept,
+            "course": course,
+            "leads": leads_count,
+            "cpl": cpl,
+            "spend": spend,
+        })
+
+    rows.sort(key=lambda r: _dept_sort_key(r["course"]))
+    return rows
+
+
+def _fetch_dsi_legacy_spend(start_date: str, end_date: str) -> Dict[str, float]:
+    """Fetch hardcoded legacy spend (DSI old Google Ads account, Jan-26 to Mar-26).
+    Returns {course: spend_float}."""
+    from backend.db.database import SessionLocal
+    from backend.db.models import DsiLegacySpend
+
+    db = SessionLocal()
+    try:
+        entries = db.query(DsiLegacySpend).all()
+        course_spend = defaultdict(float)
+        for entry in entries:
+            # Month stored as "2026-01"; check overlap with requested range
+            if entry.month >= start_date[:7] and entry.month <= end_date[:7]:
+                course_spend[entry.course] += entry.spend
+        return dict(course_spend)
+    except Exception as e:
+        logger.warning(f"DSI legacy spend fetch failed: {e}")
+        return {}
+    finally:
+        db.close()
 
 
 # ============================================================================
@@ -704,6 +785,7 @@ DSI_T4_SECTIONS = [
 
 def fetch_dsi_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
     """Fetch DSI Application MIS (Table 4).
+    Uses cumulative spend (legacy + live API) for consistency with Table 2.
     Returns sections with rows, section totals, and grand total."""
     leads = _fetch_dsi_lsq_leads(start_date, end_date)
 
@@ -714,7 +796,9 @@ def fetch_dsi_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
             course = lead["course"]
             submitted_counts[course] += 1
 
-    spend_data = _fetch_dsi_google_ads_spend(start_date, end_date)
+    # Use cumulative spend (legacy + live API) for consistency with Table 2
+    cumulative_rows = fetch_dsi_cumulative_range(start_date, end_date)
+    spend_data = {r["course"]: r["spend"] for r in cumulative_rows}
 
     sections = []
     grand_submitted = 0
@@ -806,8 +890,10 @@ DSI_T5_SECTIONS = [
 
 def fetch_dsi_budget_mis(start_date: str, end_date: str, db_session=None) -> Dict[str, Any]:
     """Fetch DSI Budget MIS (Table 5).
-    Uses Google Ads for spend + dsi_budget_entries for budget amounts."""
-    spend_data = _fetch_dsi_google_ads_spend(start_date, end_date)
+    Uses cumulative spend (legacy + live API) + dsi_budget_entries for budgets."""
+    # Use cumulative spend for consistency with Table 2 and Table 4
+    cumulative_rows = fetch_dsi_cumulative_range(start_date, end_date)
+    spend_data = {r["course"]: r["spend"] for r in cumulative_rows}
 
     # Fetch budgets from DB
     section_budgets = defaultdict(float)

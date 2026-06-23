@@ -105,9 +105,19 @@ EXCLUDED_SOURCES = {"DSPS-GGL"}
 
 
 def _map_campaign_to_course(name: str) -> Optional[str]:
+    """Map a Google Ads campaign name to a DSU course.
+
+    Uses normalized substring matching (dots/underscores/hyphens stripped)
+    following the AI_The_MIS logic so 'B.tech Ads' matches keyword 'b tech'.
+    """
     low = name.lower()
     for kw, course in CAMPAIGN_KEYWORDS:
         if kw in low:
+            return course
+    # Normalized fallback: strip dots, underscores, hyphens
+    norm = low.replace(".", "").replace("_", "").replace("-", "")
+    for kw, course in CAMPAIGN_KEYWORDS:
+        if kw.replace(".", "").replace("_", "").replace("-", "") in norm:
             return course
     return None
 
@@ -124,9 +134,14 @@ def _get_dsu_account_creds() -> Dict[str, Any]:
     return json.loads(decrypt(row[0]))
 
 
-def _fetch_google_ads_spend(start_date: str, end_date: str) -> Dict[str, float]:
+def _fetch_google_ads_spend(start_date: str, end_date: str, live_only: bool = False) -> Dict[str, float]:
     """Fetch campaign-level spend from Google Ads, mapped to courses.
     GST (18%) is applied per-day on spend from 19-Jun-2026 onwards.
+    
+    Args:
+        live_only: if True, only include enabled/live/active campaigns (Table 1).
+                   if False, include all campaigns regardless of status (Table 2).
+    
     Returns {course: spend_float}."""
     creds = _get_dsu_account_creds()
     from google.ads.googleads.client import GoogleAdsClient
@@ -149,6 +164,7 @@ def _fetch_google_ads_spend(start_date: str, end_date: str) -> Dict[str, float]:
         SELECT
           campaign.id,
           campaign.name,
+          campaign.status,
           segments.date,
           metrics.cost_micros
         FROM campaign
@@ -160,6 +176,10 @@ def _fetch_google_ads_spend(start_date: str, end_date: str) -> Dict[str, float]:
         cost = (row.metrics.cost_micros or 0) / 1_000_000.0
         if cost == 0:
             continue
+        if live_only:
+            status_str = str(row.campaign.status).lower() if row.campaign.status else ""
+            if status_str not in ("enabled", "live", "active", "campaignstatus.enabled", "2"):
+                continue
         spend_date = str(row.segments.date)
         if spend_date >= DSU_GST_TRANSITION_DATE:
             cost = cost * GST_MULTIPLIER
@@ -368,9 +388,10 @@ def fetch_dsu_cumulative(start_date: str, end_date: str) -> List[Dict[str, Any]]
 
 def fetch_dsu_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch course performance for a date range (Table 1).
+    Only enabled/live/active campaigns are included in spend (per AI_The_MIS rules).
     Returns list of {course, leads, cpl, spend} sorted by spend desc.
     Only courses with leads > 0 or spend > 0 are included."""
-    spend_data = _fetch_google_ads_spend(start_date, end_date)
+    spend_data = _fetch_google_ads_spend(start_date, end_date, live_only=True)
     lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
 
     rows = []
@@ -615,7 +636,7 @@ CAMPUS3_COURSES = [
 
 def fetch_dsu_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
     """Fetch Application Submitted and CPA by Campus/Program (Table 4).
-    Uses LeadSquared for submitted counts + Google Ads for cumulative spend."""
+    Uses LeadSquared for submitted counts + cumulative spend (legacy + live API)."""
     leads = _fetch_lsq_lead_details(start_date, end_date, account_id=1)
 
     submitted_counts = defaultdict(int)
@@ -627,7 +648,9 @@ def fetch_dsu_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
                 course = "B.Tech"
             submitted_counts[course] += 1
 
-    spend_data = _fetch_google_ads_spend(start_date, end_date)
+    # Use cumulative spend (legacy + live API) for consistency with Table 2
+    cumulative_rows = fetch_dsu_cumulative_range(start_date, end_date)
+    spend_data = {r["course"]: r["spend"] for r in cumulative_rows}
 
     def get_spend(key):
         return round(spend_data.get(key, 0))
@@ -693,8 +716,10 @@ def fetch_dsu_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
 
 def fetch_dsu_budget_mis(start_date: str, end_date: str, db_session=None) -> Dict[str, Any]:
     """Fetch Budget MIS by Campus/Program (Table 5).
-    Uses Google Ads for spend + dsu_budget_entries table for campus budgets."""
-    spend_data = _fetch_google_ads_spend(start_date, end_date)
+    Uses cumulative spend (legacy + live API) + dsu_budget_entries for campus budgets."""
+    # Use cumulative spend for consistency with Table 2 and Table 4
+    cumulative_rows = fetch_dsu_cumulative_range(start_date, end_date)
+    spend_data = {r["course"]: r["spend"] for r in cumulative_rows}
 
     # Fetch campus budgets from DB
     campus4_budget = 0.0
@@ -787,11 +812,26 @@ def fetch_dsu_lead_stages(start_date: str, end_date: str) -> Dict[str, Any]:
     }
 
 
+
+def _month_key_lt(a: str, b: str) -> bool:
+    """Return True if month key a is earlier than month key b (both 'MMM-YYYY')."""
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    try:
+        ma, ya = a.split("-")
+        mb, yb = b.split("-")
+        ia = months.index(ma)
+        ib = months.index(mb)
+        return (int(ya), ia) < (int(yb), ib)
+    except (ValueError, IndexError):
+        return False
+
 # ============================================================================
 # Table 7: Monthly Spend Summary and Balance
 # ============================================================================
 
 DSU_INCEPTION_DATE = "2025-11-28"
+DSU_NEW_ACCOUNT_START = "2026-04-01"  # new Google Ads account goes live
 DSU_GST_TRANSITION_DATE = "2026-06-19"
 GST_MULTIPLIER = 1.18
 
@@ -931,15 +971,37 @@ def fetch_dsu_monthly_summary(db_session=None) -> Dict[str, Any]:
             normalized = _normalize_month_key(fr.month_key)
             google_spend_map[normalized] = fr.google_spend
 
-    # Fetch from Google Ads API for Jun-2026 onwards
-    # Start from 2026-06-01 to today (avoids re-fetching fixed months)
-    api_start = "2026-06-01"
-    api_end = date_type.today().isoformat()
+    # Fetch from Google Ads API for Apr-2026 onwards (new account start)
+    # Use yesterday as end date to match Table 2/4/5 historical range
+    from datetime import timedelta
+    api_end = (date_type.today() - timedelta(days=1)).isoformat()
+    api_start = "2026-04-01"
     api_spend = _fetch_google_ads_monthly_spend(api_start, api_end)
 
+    # Step 1b: Auto-freeze completed months so historical values stop changing.
+    # Any month fully in the past (before current month) is written to
+    # dsu_monthly_spend_fixed. The current month stays on live API.
+    if db_session:
+        from backend.db.models import DsuMonthlySpendFixed
+        current_month_key = _normalize_month_key(date_type.today().isoformat())
+        for mk, spend in api_spend.items():
+            # Only freeze months that are before the current month
+            if _month_key_lt(mk, current_month_key):
+                # If not already fixed, store it; if already fixed, keep the stored value
+                if mk not in fixed_months:
+                    db_session.add(DsuMonthlySpendFixed(month_key=mk, google_spend=round(spend, 2)))
+                    fixed_months[mk] = spend
+                    google_spend_map[mk] = spend
+                else:
+                    google_spend_map[mk] = fixed_months[mk]
+            else:
+                google_spend_map[mk] = spend
+        db_session.commit()
+    else:
+        for mk, spend in api_spend.items():
+            google_spend_map[mk] = spend
+
     # Merge API spend (overrides fixed if any overlap, but shouldn't overlap)
-    for mk, spend in api_spend.items():
-        google_spend_map[mk] = spend
 
     # Step 2: Load budget entries
     budget_entries = []
@@ -1104,21 +1166,45 @@ def fetch_dsu_cumulative_range(start_date: str, end_date: str) -> List[Dict[str,
     is_default_range = (start_date == DSU_INCEPTION_DATE and end_date == yesterday)
 
     if is_default_range:
+        # Default range: merge old-account historical spend (from Excel) +
+        # new-account live API spend + leads from LSQ mirror.
         from backend.db.database import SessionLocal
         from backend.db.models import DsuTable2Historical
+
+        # Live API spend (new account, Apr-26 onwards, GST-adjusted)
+        live_spend = _fetch_google_ads_spend(DSU_NEW_ACCOUNT_START, end_date)
+
         db = SessionLocal()
         try:
             historical = db.query(DsuTable2Historical).all()
-            rows = []
-            for h in historical:
-                if h.spend <= 0 and h.leads <= 0:
-                    continue
-                cpl = round(h.spend / h.leads) if h.leads else None
-                rows.append({"course": h.course, "leads": h.leads, "cpl": cpl, "spend": round(h.spend)})
-            rows.sort(key=lambda r: -r["spend"])
-            return rows
+            # old-account cumulative spend per course
+            old_spend_by_course = {h.course: h.spend for h in historical}
         finally:
             db.close()
+
+        # Leads from LSQ mirror (inception to yesterday)
+        lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
+
+        # Merge spend: old-account historical + new-account live
+        merged_spend = defaultdict(float)
+        for course, spend in old_spend_by_course.items():
+            merged_spend[course] += spend
+        for course, spend in live_spend.items():
+            merged_spend[course] += spend
+
+        # Build rows
+        rows = []
+        all_courses = set(DSU_COURSES) | set(merged_spend.keys()) | set(lead_data.keys())
+        for course in all_courses:
+            spend = round(merged_spend.get(course, 0))
+            leads = lead_data.get(course, 0)
+            if spend <= 0 and leads <= 0:
+                continue
+            cpl = round(spend / leads) if leads else None
+            rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
+
+        rows.sort(key=lambda r: -r["spend"])
+        return rows
 
     # Custom range: compute from legacy + live API
     live_spend = _fetch_google_ads_spend(start_date, end_date)

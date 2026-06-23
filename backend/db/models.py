@@ -447,3 +447,73 @@ class LeadSquaredLead(Base):
             "course": self.course,
             "synced_at": self.synced_at.isoformat() if self.synced_at else None,
         }
+
+
+class DsiLegacySpend(Base):
+    """Hardcoded spend from DSI's old Google Ads account (Jan-26 to Mar-26).
+
+    The old account is no longer accessible via API, so course-wise monthly
+    spend is stored here and merged with live API data for DSI Table 2.
+    """
+    __tablename__ = "dsi_legacy_spend"
+
+    id = Column(Integer, primary_key=True, index=True)
+    month = Column(String, nullable=False, index=True)  # "2026-01", "2026-02", etc.
+    course = Column(String, nullable=False)  # "DSCE", "DSIT", "BCA", etc.
+    spend = Column(Float, nullable=False, default=0.0)
+    leads = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "month": self.month,
+            "course": self.course,
+            "spend": self.spend,
+            "leads": self.leads,
+        }
+
+
+class DsiTable2Historical(Base):
+    """Exact historical figures for DSI Table 2 (from inception to yesterday).
+
+    This stores the user's raw data so that the default Table 2 view matches
+    the shared client report exactly. Custom date ranges still compute from
+    live + legacy data.
+    """
+    __tablename__ = "dsi_table2_historical"
+
+    id = Column(Integer, primary_key=True, index=True)
+    course = Column(String, nullable=False, unique=True)
+    department = Column(String, nullable=True, default="")
+    leads = Column(Integer, nullable=False, default=0)
+    spend = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "course": self.course,
+            "department": self.department or "",
+            "leads": self.leads,
+            "spend": self.spend,
+        }
+
+
+class DsiMonthlySpendFixed(Base):
+    """Fixed historical Google Ads monthly spend for DSI (Jan-26 to Mar-26).
+    These values are frozen and will not change. No GST applied to these months."""
+    __tablename__ = "dsi_monthly_spend_fixed"
+
+    id = Column(Integer, primary_key=True, index=True)
+    month_key = Column(String, nullable=False, unique=True)  # e.g. "Jan-26", "Feb-26"
+    google_spend = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "month_key": self.month_key,
+            "google_spend": self.google_spend,
+        }

@@ -413,7 +413,10 @@ def count_leads_by_course(
     """Count GGL/Programmatic leads by resolved course from the local mirror.
 
     Filters on CreatedOn date, which matches the user's raw-data expectation.
+    Excludes sources in EXCLUDED_SOURCES (e.g. DSPS-GGL).
     """
+    from backend.services.dsu_data import EXCLUDED_SOURCES
+
     rows = (
         db.query(LeadSquaredLead)
         .filter(
@@ -426,6 +429,8 @@ def count_leads_by_course(
 
     counts: Dict[str, int] = {}
     for lead in rows:
+        if lead.source in EXCLUDED_SOURCES:
+            continue
         course = lead.course or lead.source or "Unknown"
         counts[course] = counts.get(course, 0) + 1
     return counts
