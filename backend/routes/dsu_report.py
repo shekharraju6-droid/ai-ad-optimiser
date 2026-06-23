@@ -5,9 +5,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
-from backend.db.models import Account
+from backend.db.models import Account, DsuBudgetEntry
 from backend.routes.auth import get_current_user_required
-from backend.services.dsu_data import fetch_dsu_daily, fetch_dsu_cumulative, DSU_COURSES
+from backend.services.dsu_data import (
+    fetch_dsu_daily, fetch_dsu_cumulative,
+    fetch_dsu_daily_range, fetch_dsu_cumulative_range,
+    _fetch_google_ads_spend, _fetch_lsq_leads, DSU_COURSES,
+    fetch_dsu_lead_pivot, fetch_dsu_application_mis,
+    fetch_dsu_budget_mis, fetch_dsu_lead_stages,
+    fetch_dsu_monthly_summary,
+)
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -52,6 +61,10 @@ def _apply_gst(rows, report_date):
 
 @router.get("/dsu-performance")
 def dsu_performance(
+    t1_start: str = Query(None, description="Table 1 start date (YYYY-MM-DD)"),
+    t1_end: str = Query(None, description="Table 1 end date (YYYY-MM-DD)"),
+    t2_start: str = Query(None, description="Table 2 start date (YYYY-MM-DD)"),
+    t2_end: str = Query(None, description="Table 2 end date (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user_required),
 ):
@@ -63,10 +76,18 @@ def dsu_performance(
 
     yesterday = (date.today() - timedelta(days=1)).isoformat()
 
-    daily_raw = fetch_dsu_daily(yesterday)
-    daily = _apply_gst(daily_raw, yesterday)
+    # Table 1 date range — default to yesterday
+    t1_start_date = t1_start or yesterday
+    t1_end_date = t1_end or yesterday
 
-    cumulative_raw = fetch_dsu_cumulative(DSU_INCEPTION, yesterday)
+    # Table 2 date range — default to inception to yesterday
+    t2_start_date = t2_start or DSU_INCEPTION
+    t2_end_date = t2_end or yesterday
+
+    daily_raw = fetch_dsu_daily_range(t1_start_date, t1_end_date)
+    daily = _apply_gst(daily_raw, t1_end_date)
+
+    cumulative_raw = fetch_dsu_cumulative_range(t2_start_date, t2_end_date)
     cumulative = [
         {
             "course": r["course"],
@@ -91,19 +112,22 @@ def dsu_performance(
 
     return {
         "account": account.to_dict() if account else None,
-        "report_date": yesterday,
+        "t1_start": t1_start_date,
+        "t1_end": t1_end_date,
+        "t2_start": t2_start_date,
+        "t2_end": t2_end_date,
         "inception_date": DSU_INCEPTION,
         "gst_transition_date": DSU_GST_TRANSITION,
         "gst_note": "Spend values before 19-Jun-2026 are without GST. From 19-Jun-2026 onwards, platform cost is multiplied by 1.18.",
         "daily": {
-            "title": f"TABLE 1: {yesterday}",
-            "subtitle": "WITHOUT GST (BASE CAMPAIGN METRICS)",
+            "title": f"TABLE 1: {t1_start_date}" + (f" to {t1_end_date}" if t1_start_date != t1_end_date else ""),
+            "subtitle": "WITHOUT GST (BASE CAMPAIGN METRICS)" if t1_end_date < DSU_GST_TRANSITION else "WITH GST (18% APPLIED)",
             "rows": daily,
             "total": daily_total,
         },
         "cumulative": {
-            "title": f"TABLE 2: {DSU_INCEPTION} - {yesterday}",
-            "subtitle": "WITHOUT GST (BASE CAMPAIGN METRICS)",
+            "title": f"TABLE 2: {t2_start_date} to {t2_end_date}",
+            "subtitle": "WITHOUT GST (BASE CAMPAIGN METRICS)" if t2_end_date < DSU_GST_TRANSITION else "WITH GST (18% APPLIED)",
             "rows": cumulative,
             "total": cum_total,
         },
@@ -113,6 +137,10 @@ def dsu_performance(
 @router.get("/dsu-performance/pdf")
 def dsu_performance_pdf(
     table: str = Query("daily", enum=["daily", "cumulative"]),
+    t1_start: str = Query(None),
+    t1_end: str = Query(None),
+    t2_start: str = Query(None),
+    t2_end: str = Query(None),
     db: Session = Depends(get_db),
     user=Depends(get_current_user_required),
 ):
@@ -221,3 +249,166 @@ def dsu_performance_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ============================================================================
+# DSU Table 3: Lead Attribution Pivot
+# ============================================================================
+
+@router.get("/dsu/lead-pivot")
+def dsu_lead_pivot(
+    start_date: str = Query(..., description="Start date YYYY-MM-DD"),
+    end_date: str = Query(..., description="End date YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """DSU Table 3: Lead attribution pivot (Student Source × Student Stage)."""
+    return fetch_dsu_lead_pivot(start_date, end_date)
+
+
+# ============================================================================
+# DSU Table 4: Application Submitted and CPA
+# ============================================================================
+
+@router.get("/dsu/application-mis")
+def dsu_application_mis(
+    start_date: str = Query(None, description="Start date (default: inception)"),
+    end_date: str = Query(None, description="End date (default: yesterday)"),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """DSU Table 4: Application Submitted and CPA by Campus/Program."""
+    from datetime import date, timedelta
+    s = start_date or DSU_INCEPTION
+    e = end_date or (date.today() - timedelta(days=1)).isoformat()
+    return fetch_dsu_application_mis(s, e)
+
+
+# ============================================================================
+# DSU Table 5: Budget MIS
+# ============================================================================
+
+@router.get("/dsu/budget-mis")
+def dsu_budget_mis(
+    start_date: str = Query(None, description="Start date (default: inception)"),
+    end_date: str = Query(None, description="End date (default: yesterday)"),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """DSU Table 5: Budget MIS by Campus/Program."""
+    from datetime import date, timedelta
+    s = start_date or DSU_INCEPTION
+    e = end_date or (date.today() - timedelta(days=1)).isoformat()
+    return fetch_dsu_budget_mis(s, e, db_session=db)
+
+
+# ============================================================================
+# DSU Table 6: Lead Stage Summary
+# ============================================================================
+
+@router.get("/dsu/lead-stages")
+def dsu_lead_stages(
+    start_date: str = Query(..., description="Start date YYYY-MM-DD"),
+    end_date: str = Query(..., description="End date YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """DSU Table 6: Lead Stage Summary."""
+    return fetch_dsu_lead_stages(start_date, end_date)
+
+
+# ============================================================================
+# DSU Table 7: Monthly Spend Summary and Balance
+# ============================================================================
+
+@router.get("/dsu/monthly-summary")
+def dsu_monthly_summary(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """DSU Table 7: Monthly spend summary and balance."""
+    return fetch_dsu_monthly_summary(db_session=db)
+
+
+# --- Budget entry CRUD for Table 7 ---
+
+class BudgetEntryCreate(BaseModel):
+    date: str
+    amount: float
+    invoice: Optional[str] = ""
+    campus: Optional[str] = ""
+
+
+class BudgetEntryUpdate(BaseModel):
+    date: Optional[str] = None
+    amount: Optional[float] = None
+    invoice: Optional[str] = None
+    campus: Optional[str] = None
+
+
+@router.get("/dsu/budget-entries")
+def list_dsu_budget_entries(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """List all DSU budget entries."""
+    entries = db.query(DsuBudgetEntry).order_by(DsuBudgetEntry.entry_date).all()
+    return [e.to_dict() for e in entries]
+
+
+@router.post("/dsu/budget-entries")
+def create_dsu_budget_entry(
+    entry: BudgetEntryCreate,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """Create a new DSU budget entry."""
+    new_entry = DsuBudgetEntry(
+        entry_date=entry.date,
+        amount=entry.amount,
+        invoice=entry.invoice or "",
+        campus=entry.campus or "",
+    )
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry.to_dict()
+
+
+@router.put("/dsu/budget-entries/{entry_id}")
+def update_dsu_budget_entry(
+    entry_id: int,
+    entry: BudgetEntryUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """Update a DSU budget entry."""
+    existing = db.query(DsuBudgetEntry).filter(DsuBudgetEntry.id == entry_id).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Budget entry not found")
+    if entry.date is not None:
+        existing.entry_date = entry.date
+    if entry.amount is not None:
+        existing.amount = entry.amount
+    if entry.invoice is not None:
+        existing.invoice = entry.invoice
+    if entry.campus is not None:
+        existing.campus = entry.campus
+    db.commit()
+    db.refresh(existing)
+    return existing.to_dict()
+
+
+@router.delete("/dsu/budget-entries/{entry_id}")
+def delete_dsu_budget_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """Delete a DSU budget entry."""
+    existing = db.query(DsuBudgetEntry).filter(DsuBudgetEntry.id == entry_id).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Budget entry not found")
+    db.delete(existing)
+    db.commit()
+    return {"deleted": True, "id": entry_id}

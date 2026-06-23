@@ -2,7 +2,7 @@
 Database models for AdOptima AI.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean, ForeignKey, Enum, JSON
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean, ForeignKey, Enum, JSON, Date
 from sqlalchemy.orm import relationship
 from backend.db.database import Base
 import enum
@@ -283,6 +283,54 @@ class User(Base):
             "access_adpulse": self.access_adpulse,
             "access_insightdesk": self.access_insightdesk,
             "access_revenueops": self.access_revenueops,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class DsuBudgetEntry(Base):
+    """Manual budget entries for DSU Table 7 (Monthly Spend Summary)."""
+    __tablename__ = "dsu_budget_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entry_date = Column(String, nullable=False)  # YYYY-MM-DD
+    amount = Column(Float, nullable=False, default=0.0)
+    invoice = Column(String, nullable=True, default="")
+    campus = Column(String, nullable=True, default="")  # "Campus 3" or "Campus 4"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "date": self.entry_date,
+            "amount": self.amount,
+            "invoice": self.invoice or "",
+            "campus": self.campus or "",
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class DsiBudgetEntry(Base):
+    """Manual budget entries for DSI Table 5 (Budget MIS)."""
+    __tablename__ = "dsi_budget_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entry_date = Column(String, nullable=False)  # YYYY-MM-DD
+    amount = Column(Float, nullable=False, default=0.0)
+    invoice = Column(String, nullable=True, default="")
+    section = Column(String, nullable=True, default="")  # "DSCE", "DSIT", etc.
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "date": self.entry_date,
+            "amount": self.amount,
+            "invoice": self.invoice or "",
+            "section": self.section or "",
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

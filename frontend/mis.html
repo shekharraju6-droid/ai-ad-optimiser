@@ -65,6 +65,24 @@
         .form-group input, .form-group select, .form-group textarea { padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; font-family: inherit; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-glow); }
         .form-group textarea { resize: vertical; }
+        .date-input { min-width: 130px; cursor: pointer; }
+        input[type="date"].date-input { position: relative; z-index: 1; background: #fff; }
+
+        /* DSU Report tables */
+        .dsu-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: #c7d2fe; border: 1px solid #a5b4fc; border-radius: 8px; overflow: hidden; }
+        .dsu-table th, .dsu-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid #a5b4fc; text-align: left; }
+        .dsu-table th { background: transparent; font-weight: 600; color: #1f2937; }
+        .dsu-table td { background: #fff; }
+        .dsu-table tr:hover td { background: #f8fafc; }
+        .dsu-table tr:last-child td { border-bottom: none; }
+        .dsu-banner { text-align: center; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.55rem; }
+        .dsu-mode-row { text-align: center; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; padding: 0.5rem; }
+        .dsu-mode-row label { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0 0.5rem; cursor: pointer; font-weight: 700; }
+        .dsu-mode-row input[type="radio"] { width: 16px; height: 16px; accent-color: #4f46e5; }
+        .dsu-mis-row { text-align: center; font-size: 0.85rem; font-weight: 700; padding: 0.45rem; }
+        .dsu-range-label { margin-left: 1rem; color: #4338ca; font-weight: 700; }
+        .dsu-table .text-right { text-align: right; }
+        .dsu-total-row td { background: #c7d2fe !important; font-weight: 700; color: #1f2937; }
 
         table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
         th, td { text-align: left; padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border-color); }
@@ -278,23 +296,166 @@
             await renderDSUReport();
             return;
         }
+        if (a && a.name === 'DSI') {
+            await renderDSIReport();
+            return;
+        }
         computeDateRange(reportDateRange.preset || 'last30');
         await renderReport(a);
     }
 
+    let dsuT1Range = { preset: 'yesterday', start: '', end: '' };
+    let dsuT2Range = { preset: 'inception', start: '', end: '' };
+
+    function computeDSUDateRange(preset, rangeObj) {
+        const end = today();
+        let start = new Date(end);
+        switch (preset) {
+            case 'yesterday': start.setDate(end.getDate() - 1); end.setDate(end.getDate() - 1); break;
+            case 'today': break;
+            case 'last7': start.setDate(end.getDate() - 6); break;
+            case 'last15': start.setDate(end.getDate() - 14); break;
+            case 'last30': start.setDate(end.getDate() - 29); break;
+            case 'thisMonth': start.setDate(1); break;
+            case 'inception': start = new Date('2025-11-28'); break;
+            case 'custom': return;
+        }
+        rangeObj.preset = preset;
+        rangeObj.start = fmtDate(start);
+        rangeObj.end = fmtDate(end);
+    }
+
+    // --- Table 1 date helpers ---
+    const getYesterdayInputDate = () => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const getTodayInputDate = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const parseDateToComparable = (val) => {
+        if (!val) return null;
+        if (val instanceof Date) return new Date(val.getFullYear(), val.getMonth(), val.getDate());
+        const s = String(val).trim();
+        if (!s) return null;
+        const dmyMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+        if (dmyMatch) {
+            return new Date(parseInt(dmyMatch[3], 10), parseInt(dmyMatch[2], 10) - 1, parseInt(dmyMatch[1], 10));
+        }
+        const parsed = new Date(s);
+        if (!isNaN(parsed.getTime())) return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+        return null;
+    };
+    const isSameDay = (d1, d2) => {
+        if (!d1 || !d2) return false;
+        return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+    };
+    const formatHeaderDate = (date) => {
+        if (!date) return '';
+        const d = date instanceof Date ? date : parseDateToComparable(date);
+        if (!d) return '';
+        const day = d.getDate();
+        const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+        let suffix = 'th';
+        if ([1,21,31].includes(day)) suffix = 'st';
+        else if ([2,22].includes(day)) suffix = 'nd';
+        else if ([3,23].includes(day)) suffix = 'rd';
+        return `${day}${suffix} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    };
+    const t1RangeLabel = (rangeObj) => {
+        if (rangeObj.preset === 'today') return 'Today';
+        if (rangeObj.preset === 'yesterday') return 'Yesterday';
+        if (rangeObj.preset === 'custom' && rangeObj.start && rangeObj.end) {
+            return `${formatHeaderDate(rangeObj.start)} - ${formatHeaderDate(rangeObj.end)}`;
+        }
+        return '';
+    };
+
     async function renderDSUReport() {
+        if (!dsuT1Range.start) computeDSUDateRange('yesterday', dsuT1Range);
+        if (!dsuT2Range.start) computeDSUDateRange('inception', dsuT2Range);
+        await loadDSUReport();
+    }
+
+    let dsuActiveTab = 't1t2';
+
+    async function loadDSUReport() {
         try {
-            const data = await api('GET', '/reports/dsu-performance');
-            buildDSUReport(data);
+            const tab = dsuActiveTab || 't1t2';
+            if (tab === 't1t2') {
+                const params = `?t1_start=${dsuT1Range.start}&t1_end=${dsuT1Range.end}&t2_start=${dsuT2Range.start}&t2_end=${dsuT2Range.end}`;
+                const data = await api('GET', '/reports/dsu-performance' + params);
+                buildDSUReport(data);
+            } else if (tab === 't3') {
+                const params = `?start_date=${dsuT1Range.start}&end_date=${dsuT1Range.end}`;
+                const data = await api('GET', '/reports/dsu/lead-pivot' + params);
+                buildDSUTable3(data);
+            } else if (tab === 't4') {
+                const data = await api('GET', '/reports/dsu/application-mis');
+                buildDSUTable4(data);
+            } else if (tab === 't5') {
+                const data = await api('GET', '/reports/dsu/budget-mis');
+                buildDSUTable5(data);
+            } else if (tab === 't6') {
+                const params = `?start_date=${dsuT1Range.start}&end_date=${dsuT1Range.end}`;
+                const data = await api('GET', '/reports/dsu/lead-stages' + params);
+                buildDSUTable6(data);
+            } else if (tab === 't7') {
+                const data = await api('GET', '/reports/dsu/monthly-summary');
+                buildDSUTable7(data);
+            }
         } catch (e) {
             toast(e.message, true);
             $('reportContent').innerHTML = '<div class="empty-state">Failed to load DSU report: ' + escapeHtml(e.message) + '</div>';
         }
     }
 
+    function dsuTabBar() {
+        const tabs = [
+            { id: 't1t2', label: 'Table 1 & 2: Course Performance' },
+            { id: 't3', label: 'Table 3: Lead Pivot' },
+            { id: 't4', label: 'Table 4: Application MIS' },
+            { id: 't5', label: 'Table 5: Budget MIS' },
+            { id: 't6', label: 'Table 6: Lead Stages' },
+            { id: 't7', label: 'Table 7: Monthly Summary' },
+        ];
+        return `<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+            ${tabs.map(t => `<button class="btn ${dsuActiveTab===t.id?'btn-primary':'btn-secondary'}" onclick="dsuSwitchTab('${t.id}')">${t.label}</button>`).join('')}
+        </div>`;
+    }
+
+    function dsuSwitchTab(tabId) {
+        dsuActiveTab = tabId;
+        $('reportContent').innerHTML = '<div class="loading-wrap"><div class="spinner"></div> Loading...</div>';
+        loadDSUReport();
+    }
+
     function buildDSUReport(data) {
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
         const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
+        const renderDSUTable = (title, rows, total, headerRows) => {
+            const body = rows.map(r => {
+                const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
+                const spend = fmtMoney(r.spend);
+                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td><td class="text-right">${cpl}</td><td class="text-right">${spend}</td></tr>`;
+            }).join('');
+            const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
+            return `
+                <div style="background:#c7d2fe;border:1px solid #a5b4fc;border-radius:8px;overflow:hidden;margin-bottom:0.75rem">
+                    <table class="dsu-table">
+                        <thead>${headerRows}
+                            <tr><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend ↓</th></tr>
+                        </thead>
+                        <tbody>${body}
+                            <tr class="dsu-total-row"><td>TOTAL</td><td class="text-right">${fmtNum(total.leads)}</td><td class="text-right">${totalCpl}</td><td class="text-right">${fmtMoney(total.spend)}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        };
+
         const renderTable = (title, subtitle, rows, total) => {
             const body = rows.map(r => {
                 const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
@@ -322,28 +483,734 @@
         const d = data.daily;
         const c = data.cumulative;
 
+        const dsuT1DateSelector = () => {
+            const label = t1RangeLabel(dsuT1Range);
+            const custom = dsuT1Range.preset === 'custom';
+            return `
+                <div style="display:flex;align-items:center;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
+                    <span>Table 1:</span>
+                    <label class="dsu-mode-row" style="margin:0 0.35rem">
+                        <input type="radio" name="dsuT1Mode" value="yesterday" ${dsuT1Range.preset==='yesterday'?'checked':''} onchange="dsuT1Preset('yesterday')">
+                        <span>Yesterday</span>
+                    </label>
+                    <label class="dsu-mode-row" style="margin:0 0.35rem">
+                        <input type="radio" name="dsuT1Mode" value="today" ${dsuT1Range.preset==='today'?'checked':''} onchange="dsuT1Preset('today')">
+                        <span>Today</span>
+                    </label>
+                    <label class="dsu-mode-row" style="margin:0 0.35rem">
+                        <input type="radio" name="dsuT1Mode" value="custom" ${custom?'checked':''} onchange="dsuT1Preset('custom')">
+                        <span>Custom</span>
+                    </label>
+                    ${custom?`
+                        <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                            <input type="date" id="dsuT1Start" value="${dsuT1Range.start}" onchange="dsuT1Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                            <span style="font-size:0.7rem">to</span>
+                            <input type="date" id="dsuT1End" value="${dsuT1Range.end}" onchange="dsuT1Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                        </div>
+                    `:''}
+                    <span class="dsu-range-label">${label}</span>
+                </div>
+            `;
+        };
+
+        const dsuT2DateSelector = () => {
+            const label = dsuT2Range.preset === 'custom'
+                ? `${formatHeaderDate(dsuT2Range.start)} - ${formatHeaderDate(dsuT2Range.end)}`
+                : (dsuT2Range.preset || 'From Inception');
+            const custom = dsuT2Range.preset === 'custom';
+            return `
+                <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;flex-wrap:wrap;">
+                    <span>Table 2:</span>
+                    <select id="dsuT2Preset" onchange="dsuT2Preset(this.value)" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;min-width:120px;"
+                        onfocus="this.style.background='#fff'">
+                        <option value="yesterday" ${dsuT2Range.preset==='yesterday'?'selected':''}>Yesterday</option>
+                        <option value="today" ${dsuT2Range.preset==='today'?'selected':''}>Today</option>
+                        <option value="last7" ${dsuT2Range.preset==='last7'?'selected':''}>Last 7 Days</option>
+                        <option value="last15" ${dsuT2Range.preset==='last15'?'selected':''}>Last 15 Days</option>
+                        <option value="last30" ${dsuT2Range.preset==='last30'?'selected':''}>Last 30 Days</option>
+                        <option value="thisMonth" ${dsuT2Range.preset==='thisMonth'?'selected':''}>This Month</option>
+                        <option value="inception" ${dsuT2Range.preset==='inception'?'selected':''}>From Inception</option>
+                        <option value="custom" ${custom?'selected':''}>Custom</option>
+                    </select>
+                    ${custom?`
+                        <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                            <input type="date" id="dsuT2Start" value="${dsuT2Range.start}" onchange="dsuT2Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                            <span style="font-size:0.7rem">to</span>
+                            <input type="date" id="dsuT2End" value="${dsuT2Range.end}" onchange="dsuT2Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                        </div>
+                    `:''}
+                    <span class="dsu-range-label">${label}</span>
+                </div>
+            `;
+        };
+
+        const dateSelector = (label, rangeObj, onChange) => `
+            <div style="display:flex; align-items:flex-end; gap:0.5rem; flex-wrap:wrap;">
+                <div class="form-group" style="min-width:auto;">
+                    <label>${label}</label>
+                    <select id="${onChange}Preset" onchange="${onChange}Preset(this.value)" class="date-input" style="padding:0.4rem 0.6rem;border:1px solid var(--border-color);border-radius:6px;font-size:0.78rem;">
+                        <option value="yesterday" ${rangeObj.preset==='yesterday'?'selected':''}>Yesterday</option>
+                        <option value="today" ${rangeObj.preset==='today'?'selected':''}>Today</option>
+                        <option value="last7" ${rangeObj.preset==='last7'?'selected':''}>Last 7 Days</option>
+                        <option value="last15" ${rangeObj.preset==='last15'?'selected':''}>Last 15 Days</option>
+                        <option value="last30" ${rangeObj.preset==='last30'?'selected':''}>Last 30 Days</option>
+                        <option value="thisMonth" ${rangeObj.preset==='thisMonth'?'selected':''}>This Month</option>
+                        <option value="inception" ${rangeObj.preset==='inception'?'selected':''}>From Inception</option>
+                        <option value="custom" ${rangeObj.preset==='custom'?'selected':''}>Custom</option>
+                    </select>
+                </div>
+                <div class="form-group" style="min-width:130px;">
+                    <label>Start</label>
+                    <input type="date" id="${onChange}Start" value="${rangeObj.start}" onchange="${onChange}Custom()" class="date-input" style="padding:0.4rem 0.6rem;border:1px solid var(--border-color);border-radius:6px;font-size:0.78rem;">
+                </div>
+                <div class="form-group" style="min-width:130px;">
+                    <label>End</label>
+                    <input type="date" id="${onChange}End" value="${rangeObj.end}" onchange="${onChange}Custom()" class="date-input" style="padding:0.4rem 0.6rem;border:1px solid var(--border-color);border-radius:6px;font-size:0.78rem;">
+                </div>
+            </div>
+        `;
+
+        const t1Header = `
+            <tr><th colspan="4" class="dsu-banner">${data.gst_note || 'MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026'}</th></tr>
+            <tr><th colspan="4" class="dsu-mode-row">${dsuT1DateSelector()}</th></tr>
+            <tr><th colspan="4" class="dsu-mis-row">MIS</th></tr>
+        `;
+        const t2Header = `
+            <tr><th colspan="4" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
+            <tr><th colspan="4" class="dsu-mode-row">${dsuT2DateSelector()}</th></tr>
+            <tr><th colspan="4" class="dsu-mis-row">MIS</th></tr>
+        `;
+
         $('reportContent').innerHTML = `
+            ${dsuTabBar()}
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">DSU Course Performance Report</div>
-                    <div style="font-size:.8rem;color:var(--text-muted)">${data.gst_note}</div>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem">
-                    <div class="card" style="padding:0">${renderTable(d.title, d.subtitle, d.rows, d.total)}</div>
-                    <div class="card" style="padding:0">${renderTable(c.title, c.subtitle, c.rows, c.total)}</div>
+                    <div style="padding:0">
+                        ${renderDSUTable(d.title, d.rows, d.total, t1Header)}
+                    </div>
+                    <div style="padding:0">
+                        ${renderDSUTable(c.title, c.rows, c.total, t2Header)}
+                    </div>
                 </div>
                 <div style="margin-top:1rem;display:flex;gap:.75rem;justify-content:flex-end">
-                    <button class="btn btn-primary" onclick="downloadDSUPDF('daily')">Download Table 1 PDF (Daily)</button>
-                    <button class="btn btn-success" onclick="downloadDSUPDF('cumulative')">Download Table 2 PDF (Cumulative)</button>
+                    <button class="btn btn-primary" onclick="downloadDSUPDF('daily')">Download Table 1 PDF</button>
+                    <button class="btn btn-success" onclick="downloadDSUPDF('cumulative')">Download Table 2 PDF</button>
                 </div>
             </div>
         `;
     }
 
+    // ========================================================================
+    // DSU Table 3: Lead Attribution Pivot
+    // ========================================================================
+    function buildDSUTable3(data) {
+        const stages = data.stages || [];
+        const rows = data.rows || [];
+        const colTotals = data.column_totals || {};
+        const grandTotal = data.grand_total || 0;
+
+        const headerCells = stages.map(s => `<th class="text-right">${escapeHtml(s)}</th>`).join('');
+        const totalCells = stages.map(s => `<td class="text-right">${colTotals[s] || 0}</td>`).join('');
+
+        const bodyRows = rows.map(r => {
+            const cells = stages.map(s => {
+                const v = r[s] || 0;
+                return `<td class="text-right">${v === 0 ? '' : v}</td>`;
+            }).join('');
+            const rowSum = stages.reduce((sum, s) => sum + (r[s] || 0), 0);
+            return `<tr><td style="font-weight:500">${escapeHtml(r.source)}</td>${cells}<td class="text-right" style="font-weight:600">${rowSum === 0 ? '' : rowSum}</td></tr>`;
+        }).join('');
+
+        $('reportContent').innerHTML = `
+            ${dsuTabBar()}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Table 3: Lead Attribution Pivot (Student Source × Student Stage)</div>
+                </div>
+                <div style="overflow-x:auto;">
+                <table class="dsu-table">
+                    <thead>
+                        <tr><th>Source</th>${headerCells}<th class="text-right">Total</th></tr>
+                    </thead>
+                    <tbody>
+                        ${bodyRows}
+                        <tr class="dsu-total-row"><td>TOTAL</td>${totalCells}<td class="text-right">${grandTotal}</td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        `;
+    }
+
+    // ========================================================================
+    // DSU Table 4: Application Submitted and CPA by Campus/Program
+    // ========================================================================
+    function buildDSUTable4(data) {
+        const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
+
+        const renderSection = (label, rows, total) => {
+            const body = rows.map(r => {
+                const cpa = r.submitted > 0 ? fmtMoney(r.cpa) : '0';
+                const submitted = r.submitted > 0 ? fmtNum(r.submitted) : '';
+                const spend = r.spend > 0 ? fmtMoney(r.spend) : '';
+                const target = r.target > 0 ? fmtNum(r.target) : '';
+                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${submitted}</td><td class="text-right">${cpa}</td><td class="text-right">${spend}</td><td class="text-right">${target}</td></tr>`;
+            }).join('');
+            const totalCpa = total.submitted > 0 ? fmtMoney(total.cpa) : '0';
+            const totalSubmitted = total.submitted > 0 ? fmtNum(total.submitted) : '';
+            return `
+                <tr style="background:#e0e7ff;font-weight:700"><td colspan="5">${escapeHtml(label)}</td></tr>
+                ${body}
+                <tr class="dsu-total-row"><td>${total.course}</td><td class="text-right">${totalSubmitted}</td><td class="text-right">${totalCpa}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${total.target > 0 ? fmtNum(total.target) : ''}</td></tr>
+            `;
+        };
+
+        const gt = data.grand_total;
+        const gtCpa = gt.submitted > 0 ? fmtMoney(gt.cpa) : '0';
+        const gtSubmitted = gt.submitted > 0 ? fmtNum(gt.submitted) : '';
+
+        $('reportContent').innerHTML = `
+            ${dsuTabBar()}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Table 4: Application Submitted and CPA by Campus/Program</div>
+                </div>
+                <table class="dsu-table">
+                    <thead><tr><th>Course</th><th class="text-right">Application Submitted</th><th class="text-right">CPA</th><th class="text-right">Spend</th><th class="text-right">Target</th></tr></thead>
+                    <tbody>
+                        ${renderSection('Campus 4', data.campus4_rows, data.campus4_total)}
+                        ${renderSection('Campus 3', data.campus3_rows, data.campus3_total)}
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td>${gt.course}</td><td class="text-right">${gtSubmitted}</td><td class="text-right">${gtCpa}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // ========================================================================
+    // DSU Table 5: Budget MIS by Campus/Program
+    // ========================================================================
+    function buildDSUTable5(data) {
+        const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+        const renderSection = (label, rows, total) => {
+            const body = rows.map(r => {
+                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-center">${r.status}</td><td class="text-right">${fmtMoney(r.spend)}</td></tr>`;
+            }).join('');
+            return `
+                <tr style="background:#e0e7ff;font-weight:700"><td colspan="3">${escapeHtml(label)}</td></tr>
+                ${body}
+                <tr class="dsu-total-row"><td>${total.course}</td><td class="text-right">${fmtMoney(total.budget)}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${fmtMoney(total.remaining)}</td></tr>
+            `;
+        };
+
+        const gt = data.grand_total;
+
+        $('reportContent').innerHTML = `
+            ${dsuTabBar()}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Table 5: Budget MIS by Campus/Program</div>
+                </div>
+                <table class="dsu-table">
+                    <thead><tr><th>Course</th><th class="text-center">Campaign Status</th><th class="text-right">Media Budget Received</th><th class="text-right">Spend</th><th class="text-right">Remaining Budget</th></tr></thead>
+                    <tbody>
+                        ${renderSection('Campus 4', data.campus4_rows, data.campus4_total)}
+                        ${renderSection('Campus 3', data.campus3_rows, data.campus3_total)}
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td>${gt.course}</td><td></td><td class="text-right">${fmtMoney(gt.budget)}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${fmtMoney(gt.remaining)}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // ========================================================================
+    // DSU Table 6: Lead Stage Summary
+    // ========================================================================
+    function buildDSUTable6(data) {
+        const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
+        const rows = data.rows || [];
+        const total = data.total || 0;
+
+        const body = rows.map(r => {
+            return `<tr><td style="font-weight:500">${escapeHtml(r.stage)}</td><td class="text-right">${fmtNum(r.count)}</td><td class="text-right">${r.percentage}%</td></tr>`;
+        }).join('');
+
+        $('reportContent').innerHTML = `
+            ${dsuTabBar()}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Table 6: Lead Stage Summary</div>
+                </div>
+                <table class="dsu-table">
+                    <thead><tr><th>Stage</th><th class="text-right">Count</th><th class="text-right">Percentage</th></tr></thead>
+                    <tbody>
+                        ${body}
+                        <tr class="dsu-total-row"><td>TOTAL</td><td class="text-right">${fmtNum(total)}</td><td></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // ========================================================================
+    // DSU Table 7: Monthly Spend Summary and Balance
+    // ========================================================================
+    function buildDSUTable7(data) {
+        const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        const rows = data.rows || [];
+        const gt = data.grand_total || {};
+
+        const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const fmtDate = (dateStr) => {
+            if (!dateStr) return '-';
+            try {
+                const d = new Date(dateStr + 'T00:00:00');
+                if (isNaN(d.getTime())) return dateStr;
+                return `${String(d.getDate()).padStart(2,'0')}-${monthNames[d.getMonth()]}-${d.getFullYear()}`;
+            } catch(e) { return dateStr; }
+        };
+
+        const body = rows.map(r => {
+            const monthCells = r.is_first_in_month
+                ? `<td class="text-right" style="font-weight:600" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''}>₹${Number(r.received_monthly || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                   <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''}>₹${Number(r.google_spend || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                   <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''}>₹${Number(r.meta_spend || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                   <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''}>₹${Number(r.total_spend || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                   <td class="text-right" style="color:${(r.available_balance || 0) < 0 ? 'var(--color-danger)' : 'inherit'};font-weight:600" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''}>₹${Number(r.available_balance || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>`
+                : '';
+
+            if (r.is_virtual) {
+                return `<tr style="opacity:0.7">
+                    <td>${escapeHtml(fmtDate(r.date))}</td>
+                    <td class="text-right">-</td>
+                    ${monthCells}
+                    <td>-</td><td>-</td>
+                </tr>`;
+            }
+
+            return `<tr>
+                <td style="white-space:nowrap">${escapeHtml(fmtDate(r.date))}</td>
+                <td class="text-right">₹${Number(r.amount || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                ${monthCells}
+                <td>${escapeHtml(r.invoice || '-')}</td>
+                <td>${escapeHtml(r.campus || '-')}</td>
+            </tr>`;
+        }).join('');
+
+        $('reportContent').innerHTML = `
+            ${dsuTabBar()}
+            <div class="card">
+                <div class="card-header" style="flex-wrap:wrap">
+                    <div class="card-title">Table 7: Monthly Spend Summary and Balance</div>
+                    <div style="display:flex;gap:0.5rem">
+                        <button class="btn btn-success" onclick="dsuAddBudgetEntry()">+ Add Budget Entry</button>
+                    </div>
+                </div>
+                <div style="overflow-x:auto;">
+                <table class="dsu-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th class="text-right">Amount Received</th>
+                            <th class="text-right">Received Monthly</th>
+                            <th class="text-right">Google Spend</th>
+                            <th class="text-right">Meta Spend</th>
+                            <th class="text-right">Total Spend</th>
+                            <th class="text-right">Available Balance</th>
+                            <th>Invoice #</th>
+                            <th>Campus</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${body}
+                        <tr class="dsu-total-row" style="background:#c7d2fe">
+                            <td>GRAND TOTAL</td>
+                            <td class="text-right">₹${Number(gt.amount || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                            <td></td>
+                            <td class="text-right">₹${Number(gt.google_spend || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                            <td class="text-right">₹${Number(gt.meta_spend || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                            <td class="text-right">₹${Number(gt.total_spend || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                            <td class="text-right" style="color:${(gt.available_balance || 0) < 0 ? 'var(--color-danger)' : 'inherit'}">₹${Number(gt.available_balance || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                            <td></td><td></td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+                <div id="dsuBudgetForm" class="hidden" style="margin-top:1rem;padding:1rem;background:var(--bg-sidebar);border-radius:8px;">
+                    <div class="form-row">
+                        <div class="form-group"><label>Date</label><input type="date" id="dsuBudgetDate" class="date-input"></div>
+                        <div class="form-group"><label>Amount</label><input type="number" id="dsuBudgetAmount" step="0.01"></div>
+                        <div class="form-group"><label>Invoice #</label><input type="text" id="dsuBudgetInvoice"></div>
+                        <div class="form-group"><label>Campus</label>
+                            <select id="dsuBudgetCampus"><option value="Campus 3">Campus 3</option><option value="Campus 4">Campus 4</option></select>
+                        </div>
+                        <div class="form-group" style="flex:0;min-width:auto;">
+                            <button class="btn btn-primary" onclick="dsuSaveBudgetEntry()">Save</button>
+                            <button class="btn btn-secondary" onclick="$('dsuBudgetForm').classList.add('hidden')">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function dsuAddBudgetEntry() {
+        $('dsuBudgetForm').classList.remove('hidden');
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        $('dsuBudgetDate').value = todayStr;
+        $('dsuBudgetAmount').value = '';
+        $('dsuBudgetInvoice').value = '';
+        $('dsuBudgetCampus').value = 'Campus 3';
+    }
+
+    async function dsuSaveBudgetEntry() {
+        const payload = {
+            date: $('dsuBudgetDate').value,
+            amount: parseFloat($('dsuBudgetAmount').value) || 0,
+            invoice: $('dsuBudgetInvoice').value,
+            campus: $('dsuBudgetCampus').value,
+        };
+        if (!payload.date) { toast('Date is required', true); return; }
+        try {
+            await api('POST', '/reports/dsu/budget-entries', payload);
+            toast('Budget entry added');
+            $('dsuBudgetForm').classList.add('hidden');
+            await loadDSUReport();
+        } catch(e) { toast(e.message, true); }
+    }
+
+    // ========================================================================
+    // DSI REPORT RENDERING
+    // ========================================================================
+
+    let dsiT1Range = { preset: 'yesterday', start: '', end: '' };
+    let dsiT2Range = { preset: 'inception', start: '', end: '' };
+    let dsiActiveTab = 't1t2';
+
+    function computeDSIDateRange(preset, rangeObj) {
+        const end = today();
+        let start = new Date(end);
+        switch (preset) {
+            case 'yesterday': start.setDate(end.getDate() - 1); end.setDate(end.getDate() - 1); break;
+            case 'today': break;
+            case 'last7': start.setDate(end.getDate() - 6); break;
+            case 'last15': start.setDate(end.getDate() - 14); break;
+            case 'last30': start.setDate(end.getDate() - 29); break;
+            case 'thisMonth': start.setDate(1); break;
+            case 'inception': start = new Date('2025-11-28'); break;
+            case 'custom': return;
+        }
+        rangeObj.preset = preset;
+        rangeObj.start = fmtDate(start);
+        rangeObj.end = fmtDate(end);
+    }
+
+    async function renderDSIReport() {
+        if (!dsiT1Range.start) computeDSIDateRange('yesterday', dsiT1Range);
+        if (!dsiT2Range.start) computeDSIDateRange('inception', dsiT2Range);
+        await loadDSIReport();
+    }
+
+    async function loadDSIReport() {
+        try {
+            const tab = dsiActiveTab || 't1t2';
+            if (tab === 't1t2') {
+                const params = `?t1_start=${dsiT1Range.start}&t1_end=${dsiT1Range.end}&t2_start=${dsiT2Range.start}&t2_end=${dsiT2Range.end}`;
+                const data = await api('GET', '/reports/dsi-performance' + params);
+                buildDSIReport(data);
+            } else if (tab === 't3') {
+                const params = `?start_date=${dsiT1Range.start}&end_date=${dsiT1Range.end}`;
+                const data = await api('GET', '/reports/dsi/lead-pivot' + params);
+                buildDSITable3(data);
+            } else if (tab === 't4') {
+                const data = await api('GET', '/reports/dsi/application-mis');
+                buildDSITable4(data);
+            } else if (tab === 't5') {
+                const data = await api('GET', '/reports/dsi/budget-mis');
+                buildDSITable5(data);
+            }
+        } catch (e) {
+            toast(e.message, true);
+            $('reportContent').innerHTML = '<div class="empty-state">Failed to load DSI report: ' + escapeHtml(e.message) + '</div>';
+        }
+    }
+
+    function dsiTabBar() {
+        const tabs = [
+            { id: 't1t2', label: 'Table 1 & 2: Course Performance' },
+            { id: 't3', label: 'Table 3: Lead Pivot' },
+            { id: 't4', label: 'Table 4: Application MIS' },
+            { id: 't5', label: 'Table 5: Budget MIS' },
+        ];
+        return `<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+            ${tabs.map(t => `<button class="btn ${dsiActiveTab===t.id?'btn-primary':'btn-secondary'}" onclick="dsiSwitchTab('${t.id}')">${t.label}</button>`).join('')}
+        </div>`;
+    }
+
+    function dsiSwitchTab(tabId) {
+        dsiActiveTab = tabId;
+        $('reportContent').innerHTML = '<div class="loading-wrap"><div class="spinner"></div> Loading...</div>';
+        loadDSIReport();
+    }
+
+    function buildDSIReport(data) {
+        const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
+
+        const renderDSITable = (title, rows, total, headerRows) => {
+            // Group by department for rowSpan
+            let prevDept = '';
+            const body = rows.map(r => {
+                const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
+                const spend = fmtMoney(r.spend);
+                const deptCell = r.department !== prevDept ? `<td style="font-weight:700;vertical-align:top">${escapeHtml(r.department || '')}</td>` : `<td></td>`;
+                prevDept = r.department;
+                return `<tr>${deptCell}<td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td><td class="text-right">${cpl}</td><td class="text-right">${spend}</td></tr>`;
+            }).join('');
+            const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
+            return `
+                <div style="background:#c7d2fe;border:1px solid #a5b4fc;border-radius:8px;overflow:hidden;margin-bottom:0.75rem">
+                    <table class="dsu-table">
+                        <thead>${headerRows}
+                            <tr><th>Department</th><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend</th></tr>
+                        </thead>
+                        <tbody>${body}
+                            <tr class="dsu-total-row"><td colspan="2">TOTAL</td><td class="text-right">${fmtNum(total.leads)}</td><td class="text-right">${totalCpl}</td><td class="text-right">${fmtMoney(total.spend)}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        };
+
+        const d = data.daily;
+        const c = data.cumulative;
+
+        const t1Header = `
+            <tr><th colspan="5" class="dsu-banner">${data.gst_note || 'MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026'}</th></tr>
+            <tr><th colspan="5" class="dsu-mis-row">MIS</th></tr>
+        `;
+        const t2Header = `
+            <tr><th colspan="5" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
+            <tr><th colspan="5" class="dsu-mis-row">MIS</th></tr>
+        `;
+
+        $('reportContent').innerHTML = `
+            ${dsiTabBar()}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">DSI Course Performance Report</div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem">
+                    <div style="padding:0">
+                        ${renderDSITable(d.title, d.rows, d.total, t1Header)}
+                    </div>
+                    <div style="padding:0">
+                        ${renderDSITable(c.title, c.rows, c.total, t2Header)}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function buildDSITable3(data) {
+        const stages = data.stages || [];
+        const rows = data.rows || [];
+        const colTotals = data.column_totals || {};
+        const grandTotal = data.grand_total || 0;
+
+        const headerCells = stages.map(s => `<th class="text-right">${escapeHtml(s)}</th>`).join('');
+        const totalCells = stages.map(s => `<td class="text-right">${colTotals[s] || 0}</td>`).join('');
+
+        const bodyRows = rows.map(r => {
+            const cells = stages.map(s => {
+                const v = r[s] || 0;
+                return `<td class="text-right">${v === 0 ? '' : v}</td>`;
+            }).join('');
+            const rowSum = stages.reduce((sum, s) => sum + (r[s] || 0), 0);
+            return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td>${cells}<td class="text-right" style="font-weight:600">${rowSum === 0 ? '' : rowSum}</td></tr>`;
+        }).join('');
+
+        $('reportContent').innerHTML = `
+            ${dsiTabBar()}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Table 3: Lead Attribution Pivot (Course × Student Stage)</div>
+                </div>
+                <div style="overflow-x:auto;">
+                <table class="dsu-table">
+                    <thead>
+                        <tr><th>Course</th>${headerCells}<th class="text-right">Total</th></tr>
+                    </thead>
+                    <tbody>
+                        ${bodyRows}
+                        <tr class="dsu-total-row"><td>TOTAL</td>${totalCells}<td class="text-right">${grandTotal}</td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        `;
+    }
+
+    function buildDSITable4(data) {
+        const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
+
+        const sections = data.sections || [];
+        const gt = data.grand_total || {};
+
+        const renderSection = (section) => {
+            const body = (section.rows || []).map(r => {
+                const cpa = r.submitted > 0 ? fmtMoney(r.cpa) : '0';
+                const submitted = r.submitted > 0 ? fmtNum(r.submitted) : '';
+                const spend = r.spend > 0 ? fmtMoney(r.spend) : '';
+                const target = r.target > 0 ? fmtNum(r.target) : '';
+                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${submitted}</td><td class="text-right">${cpa}</td><td class="text-right">${spend}</td><td class="text-right">${target}</td></tr>`;
+            }).join('');
+            const total = section.total || {};
+            const totalCpa = total.submitted > 0 ? fmtMoney(total.cpa) : '0';
+            const totalSubmitted = total.submitted > 0 ? fmtNum(total.submitted) : '';
+            return `
+                <tr style="background:#e0e7ff;font-weight:700"><td colspan="5">${escapeHtml(section.label)}</td></tr>
+                ${body}
+                <tr class="dsu-total-row"><td>${total.course || 'Total'}</td><td class="text-right">${totalSubmitted}</td><td class="text-right">${totalCpa}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${total.target > 0 ? fmtNum(total.target) : ''}</td></tr>
+            `;
+        };
+
+        const gtCpa = gt.submitted > 0 ? fmtMoney(gt.cpa) : '0';
+        const gtSubmitted = gt.submitted > 0 ? fmtNum(gt.submitted) : '';
+
+        $('reportContent').innerHTML = `
+            ${dsiTabBar()}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Table 4: Application Submitted and CPA by Department</div>
+                </div>
+                <table class="dsu-table">
+                    <thead><tr><th>Course</th><th class="text-right">Application Submitted</th><th class="text-right">CPA</th><th class="text-right">Spend</th><th class="text-right">Target</th></tr></thead>
+                    <tbody>
+                        ${sections.map(renderSection).join('')}
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td>${gt.course}</td><td class="text-right">${gtSubmitted}</td><td class="text-right">${gtCpa}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function buildDSITable5(data) {
+        const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+        const sections = data.sections || [];
+        const gt = data.grand_total || {};
+
+        const renderSection = (section) => {
+            const body = (section.rows || []).map(r => {
+                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-center">${r.status}</td><td class="text-right">${fmtMoney(r.spend)}</td></tr>`;
+            }).join('');
+            const total = section.total || {};
+            return `
+                <tr style="background:#e0e7ff;font-weight:700"><td colspan="3">${escapeHtml(section.label)}</td></tr>
+                ${body}
+                <tr class="dsu-total-row"><td>${total.course || 'Total'}</td><td class="text-right">${fmtMoney(total.budget)}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${fmtMoney(total.remaining)}</td></tr>
+            `;
+        };
+
+        $('reportContent').innerHTML = `
+            ${dsiTabBar()}
+            <div class="card">
+                <div class="card-header" style="flex-wrap:wrap">
+                    <div class="card-title">Table 5: Budget MIS by Department</div>
+                    <div style="display:flex;gap:0.5rem">
+                        <button class="btn btn-success" onclick="dsiAddBudgetEntry()">+ Add Budget Entry</button>
+                    </div>
+                </div>
+                <table class="dsu-table">
+                    <thead><tr><th>Course</th><th class="text-center">Campaign Status</th><th class="text-right">Media Budget Received</th><th class="text-right">Spend</th><th class="text-right">Remaining Budget</th></tr></thead>
+                    <tbody>
+                        ${sections.map(renderSection).join('')}
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td>${gt.course}</td><td></td><td class="text-right">${fmtMoney(gt.budget)}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${fmtMoney(gt.remaining)}</td></tr>
+                    </tbody>
+                </table>
+                <div id="dsiBudgetForm" class="hidden" style="margin-top:1rem;padding:1rem;background:var(--bg-sidebar);border-radius:8px;">
+                    <div class="form-row">
+                        <div class="form-group"><label>Date</label><input type="date" id="dsiBudgetDate" class="date-input"></div>
+                        <div class="form-group"><label>Amount</label><input type="number" id="dsiBudgetAmount" step="0.01"></div>
+                        <div class="form-group"><label>Invoice #</label><input type="text" id="dsiBudgetInvoice"></div>
+                        <div class="form-group"><label>Section</label>
+                            <select id="dsiBudgetSection">
+                                <option value="DSCE">DSCE</option>
+                                <option value="DSIT">DSIT</option>
+                                <option value="DSCA">DSCA</option>
+                                <option value="DSCASC - UG">DSCASC - UG</option>
+                                <option value="DSCASC - Masters">DSCASC - Masters</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:0;min-width:auto;">
+                            <button class="btn btn-primary" onclick="dsiSaveBudgetEntry()">Save</button>
+                            <button class="btn btn-secondary" onclick="$('dsiBudgetForm').classList.add('hidden')">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function dsiAddBudgetEntry() {
+        $('dsiBudgetForm').classList.remove('hidden');
+        const t = new Date();
+        const todayStr = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+        $('dsiBudgetDate').value = todayStr;
+        $('dsiBudgetAmount').value = '';
+        $('dsiBudgetInvoice').value = '';
+        $('dsiBudgetSection').value = 'DSCE';
+    }
+
+    async function dsiSaveBudgetEntry() {
+        const payload = {
+            date: $('dsiBudgetDate').value,
+            amount: parseFloat($('dsiBudgetAmount').value) || 0,
+            invoice: $('dsiBudgetInvoice').value,
+            section: $('dsiBudgetSection').value,
+        };
+        if (!payload.date) { toast('Date is required', true); return; }
+        try {
+            await api('POST', '/reports/dsi/budget-entries', payload);
+            toast('Budget entry added');
+            $('dsiBudgetForm').classList.add('hidden');
+            await loadDSIReport();
+        } catch(e) { toast(e.message, true); }
+    }
+
+    function dsuT1Preset(val) {
+        if (val === 'custom') {
+            dsuT1Range = { preset: 'custom', start: getYesterdayInputDate(), end: getYesterdayInputDate() };
+        } else {
+            computeDSUDateRange(val, dsuT1Range);
+        }
+        loadDSUReport();
+    }
+    function dsuT1Custom() {
+        dsuT1Range = { preset: 'custom', start: $('dsuT1Start').value, end: $('dsuT1End').value };
+        loadDSUReport();
+    }
+    function dsuT2Preset(val) {
+        computeDSUDateRange(val, dsuT2Range);
+        loadDSUReport();
+    }
+    function dsuT2Custom() {
+        dsuT2Range = { preset: 'custom', start: $('dsuT2Start').value, end: $('dsuT2End').value };
+        $('dsuT2Preset').value = 'custom';
+        loadDSUReport();
+    }
+
     async function downloadDSUPDF(table) {
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(API_BASE + '/reports/dsu-performance/pdf?table=' + encodeURIComponent(table), {
+            const res = await fetch(API + '/reports/dsu-performance/pdf?table=' + encodeURIComponent(table), {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
             if (!res.ok) throw new Error(await res.text() || 'PDF download failed');
@@ -652,6 +1519,20 @@
     window.addEventListener('DOMContentLoaded', () => {
         computeDateRange('last30');
         loadAccounts();
+    });
+
+    // Swallow browser-extension message-channel errors that leak into our page
+    window.addEventListener('unhandledrejection', (e) => {
+        const msg = (e.reason && e.reason.message) || String(e.reason);
+        if (msg && (msg.includes('message channel closed') || msg.includes('asynchronous response'))) {
+            e.preventDefault();
+        }
+    });
+    window.addEventListener('error', (e) => {
+        const msg = e.message || '';
+        if (msg.includes('message channel closed') || msg.includes('asynchronous response')) {
+            e.preventDefault();
+        }
     });
     </script>
 </body>

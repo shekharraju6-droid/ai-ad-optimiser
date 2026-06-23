@@ -174,6 +174,7 @@ def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> 
 
     import requests
     import sqlite3
+    from datetime import date, timedelta
     from backend.services.config import load_config
 
     access_key = ""
@@ -208,21 +209,28 @@ def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> 
     if not base_url.endswith("/v2"):
         base_url = base_url + "/v2"
 
+    # RecentlyModified returns leads modified in the date range, not created.
+    # A lead created on start_date may be modified on a later date, so we must
+    # search from start_date through today to catch all leads created in the range.
+    today_str = (date.today() + timedelta(days=1)).isoformat()  # +1 to include today fully
+    search_from = start_date
+    search_to = today_str
+
     url = f"{base_url}/LeadManagement.svc/Leads.RecentlyModified"
     course_leads = defaultdict(int)
     page = 1
-    max_pages = 50
+    max_pages = 100
     total_records = None
     total_fetched = 0
 
     while page <= max_pages:
         payload = {
             "Parameter": {
-                "FromDate": f"{start_date} 00:00:00",
-                "ToDate": f"{end_date} 23:59:59",
+                "FromDate": f"{search_from} 00:00:00",
+                "ToDate": f"{search_to} 23:59:59",
             },
             "Columns": {
-                "Include_CSV": "ProspectID,Source,SourceCampaign,CreatedOn"
+                "Include_CSV": "ProspectID,Source,SourceCampaign,CreatedOn,mx_Student_Source,mx_Student_Stage,mx_Application_Status,mx_Latest_Source,mx_Secondary_Source"
             },
             "Paging": {"PageIndex": page, "PageSize": 1000},
             "Sorting": {"ColumnName": "ProspectAutoId", "Direction": "1"},
@@ -244,7 +252,7 @@ def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> 
 
         if total_records is None:
             total_records = resp.get("RecordCount", 0)
-            logger.info(f"LSQ total leads for {start_date} to {end_date}: {total_records}")
+            logger.info(f"LSQ total modified leads {search_from} to {search_to}: {total_records}")
         records = resp.get("Leads", [])
         if not records:
             break
@@ -257,20 +265,24 @@ def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> 
             source = (props.get("Source") or "")
             source_upper = source.upper()
 
-            # Filter 1: CreatedOn must be within the date range
+            # Filter 1: CreatedOn must be within the requested date range
             created_day = created[:10]
             if not (start_date <= created_day <= end_date):
                 continue
 
-            # Filter 2: Source must contain "GGL" or "Programmatic"
-            if "GGL" not in source_upper and "PROGRAMMATIC" not in source_upper:
+            # Filter 2: Source / Student Source must contain "GGL" or "Programmatic".
+            # LeadSquared exposes source data across multiple fields; check all.
+            student_source = (props.get("mx_Student_Source") or "")
+            latest_source = (props.get("mx_Latest_Source") or "")
+            secondary_source = (props.get("mx_Secondary_Source") or "")
+            source_combined = " ".join([source, student_source, latest_source, secondary_source]).upper()
+            if "GGL" not in source_combined and "PROGRAMMATIC" not in source_combined:
                 continue
 
             course = _map_campaign_to_course(source)
             if course:
                 course_leads[course] += 1
             else:
-                # Count unmapped sources under their own source name
                 course_leads[source] += 1
 
         total_fetched += len(records)
@@ -311,6 +323,685 @@ def fetch_dsu_cumulative(start_date: str, end_date: str) -> List[Dict[str, Any]]
 
     rows = []
     # Include all courses that have either spend or leads
+    all_courses = set(DSU_COURSES) | set(spend_data.keys()) | set(lead_data.keys())
+    for course in all_courses:
+        spend = round(spend_data.get(course, 0))
+        leads = lead_data.get(course, 0)
+        cpl = round(spend / leads) if leads else None
+        if spend > 0 or leads > 0:
+            rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
+
+    rows.sort(key=lambda r: -r["spend"])
+    return rows
+
+
+def fetch_dsu_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """Fetch course performance for a date range (Table 1).
+    Returns list of {course, leads, cpl, spend} sorted by spend desc."""
+    spend_data = _fetch_google_ads_spend(start_date, end_date)
+    lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
+
+    rows = []
+    for course in DSU_COURSES:
+        spend = round(spend_data.get(course, 0))
+        leads = lead_data.get(course, 0)
+        cpl = round(spend / leads) if leads else None
+        rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
+
+    rows.sort(key=lambda r: -r["spend"])
+    return rows
+
+
+# ============================================================================
+# Table 3: Lead Attribution Pivot (Student Source × Student Stage)
+# ============================================================================
+
+def _fetch_lsq_lead_details(start_date: str, end_date: str, account_id: int = 1) -> List[Dict[str, Any]]:
+    """Fetch full lead details from LeadSquared including Student Stage and Application Status.
+    Returns list of lead dicts: {source, student_source, stage, application_status, created_on, course}
+    This is the detailed fetch (not cached like _fetch_lsq_leads) for Tables 3, 4, 6."""
+    import requests
+    import sqlite3
+    import time as time_module
+    from datetime import date, timedelta
+    from backend.services.config import load_config
+
+    access_key = ""
+    secret_key = ""
+    base_url = ""
+
+    if account_id:
+        c = sqlite3.connect("adoptima.db")
+        cur = c.cursor()
+        cur.execute("SELECT lsq_access_key, lsq_secret_key, lsq_base_url FROM accounts WHERE id=?", (account_id,))
+        row = cur.fetchone()
+        c.close()
+        if row and row[0] and row[1]:
+            access_key = row[0]
+            secret_key = row[1]
+            base_url = row[2] or ""
+
+    if not access_key:
+        cfg = load_config()
+        access_key = cfg.get("leadsquared_access_key", "")
+        secret_key = cfg.get("leadsquared_secret_key", "")
+        base_url = cfg.get("leadsquared_base_url", "")
+
+    if not base_url or not access_key or not secret_key:
+        logger.warning(f"LeadSquared credentials not configured for account_id={account_id}; returning empty list.")
+        return []
+
+    base_url = base_url.rstrip("/")
+    if not base_url.endswith("/v2"):
+        base_url = base_url + "/v2"
+
+    today_str = (date.today() + timedelta(days=1)).isoformat()
+    search_from = start_date
+    search_to = today_str
+
+    url = f"{base_url}/LeadManagement.svc/Leads.RecentlyModified"
+    all_leads = []
+    page = 1
+    max_pages = 100
+    total_records = None
+    total_fetched = 0
+
+    while page <= max_pages:
+        payload = {
+            "Parameter": {
+                "FromDate": f"{search_from} 00:00:00",
+                "ToDate": f"{search_to} 23:59:59",
+            },
+            "Columns": {
+                "Include_CSV": "ProspectID,Source,SourceCampaign,CreatedOn,mx_Student_Source,mx_Student_Stage,mx_Application_Status,mx_Latest_Source,mx_Secondary_Source"
+            },
+            "Paging": {"PageIndex": page, "PageSize": 1000},
+            "Sorting": {"ColumnName": "ProspectAutoId", "Direction": "1"},
+        }
+        success = False
+        for attempt in range(3):
+            try:
+                r = requests.post(url, params={"accessKey": access_key, "secretKey": secret_key}, json=payload, timeout=120)
+                r.raise_for_status()
+                resp = r.json()
+                success = True
+                break
+            except Exception as e:
+                logger.warning(f"LeadSquared detail page {page} attempt {attempt+1} failed: {e}")
+                time_module.sleep(5)
+        if not success:
+            logger.error(f"LeadSquared detail page {page} failed after 3 retries, stopping")
+            break
+
+        if total_records is None:
+            total_records = resp.get("RecordCount", 0)
+            logger.info(f"LSQ detail total modified leads {search_from} to {search_to}: {total_records}")
+        records = resp.get("Leads", [])
+        if not records:
+            break
+
+        for rec in records:
+            props = {}
+            for item in rec.get("LeadPropertyList", []):
+                props[item.get("Attribute", "")] = item.get("Value", "")
+            created = (props.get("CreatedOn") or "")
+            source = (props.get("Source") or "")
+            created_day = created[:10]
+            if not (start_date <= created_day <= end_date):
+                continue
+
+            student_source = (props.get("mx_Student_Source") or "")
+            latest_source = (props.get("mx_Latest_Source") or "")
+            secondary_source = (props.get("mx_Secondary_Source") or "")
+            source_combined = " ".join([source, student_source, latest_source, secondary_source]).upper()
+            if "GGL" not in source_combined and "PROGRAMMATIC" not in source_combined:
+                continue
+
+            stage = (props.get("mx_Student_Stage") or "")
+            application_status = (props.get("mx_Application_Status") or "")
+            course = _map_campaign_to_course(source)
+
+            all_leads.append({
+                "source": source,
+                "student_source": student_source,
+                "stage": stage,
+                "application_status": application_status,
+                "created_on": created_day,
+                "course": course or source,
+            })
+
+        total_fetched += len(records)
+        logger.info(f"LSQ detail page {page}: fetched {len(records)} (total: {total_fetched}/{total_records}), filtered leads: {len(all_leads)}")
+        if len(records) < 1000:
+            break
+        page += 1
+
+    logger.info(f"LSQ detail fetch complete: {len(all_leads)} GGL/Programmatic leads for {start_date} to {end_date}")
+    return all_leads
+
+
+def fetch_dsu_lead_pivot(start_date: str, end_date: str) -> Dict[str, Any]:
+    """Fetch lead attribution pivot: Student Source × Student Stage (Table 3).
+    Returns {stages: [...], rows: [{source, stage1: count, ...}], column_totals: {...}, grand_total: int}"""
+    leads = _fetch_lsq_lead_details(start_date, end_date, account_id=1)
+
+    matrix_map = defaultdict(lambda: defaultdict(int))
+    unique_stages = set()
+
+    for lead in leads:
+        source = lead["source"]
+        stage = lead["stage"]
+        if source and stage:
+            matrix_map[source][stage] += 1
+            unique_stages.add(stage)
+
+    all_stages = sorted(unique_stages)
+
+    rows = []
+    for source in sorted(matrix_map.keys()):
+        row = {"source": source}
+        for stage in all_stages:
+            row[stage] = matrix_map[source].get(stage, 0)
+        rows.append(row)
+
+    column_totals = {}
+    grand_total = 0
+    for stage in all_stages:
+        col_sum = sum(matrix_map[source].get(stage, 0) for source in matrix_map)
+        column_totals[stage] = col_sum
+        grand_total += col_sum
+
+    return {
+        "stages": all_stages,
+        "rows": rows,
+        "column_totals": column_totals,
+        "grand_total": grand_total,
+    }
+
+
+# ============================================================================
+# Table 4: Application Submitted and CPA by Campus/Program
+# ============================================================================
+
+APPLICATION_SUBMITTED_STATUSES = {
+    "application fee paid",
+    "application submitted",
+    "enrolled",
+    "partially paid",
+}
+
+# Campus mapping: Campus 4 = B.Tech; Campus 3 = all others
+CAMPUS4_COURSES = [
+    {"key": "B.Tech", "display": "B.Tech", "target": 522},
+]
+CAMPUS3_COURSES = [
+    {"key": "B.Sc Data Science", "display": "BSc Data Science", "target": 7},
+    {"key": "M.Sc Data Science", "display": "MSc Data Science", "target": 6},
+    {"key": "School of Law", "display": "LAW", "target": 10},
+    {"key": "MBA", "display": "MBA", "target": 39},
+    {"key": "BBA", "display": "BBA", "target": 12},
+    {"key": "BCA", "display": "BCA", "target": 30},
+    {"key": "JMC", "display": "JMC", "target": 7},
+    {"key": "B.Sc Biological Sciences", "display": "B.Sc. Biological Science", "target": 9},
+    {"key": "M.Sc Biological Sciences", "display": "M.Sc. Biological Science", "target": 6},
+    {"key": "B.Sc Cyber Security", "display": "B.Sc. Cyber security", "target": 0},
+    {"key": "M.Sc Cyber Security", "display": "M.Sc. Cyber security", "target": 0},
+    {"key": "B.Com", "display": "B Com", "target": 5},
+    {"key": "B.Design", "display": "B Design", "target": 13},
+    {"key": "MCA", "display": "MCA", "target": 29},
+]
+
+
+def fetch_dsu_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
+    """Fetch Application Submitted and CPA by Campus/Program (Table 4).
+    Uses LeadSquared for submitted counts + Google Ads for cumulative spend."""
+    leads = _fetch_lsq_lead_details(start_date, end_date, account_id=1)
+
+    submitted_counts = defaultdict(int)
+    for lead in leads:
+        status_lower = (lead["application_status"] or "").lower().strip()
+        if status_lower in APPLICATION_SUBMITTED_STATUSES:
+            course = lead["course"]
+            if course in ("Direct Traffic", "GGL-DSAT"):
+                course = "B.Tech"
+            submitted_counts[course] += 1
+
+    spend_data = _fetch_google_ads_spend(start_date, end_date)
+
+    def get_spend(key):
+        return round(spend_data.get(key, 0))
+
+    def build_rows(course_list):
+        rows = []
+        for c in course_list:
+            submitted = submitted_counts.get(c["key"], 0)
+            spend = get_spend(c["key"])
+            cpa = round(spend / submitted) if submitted > 0 else 0
+            rows.append({
+                "course": c["display"],
+                "submitted": submitted,
+                "spend": spend,
+                "cpa": cpa,
+                "target": c["target"],
+            })
+        return rows
+
+    def build_total(rows):
+        total_submitted = sum(r["submitted"] for r in rows)
+        total_spend = sum(r["spend"] for r in rows)
+        total_cpa = round(total_spend / total_submitted) if total_submitted > 0 else 0
+        total_target = sum(r["target"] for r in rows)
+        return {
+            "course": "Total",
+            "submitted": total_submitted,
+            "spend": total_spend,
+            "cpa": total_cpa,
+            "target": total_target,
+        }
+
+    campus4_rows = build_rows(CAMPUS4_COURSES)
+    campus3_rows = build_rows(CAMPUS3_COURSES)
+    campus4_total = build_total(campus4_rows)
+    campus3_total = build_total(campus3_rows)
+
+    grand_submitted = campus4_total["submitted"] + campus3_total["submitted"]
+    grand_spend = campus4_total["spend"] + campus3_total["spend"]
+    grand_cpa = round(grand_spend / grand_submitted) if grand_submitted > 0 else 0
+    grand_target = campus4_total["target"] + campus3_total["target"]
+
+    grand_total = {
+        "course": "GRAND TOTAL",
+        "submitted": grand_submitted,
+        "spend": grand_spend,
+        "cpa": grand_cpa,
+        "target": grand_target,
+    }
+
+    return {
+        "campus4_rows": campus4_rows,
+        "campus3_rows": campus3_rows,
+        "campus4_total": campus4_total,
+        "campus3_total": campus3_total,
+        "grand_total": grand_total,
+    }
+
+
+# ============================================================================
+# Table 5: Budget MIS by Campus and Program
+# ============================================================================
+
+def fetch_dsu_budget_mis(start_date: str, end_date: str, db_session=None) -> Dict[str, Any]:
+    """Fetch Budget MIS by Campus/Program (Table 5).
+    Uses Google Ads for spend + dsu_budget_entries table for campus budgets."""
+    spend_data = _fetch_google_ads_spend(start_date, end_date)
+
+    # Fetch campus budgets from DB
+    campus4_budget = 0.0
+    campus3_budget = 0.0
+    if db_session:
+        from backend.db.models import DsuBudgetEntry
+        entries = db_session.query(DsuBudgetEntry).all()
+        for entry in entries:
+            if entry.campus == "Campus 4":
+                campus4_budget += entry.amount
+            elif entry.campus == "Campus 3":
+                campus3_budget += entry.amount
+
+    def get_spend(key):
+        return round(spend_data.get(key, 0))
+
+    campus4_courses = [{"key": "B.Tech", "display": "B.Tech"}]
+    campus3_courses = [{"key": c["key"], "display": c["display"]} for c in CAMPUS3_COURSES]
+
+    def build_rows(course_list):
+        rows = []
+        for c in course_list:
+            spend = get_spend(c["key"])
+            status = "Live" if spend > 0 else "Paused"
+            rows.append({
+                "course": c["display"],
+                "status": status,
+                "spend": spend,
+            })
+        return rows
+
+    campus4_rows = build_rows(campus4_courses)
+    campus3_rows = build_rows(campus3_courses)
+
+    campus4_spend = sum(r["spend"] for r in campus4_rows)
+    campus3_spend = sum(r["spend"] for r in campus3_rows)
+
+    return {
+        "campus4_rows": campus4_rows,
+        "campus3_rows": campus3_rows,
+        "campus4_total": {
+            "course": "Total",
+            "budget": round(campus4_budget),
+            "spend": campus4_spend,
+            "remaining": round(campus4_budget - campus4_spend),
+        },
+        "campus3_total": {
+            "course": "Total",
+            "budget": round(campus3_budget),
+            "spend": campus3_spend,
+            "remaining": round(campus3_budget - campus3_spend),
+        },
+        "grand_total": {
+            "course": "GRAND TOTAL",
+            "budget": round(campus4_budget + campus3_budget),
+            "spend": campus4_spend + campus3_spend,
+            "remaining": round((campus4_budget + campus3_budget) - (campus4_spend + campus3_spend)),
+        },
+    }
+
+
+# ============================================================================
+# Table 6: Lead Stage Summary
+# ============================================================================
+
+def fetch_dsu_lead_stages(start_date: str, end_date: str) -> Dict[str, Any]:
+    """Fetch Lead Stage Summary (Table 6).
+    Returns {rows: [{stage, count, percentage}], total: int}"""
+    leads = _fetch_lsq_lead_details(start_date, end_date, account_id=1)
+
+    counts_map = defaultdict(int)
+    total = 0
+
+    for lead in leads:
+        stage = lead["stage"]
+        if stage:
+            counts_map[stage] += 1
+            total += 1
+
+    rows = []
+    for stage, count in counts_map.items():
+        percentage = round((count / total) * 100) if total > 0 else 0
+        rows.append({"stage": stage, "count": count, "percentage": percentage})
+
+    rows.sort(key=lambda r: (-r["count"], r["stage"]))
+
+    return {
+        "rows": rows,
+        "total": total,
+    }
+
+
+# ============================================================================
+# Table 7: Monthly Spend Summary and Balance
+# ============================================================================
+
+DSU_INCEPTION_DATE = "2025-11-28"
+DSU_GST_TRANSITION_DATE = "2026-06-19"
+GST_MULTIPLIER = 1.18
+
+
+def _apply_gst_to_cost(raw_cost: float, date_str: str) -> float:
+    """Apply GST rule: no GST till 18-Jun-2026 inclusive, 18% GST from 19-Jun-2026 onwards."""
+    if not raw_cost or raw_cost <= 0:
+        return 0.0
+    if not date_str:
+        return raw_cost
+    from datetime import date as date_type
+    try:
+        spend_day = date_type.fromisoformat(date_str[:10])
+        cutoff = date_type(2026, 6, 18)
+        if spend_day <= cutoff:
+            return raw_cost
+        return raw_cost * GST_MULTIPLIER
+    except (ValueError, TypeError):
+        return raw_cost
+
+
+def _fetch_google_ads_monthly_spend(start_date: str, end_date: str) -> Dict[str, float]:
+    """Fetch Google Ads spend grouped by month using segments.month.
+    Returns {month_key: spend_float} where month_key is 'MMM-YYYY' e.g. 'Jun-2026'.
+    GST is applied per-month: no GST for months up to Jun-2026, 18% for Jul-2026 onwards.
+    Note: GST cutoff is 18-Jun-2026, so Jun-2026 is a mixed month — treat as no GST for simplicity
+    (the per-day GST application would require daily segmentation which is not available with segments.month).
+    For exact GST on Jun-2026, use the daily-level query instead."""
+    creds = _get_dsu_account_creds()
+    from google.ads.googleads.client import GoogleAdsClient
+    from collections import defaultdict as dd
+
+    client_dict = {
+        "developer_token": creds["developer_token"],
+        "client_id": creds["client_id"],
+        "client_secret": creds["client_secret"],
+        "refresh_token": creds["refresh_token"],
+        "use_proto_plus": True,
+    }
+    if creds.get("login_customer_id"):
+        client_dict["login_customer_id"] = str(creds["login_customer_id"]).replace("-", "")
+
+    gclient = GoogleAdsClient.load_from_dict(client_dict)
+    service = gclient.get_service("GoogleAdsService")
+    customer_id = "2909919094"
+
+    query = f"""
+        SELECT
+          campaign.id,
+          campaign.name,
+          segments.month,
+          metrics.cost_micros
+        FROM campaign
+        WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+    """
+    response = service.search(customer_id=customer_id, query=query)
+
+    month_spend = dd(float)
+    for row in response:
+        cost = (row.metrics.cost_micros or 0) / 1_000_000.0
+        if cost == 0:
+            continue
+        month_str = row.segments.month
+        if not month_str:
+            continue
+        month_key = _normalize_month_key(month_str)
+        month_spend[month_key] += cost
+
+    # Apply GST: months after Jun-2026 get 18% GST
+    gst_cutoff_year = 2026
+    gst_cutoff_month_idx = 5  # June (0-indexed)
+    months_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    result = {}
+    for mk, cost in month_spend.items():
+        try:
+            parts = mk.split("-")
+            m_name = parts[0]
+            year = int(parts[1])
+            m_idx = months_order.index(m_name) if m_name in months_order else 0
+            if year > gst_cutoff_year or (year == gst_cutoff_year and m_idx > gst_cutoff_month_idx):
+                result[mk] = cost * GST_MULTIPLIER
+            else:
+                result[mk] = cost
+        except (ValueError, IndexError):
+            result[mk] = cost
+
+    return result
+
+
+def _normalize_month_key(month_str: str) -> str:
+    """Normalize various month formats to 'MMM-YYYY' e.g. 'Jun-2026'."""
+    if not month_str:
+        return ""
+    from datetime import date as date_type
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    s = month_str.strip()
+
+    try:
+        if "-" in s and len(s.split("-")) == 2:
+            parts = s.split("-")
+            month_name = parts[0]
+            year = parts[1]
+            if len(year) == 2:
+                year = "20" + year
+            for i, m in enumerate(months):
+                if month_name.lower() == m.lower():
+                    return f"{m}-{year}"
+            return s
+
+        if "-" in s and len(s.split("-")) == 3:
+            d = date_type.fromisoformat(s)
+            return f"{months[d.month - 1]}-{d.year}"
+
+        d = date_type.fromisoformat(s)
+        return f"{months[d.month - 1]}-{d.year}"
+    except (ValueError, TypeError):
+        return s
+
+
+def fetch_dsu_monthly_summary(db_session=None) -> Dict[str, Any]:
+    """Fetch Monthly Spend Summary and Balance (Table 7).
+    Uses Google Ads segments.month for spend + dsu_budget_entries for received amounts.
+    Returns monthly summaries with manual entries, grand totals."""
+    from datetime import date as date_type
+    from collections import OrderedDict
+
+    google_spend_map = _fetch_google_ads_monthly_spend(DSU_INCEPTION_DATE, date_type.today().isoformat())
+
+    budget_entries = []
+    if db_session:
+        from backend.db.models import DsuBudgetEntry
+        db_entries = db_session.query(DsuBudgetEntry).order_by(DsuBudgetEntry.entry_date).all()
+        for e in db_entries:
+            campus_val = (e.campus or "").strip()
+            campus_lower = campus_val.lower()
+            if "campus 3" in campus_lower or campus_lower == "3":
+                campus_val = "Campus 3"
+            elif "campus 4" in campus_lower or campus_lower == "4":
+                campus_val = "Campus 4"
+            else:
+                campus_val = "Campus 3"
+            budget_entries.append({
+                "id": e.id,
+                "date": e.entry_date,
+                "amount": e.amount,
+                "invoice": e.invoice or "",
+                "campus": campus_val,
+            })
+
+    all_month_keys = set(google_spend_map.keys())
+    for entry in budget_entries:
+        mk = _normalize_month_key(entry["date"])
+        if mk:
+            all_month_keys.add(mk)
+
+    months_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    def sort_key(mk):
+        try:
+            parts = mk.split("-")
+            m_name = parts[0]
+            year = int(parts[1])
+            m_idx = months_order.index(m_name) if m_name in months_order else 0
+            return (year, m_idx)
+        except (ValueError, IndexError):
+            return (9999, 0)
+
+    sorted_months = sorted(all_month_keys, key=sort_key)
+
+    monthly_summaries = {}
+    for mk in sorted_months:
+        received_monthly = sum(
+            e["amount"] for e in budget_entries
+            if _normalize_month_key(e["date"]) == mk
+        )
+        google_spend = google_spend_map.get(mk, 0.0)
+        meta_spend = 0.0
+        total_spend = google_spend + meta_spend
+        available_balance = received_monthly - total_spend
+
+        monthly_summaries[mk] = {
+            "month_key": mk,
+            "received_monthly": round(received_monthly),
+            "google_spend": round(google_spend),
+            "meta_spend": round(meta_spend),
+            "total_spend": round(total_spend),
+            "available_balance": round(available_balance),
+        }
+
+    table7_rows = []
+    for mk in sorted_months:
+        summary = monthly_summaries[mk]
+        entries_for_month = [e for e in budget_entries if _normalize_month_key(e["date"]) == mk]
+        entries_for_month.sort(key=lambda e: (e["date"], 0 if e["campus"] == "Campus 4" else 1))
+
+        if not entries_for_month:
+            year_part = mk.split("-")[1] if "-" in mk else "2026"
+            m_name = mk.split("-")[0] if "-" in mk else "Jan"
+            m_idx = months_order.index(m_name) if m_name in months_order else 0
+            virtual_date = f"{year_part}-{m_idx + 1:02d}-01"
+            table7_rows.append({
+                "id": f"virtual_{mk}",
+                "date": virtual_date,
+                "amount": 0,
+                "invoice": "-",
+                "campus": "-",
+                "is_virtual": True,
+                "is_first_in_month": True,
+                "month_rowspan": 1,
+                "month_key": mk,
+                **summary,
+            })
+        else:
+            for idx, entry in enumerate(entries_for_month):
+                table7_rows.append({
+                    "id": entry["id"],
+                    "date": entry["date"],
+                    "amount": entry["amount"],
+                    "invoice": entry["invoice"] or "-",
+                    "campus": entry["campus"],
+                    "is_virtual": False,
+                    "is_first_in_month": (idx == 0),
+                    "month_rowspan": len(entries_for_month),
+                    "month_key": mk,
+                    **summary,
+                })
+
+    grand_total_amount = sum(e["amount"] for e in budget_entries)
+    grand_total_google = sum(s["google_spend"] for s in monthly_summaries.values())
+    grand_total_meta = sum(s["meta_spend"] for s in monthly_summaries.values())
+    grand_total_total_spend = sum(s["total_spend"] for s in monthly_summaries.values())
+    grand_total_balance = grand_total_amount - grand_total_total_spend
+
+    return {
+        "rows": table7_rows,
+        "grand_total": {
+            "amount": round(grand_total_amount),
+            "google_spend": round(grand_total_google),
+            "meta_spend": round(grand_total_meta),
+            "total_spend": round(grand_total_total_spend),
+            "available_balance": round(grand_total_balance),
+        },
+    }
+    """Fetch course performance for a date range (Table 1).
+    Returns list of {course, leads, cpl, spend} sorted by spend desc."""
+    spend_data = _fetch_google_ads_spend(start_date, end_date)
+    lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
+
+    rows = []
+    for course in DSU_COURSES:
+        spend = round(spend_data.get(course, 0))
+        leads = lead_data.get(course, 0)
+        cpl = round(spend / leads) if leads else None
+        rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
+
+    rows.sort(key=lambda r: -r["spend"])
+    return rows
+
+
+def fetch_dsu_cumulative_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """Fetch cumulative course performance for a date range (Table 2).
+    Returns list of {course, leads, cpl, spend} sorted by spend desc."""
+    spend_data = _fetch_google_ads_spend(start_date, end_date)
+    lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
+
+    rows = []
     all_courses = set(DSU_COURSES) | set(spend_data.keys()) | set(lead_data.keys())
     for course in all_courses:
         spend = round(spend_data.get(course, 0))
