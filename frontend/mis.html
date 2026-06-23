@@ -586,9 +586,11 @@
             <tr><th colspan="4" class="dsu-mode-row">${dsuT1DateSelector()}</th></tr>
             <tr><th colspan="4" class="dsu-mis-row">MIS</th></tr>
         `;
+        const t2Title = `From ${formatHeaderDate(data.t2_start)} to ${formatHeaderDate(data.t2_end)}`;
         const t2Header = `
             <tr><th colspan="4" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
             <tr><th colspan="4" class="dsu-mode-row">${dsuT2DateSelector()}</th></tr>
+            <tr><th colspan="4" style="background:#e0e7ff;padding:0.4rem;text-align:center;font-size:0.8rem;font-weight:700;color:#1e3a8a">${t2Title}</th></tr>
             <tr><th colspan="4" class="dsu-mis-row">MIS</th></tr>
         `;
 
