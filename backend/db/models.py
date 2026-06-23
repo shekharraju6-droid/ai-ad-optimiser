@@ -312,6 +312,24 @@ class DsuBudgetEntry(Base):
         }
 
 
+class DsuMonthlySpendFixed(Base):
+    """Fixed historical Google Ads monthly spend for DSU Table 7 (Nov-25 to May-26).
+    These values are frozen and will not change. No GST applied to these months."""
+    __tablename__ = "dsu_monthly_spend_fixed"
+
+    id = Column(Integer, primary_key=True, index=True)
+    month_key = Column(String, nullable=False, unique=True)  # e.g. "Nov-25", "Dec-25"
+    google_spend = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "month_key": self.month_key,
+            "google_spend": self.google_spend,
+        }
+
+
 class DsiBudgetEntry(Base):
     """Manual budget entries for DSI Table 5 (Budget MIS)."""
     __tablename__ = "dsi_budget_entries"
@@ -333,4 +351,49 @@ class DsiBudgetEntry(Base):
             "section": self.section or "",
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class LeadSquaredLead(Base):
+    """Local mirror of LeadSquared leads for fast MIS reporting.
+    
+    Each row stores the immutable properties needed by InsightDesk.
+    The mirror is refreshed periodically from LeadSquared.RecentlyModified.
+    """
+    __tablename__ = "leadsquared_leads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False, index=True)
+    prospect_id = Column(String, nullable=True, index=True)
+    source = Column(String, nullable=True, default="")
+    source_campaign = Column(String, nullable=True, default="")
+    student_source = Column(String, nullable=True, default="")
+    latest_source = Column(String, nullable=True, default="")
+    secondary_source = Column(String, nullable=True, default="")
+    student_stage = Column(String, nullable=True, default="")
+    application_status = Column(String, nullable=True, default="")
+    created_on = Column(String, nullable=True, index=True)  # ISO date YYYY-MM-DD
+    modified_on = Column(String, nullable=True)              # ISO date YYYY-MM-DD
+    course = Column(String, nullable=True, default="")     # resolved course mapping
+    raw_json = Column(Text, nullable=True)                   # full LeadPropertyList JSON for traceability
+    synced_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    account = relationship("Account")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "account_id": self.account_id,
+            "prospect_id": self.prospect_id,
+            "source": self.source,
+            "source_campaign": self.source_campaign,
+            "student_source": self.student_source,
+            "latest_source": self.latest_source,
+            "secondary_source": self.secondary_source,
+            "student_stage": self.student_stage,
+            "application_status": self.application_status,
+            "created_on": self.created_on,
+            "modified_on": self.modified_on,
+            "course": self.course,
+            "synced_at": self.synced_at.isoformat() if self.synced_at else None,
         }

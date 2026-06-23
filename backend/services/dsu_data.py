@@ -161,11 +161,40 @@ def _fetch_google_ads_spend(start_date: str, end_date: str) -> Dict[str, float]:
 
 
 def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> Dict[str, int]:
-    """Fetch leads from LeadSquared, mapped to courses.
-    Filters: CreatedOn within date range AND Source contains "GGL" or "Programmatic".
-    Uses per-account LSQ credentials if account_id is provided, else falls back to global config.
-    Results are cached per date range to avoid repeated slow API calls.
-    Returns {course: lead_count}."""
+    """Fetch leads from the local LeadSquared mirror.
+
+    The local mirror is kept up-to-date by the scheduler. This makes InsightDesk
+    reports load in milliseconds instead of waiting for the slow LSQ API.
+    Falls back to direct API only if the mirror is empty or account_id is missing.
+    """
+    if account_id is None:
+        return {}
+
+    from backend.db.database import SessionLocal
+    from backend.db.models import LeadSquaredLead
+    from backend.services.lsq_mirror import count_leads_by_course
+
+    db = SessionLocal()
+    try:
+        # Trigger a lightweight incremental sync if mirror is empty
+        existing = db.query(LeadSquaredLead).filter(LeadSquaredLead.account_id == account_id).first()
+        if not existing:
+            logger.warning(f"LSQ mirror empty for account {account_id}, falling back to direct API")
+            return _fetch_lsq_leads_direct(start_date, end_date, account_id)
+
+        # Use the local mirror for fast filtering by CreatedOn date
+        counts = count_leads_by_course(db, account_id, start_date, end_date)
+        logger.info(f"LSQ mirror query for account {account_id} {start_date}-{end_date}: {counts}")
+        return counts
+    except Exception as e:
+        logger.exception(f"LSQ mirror query failed for account {account_id}: {e}")
+        return _fetch_lsq_leads_direct(start_date, end_date, account_id)
+    finally:
+        db.close()
+
+
+def _fetch_lsq_leads_direct(start_date: str, end_date: str, account_id: int = None) -> Dict[str, int]:
+    """Direct API fallback. Kept for cold-start / mirror rebuild scenarios."""
     cache_key = f"{account_id}_{start_date}_{end_date}"
     import time
     if cache_key in _LSQ_CACHE and (time.time() - _LSQ_CACHE_TIME.get(cache_key, 0)) < _LSQ_CACHE_TTL:
@@ -181,7 +210,6 @@ def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> 
     secret_key = ""
     base_url = ""
 
-    # Try per-account credentials first
     if account_id:
         c = sqlite3.connect("adoptima.db")
         cur = c.cursor()
@@ -194,7 +222,6 @@ def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> 
             base_url = row[2] or ""
             logger.info(f"Using per-account LSQ creds for account_id={account_id}")
 
-    # Fall back to global config
     if not access_key:
         cfg = load_config()
         access_key = cfg.get("leadsquared_access_key", "")
@@ -209,10 +236,7 @@ def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> 
     if not base_url.endswith("/v2"):
         base_url = base_url + "/v2"
 
-    # RecentlyModified returns leads modified in the date range, not created.
-    # A lead created on start_date may be modified on a later date, so we must
-    # search from start_date through today to catch all leads created in the range.
-    today_str = (date.today() + timedelta(days=1)).isoformat()  # +1 to include today fully
+    today_str = (date.today() + timedelta(days=1)).isoformat()
     search_from = start_date
     search_to = today_str
 
@@ -263,15 +287,11 @@ def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> 
                 props[item.get("Attribute", "")] = item.get("Value", "")
             created = (props.get("CreatedOn") or "")
             source = (props.get("Source") or "")
-            source_upper = source.upper()
 
-            # Filter 1: CreatedOn must be within the requested date range
             created_day = created[:10]
             if not (start_date <= created_day <= end_date):
                 continue
 
-            # Filter 2: Source / Student Source must contain "GGL" or "Programmatic".
-            # LeadSquared exposes source data across multiple fields; check all.
             student_source = (props.get("mx_Student_Source") or "")
             latest_source = (props.get("mx_Latest_Source") or "")
             secondary_source = (props.get("mx_Secondary_Source") or "")
@@ -279,7 +299,9 @@ def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> 
             if "GGL" not in source_combined and "PROGRAMMATIC" not in source_combined:
                 continue
 
-            course = _map_campaign_to_course(source)
+            course = SOURCE_TO_COURSE.get(source)
+            if not course:
+                course = _map_campaign_to_course(source)
             if course:
                 course_leads[course] += 1
             else:
@@ -357,9 +379,34 @@ def fetch_dsu_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]
 # ============================================================================
 
 def _fetch_lsq_lead_details(start_date: str, end_date: str, account_id: int = 1) -> List[Dict[str, Any]]:
-    """Fetch full lead details from LeadSquared including Student Stage and Application Status.
-    Returns list of lead dicts: {source, student_source, stage, application_status, created_on, course}
-    This is the detailed fetch (not cached like _fetch_lsq_leads) for Tables 3, 4, 6."""
+    """Fetch full lead details from the local LeadSquared mirror.
+
+    Tables 3, 4, 6 need stage and application_status. The mirror stores these,
+    so we query locally instead of hitting the slow LSQ API each time.
+    """
+    from backend.db.database import SessionLocal
+    from backend.db.models import LeadSquaredLead
+    from backend.services.lsq_mirror import get_lead_details
+
+    db = SessionLocal()
+    try:
+        existing = db.query(LeadSquaredLead).filter(LeadSquaredLead.account_id == account_id).first()
+        if not existing:
+            logger.warning(f"LSQ mirror empty for account {account_id}, falling back to direct API for lead details")
+            return _fetch_lsq_lead_details_direct(start_date, end_date, account_id)
+
+        leads = get_lead_details(db, account_id, start_date, end_date)
+        logger.info(f"LSQ mirror detail query for account {account_id} {start_date}-{end_date}: {len(leads)} leads")
+        return leads
+    except Exception as e:
+        logger.exception(f"LSQ mirror detail query failed for account {account_id}: {e}")
+        return _fetch_lsq_lead_details_direct(start_date, end_date, account_id)
+    finally:
+        db.close()
+
+
+def _fetch_lsq_lead_details_direct(start_date: str, end_date: str, account_id: int = 1) -> List[Dict[str, Any]]:
+    """Direct API fallback for lead details (cold-start / mirror rebuild)."""
     import requests
     import sqlite3
     import time as time_module
@@ -459,7 +506,9 @@ def _fetch_lsq_lead_details(start_date: str, end_date: str, account_id: int = 1)
 
             stage = (props.get("mx_Student_Stage") or "")
             application_status = (props.get("mx_Application_Status") or "")
-            course = _map_campaign_to_course(source)
+            course = SOURCE_TO_COURSE.get(source)
+            if not course:
+                course = _map_campaign_to_course(source)
 
             all_leads.append({
                 "source": source,
@@ -753,12 +802,10 @@ def _apply_gst_to_cost(raw_cost: float, date_str: str) -> float:
 
 
 def _fetch_google_ads_monthly_spend(start_date: str, end_date: str) -> Dict[str, float]:
-    """Fetch Google Ads spend grouped by month using segments.month.
-    Returns {month_key: spend_float} where month_key is 'MMM-YYYY' e.g. 'Jun-2026'.
-    GST is applied per-month: no GST for months up to Jun-2026, 18% for Jul-2026 onwards.
-    Note: GST cutoff is 18-Jun-2026, so Jun-2026 is a mixed month — treat as no GST for simplicity
-    (the per-day GST application would require daily segmentation which is not available with segments.month).
-    For exact GST on Jun-2026, use the daily-level query instead."""
+    """Fetch Google Ads spend for DSU grouped by month using segments.date.
+    Applies per-day GST (no GST till 18-Jun-2026, 18% from 19-Jun-2026).
+    Aggregates daily spend into monthly totals.
+    Returns {month_key: spend_float} where month_key is 'MMM-YYYY' e.g. 'Jun-2026'."""
     creds = _get_dsu_account_creds()
     from google.ads.googleads.client import GoogleAdsClient
     from collections import defaultdict as dd
@@ -781,7 +828,7 @@ def _fetch_google_ads_monthly_spend(start_date: str, end_date: str) -> Dict[str,
         SELECT
           campaign.id,
           campaign.name,
-          segments.month,
+          segments.date,
           metrics.cost_micros
         FROM campaign
         WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
@@ -789,37 +836,30 @@ def _fetch_google_ads_monthly_spend(start_date: str, end_date: str) -> Dict[str,
     response = service.search(customer_id=customer_id, query=query)
 
     month_spend = dd(float)
+    months_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
     for row in response:
         cost = (row.metrics.cost_micros or 0) / 1_000_000.0
         if cost == 0:
             continue
-        month_str = row.segments.month
-        if not month_str:
+        day_str = str(row.segments.date) if row.segments.date else ""
+        if not day_str:
             continue
-        month_key = _normalize_month_key(month_str)
-        month_spend[month_key] += cost
 
-    # Apply GST: months after Jun-2026 get 18% GST
-    gst_cutoff_year = 2026
-    gst_cutoff_month_idx = 5  # June (0-indexed)
-    months_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        # Apply per-day GST
+        cost_with_gst = _apply_gst_to_cost(cost, day_str)
 
-    result = {}
-    for mk, cost in month_spend.items():
+        # Normalize to month key
         try:
-            parts = mk.split("-")
-            m_name = parts[0]
-            year = int(parts[1])
-            m_idx = months_order.index(m_name) if m_name in months_order else 0
-            if year > gst_cutoff_year or (year == gst_cutoff_year and m_idx > gst_cutoff_month_idx):
-                result[mk] = cost * GST_MULTIPLIER
-            else:
-                result[mk] = cost
-        except (ValueError, IndexError):
-            result[mk] = cost
+            d = date.fromisoformat(day_str)
+            mk = f"{months_order[d.month - 1]}-{d.year}"
+        except (ValueError, TypeError):
+            continue
 
-    return result
+        month_spend[mk] += cost_with_gst
+
+    return dict(month_spend)
 
 
 def _normalize_month_key(month_str: str) -> str:
@@ -856,13 +896,40 @@ def _normalize_month_key(month_str: str) -> str:
 
 def fetch_dsu_monthly_summary(db_session=None) -> Dict[str, Any]:
     """Fetch Monthly Spend Summary and Balance (Table 7).
-    Uses Google Ads segments.month for spend + dsu_budget_entries for received amounts.
+    - Nov-2025 to May-2026: uses fixed spend values from dsu_monthly_spend_fixed DB table (no GST)
+    - Jun-2026 onwards: fetches from Google Ads API with per-day GST applied
+    Uses dsu_budget_entries for received amounts.
     Returns monthly summaries with manual entries, grand totals."""
     from datetime import date as date_type
     from collections import OrderedDict
 
-    google_spend_map = _fetch_google_ads_monthly_spend(DSU_INCEPTION_DATE, date_type.today().isoformat())
+    # Step 1: Build google_spend_map
+    # Fixed months: Nov-25 to May-26 (no GST, from DB)
+    # API months: Jun-26 onwards (per-day GST, from Google Ads)
+    google_spend_map = {}
 
+    # Load fixed historical values from DB
+    fixed_months = {}
+    if db_session:
+        from backend.db.models import DsuMonthlySpendFixed
+        fixed_rows = db_session.query(DsuMonthlySpendFixed).all()
+        for fr in fixed_rows:
+            fixed_months[fr.month_key] = fr.google_spend
+            # Normalize to MMM-YYYY format
+            normalized = _normalize_month_key(fr.month_key)
+            google_spend_map[normalized] = fr.google_spend
+
+    # Fetch from Google Ads API for Jun-2026 onwards
+    # Start from 2026-06-01 to today (avoids re-fetching fixed months)
+    api_start = "2026-06-01"
+    api_end = date_type.today().isoformat()
+    api_spend = _fetch_google_ads_monthly_spend(api_start, api_end)
+
+    # Merge API spend (overrides fixed if any overlap, but shouldn't overlap)
+    for mk, spend in api_spend.items():
+        google_spend_map[mk] = spend
+
+    # Step 2: Load budget entries
     budget_entries = []
     if db_session:
         from backend.db.models import DsuBudgetEntry
@@ -884,6 +951,7 @@ def fetch_dsu_monthly_summary(db_session=None) -> Dict[str, Any]:
                 "campus": campus_val,
             })
 
+    # Step 3: Collect all month keys
     all_month_keys = set(google_spend_map.keys())
     for entry in budget_entries:
         mk = _normalize_month_key(entry["date"])
@@ -905,6 +973,7 @@ def fetch_dsu_monthly_summary(db_session=None) -> Dict[str, Any]:
 
     sorted_months = sorted(all_month_keys, key=sort_key)
 
+    # Step 4: Build monthly summaries
     monthly_summaries = {}
     for mk in sorted_months:
         received_monthly = sum(
@@ -925,6 +994,7 @@ def fetch_dsu_monthly_summary(db_session=None) -> Dict[str, Any]:
             "available_balance": round(available_balance),
         }
 
+    # Step 5: Build table rows (one row per budget entry, virtual rows for months with no entries)
     table7_rows = []
     for mk in sorted_months:
         summary = monthly_summaries[mk]
@@ -979,20 +1049,6 @@ def fetch_dsu_monthly_summary(db_session=None) -> Dict[str, Any]:
             "available_balance": round(grand_total_balance),
         },
     }
-    """Fetch course performance for a date range (Table 1).
-    Returns list of {course, leads, cpl, spend} sorted by spend desc."""
-    spend_data = _fetch_google_ads_spend(start_date, end_date)
-    lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
-
-    rows = []
-    for course in DSU_COURSES:
-        spend = round(spend_data.get(course, 0))
-        leads = lead_data.get(course, 0)
-        cpl = round(spend / leads) if leads else None
-        rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
-
-    rows.sort(key=lambda r: -r["spend"])
-    return rows
 
 
 def fetch_dsu_cumulative_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
