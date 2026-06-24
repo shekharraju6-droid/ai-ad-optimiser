@@ -85,7 +85,8 @@
         .dsu-total-row td { background: #c7d2fe !important; border: 1.5px solid #3730a3 !important; font-weight: 700; color: #1f2937; }
         .dsu-grand-row td { background: #fed7aa !important; border: 2px solid #9a3412 !important; font-weight: 700; color: #1f2937; }
         .dsu-section-row td { background: #dbe4ff !important; border: 1.5px solid #3730a3 !important; font-weight: 700; color: #1f2937; text-align: center; letter-spacing: 0.03em; font-size: 0.78rem; }
-        .dsu-table4-wrap { max-width: 1000px; margin: 0 auto; }
+        .dsu-table4-wrap { max-width: 720px; margin: 0 auto; }
+        .dsi-table4-wrap { max-width: 720px; margin: 0 auto; }
 
                 .dsu-table7 { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: #fff; border: 2px solid #3730a3; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .dsu-table7 th { padding: 0.6rem 0.7rem; border: 1.5px solid #3730a3; text-align: left; background: #4338ca; color: #fff; font-weight: 700; font-size: 0.8rem; }
@@ -1233,21 +1234,25 @@
         const sections = data.sections || [];
         const gt = data.grand_total || {};
 
+        // Compact: show only non-empty rows + section totals
         const renderSection = (section) => {
-            const body = (section.rows || []).map(r => {
+            const activeRows = (section.rows || []).filter(r => r.submitted > 0 || r.spend > 0 || r.target > 0);
+            if (activeRows.length === 0) return '';
+
+            const body = activeRows.map(r => {
                 const cpa = r.submitted > 0 ? fmtMoney(r.cpa) : '0';
                 const submitted = r.submitted > 0 ? fmtNum(r.submitted) : '';
                 const spend = r.spend > 0 ? fmtMoney(r.spend) : '';
                 const target = r.target > 0 ? fmtNum(r.target) : '';
-                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${submitted}</td><td class="text-right">${cpa}</td><td class="text-right">${spend}</td><td class="text-right">${target}</td></tr>`;
+                return `<tr><td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${submitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${cpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${spend}</td><td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
             }).join('');
             const total = section.total || {};
             const totalCpa = total.submitted > 0 ? fmtMoney(total.cpa) : '0';
             const totalSubmitted = total.submitted > 0 ? fmtNum(total.submitted) : '';
             return `
-                <tr style="background:#e0e7ff;font-weight:700"><td colspan="5">${escapeHtml(section.label)}</td></tr>
+                <tr style="background:#e0e7ff;font-weight:700"><td colspan="5" style="padding:0.35rem 0.5rem;font-size:0.76rem">${escapeHtml(section.label)}</td></tr>
                 ${body}
-                <tr class="dsu-total-row"><td>${total.course || 'Total'}</td><td class="text-right">${totalSubmitted}</td><td class="text-right">${totalCpa}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${total.target > 0 ? fmtNum(total.target) : ''}</td></tr>
+                <tr class="dsu-total-row"><td style="padding:0.35rem 0.5rem">${total.course || 'Total'}</td><td class="text-right" style="padding:0.35rem 0.5rem">${totalSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${totalCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(total.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${total.target > 0 ? fmtNum(total.target) : ''}</td></tr>
             `;
         };
 
@@ -1256,17 +1261,19 @@
 
         $('reportContent').innerHTML = `
             ${dsiTabBar()}
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">Table 4: Application Submitted and CPA by Department</div>
+            <div class="card" style="padding:0.75rem">
+                <div class="card-header" style="margin-bottom:0.5rem">
+                    <div class="card-title" style="font-size:0.9rem">Table 4: Application Submitted and CPA by Department</div>
                 </div>
-                <table class="dsu-table">
-                    <thead><tr><th>Course</th><th class="text-right">Application Submitted</th><th class="text-right">CPA</th><th class="text-right">Spend</th><th class="text-right">Target</th></tr></thead>
+                <div class="dsi-table4-wrap">
+                <table class="dsu-table" style="font-size:0.78rem">
+                    <thead><tr><th style="padding:0.35rem 0.5rem">Course</th><th class="text-right" style="padding:0.35rem 0.5rem;white-space:nowrap">Application Submitted</th><th class="text-right" style="padding:0.35rem 0.5rem">CPA</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Target</th></tr></thead>
                     <tbody>
                         ${sections.map(renderSection).join('')}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td>${gt.course}</td><td class="text-right">${gtSubmitted}</td><td class="text-right">${gtCpa}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td style="padding:0.35rem 0.5rem">${gt.course}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         `;
     }
