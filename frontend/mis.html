@@ -1311,37 +1311,77 @@
     function buildDSITable5(data) {
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-        const sections = data.sections || [];
+        const rows = data.rows || [];
         const gt = data.grand_total || {};
 
-        const renderSection = (section) => {
-            const body = (section.rows || []).map(r => {
-                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-center">${r.status}</td><td class="text-right">${fmtMoney(r.spend)}</td></tr>`;
-            }).join('');
-            const total = section.total || {};
-            return `
-                <tr style="background:#e0e7ff;font-weight:700"><td colspan="3">${escapeHtml(section.label)}</td></tr>
-                ${body}
-                <tr class="dsu-total-row"><td>${total.course || 'Total'}</td><td class="text-right">${fmtMoney(total.budget)}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${fmtMoney(total.remaining)}</td></tr>
-            `;
-        };
+        // Department rowspan for merged Department column
+        const deptRuns = [];
+        for (let i = 0; i < rows.length; i++) {
+            if (i === 0 || rows[i].department !== rows[i - 1].department) {
+                deptRuns.push({ start: i, count: 1, dept: rows[i].department });
+            } else {
+                deptRuns[deptRuns.length - 1].count++;
+            }
+        }
+        const deptRowSpan = {};
+        deptRuns.forEach(run => { deptRowSpan[run.start] = run.count; });
+
+        // For DSCASC - UG, merge Budget / Spend / Remaining cells at department level
+        const budgetMergeRowSpan = {};
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].department === 'DSCASC - UG') {
+                if (i === 0 || rows[i - 1].department !== 'DSCASC - UG') {
+                    let count = 1;
+                    while (i + count < rows.length && rows[i + count].department === 'DSCASC - UG') count++;
+                    budgetMergeRowSpan[i] = count;
+                }
+            }
+        }
+
+        const body = rows.map((r, i) => {
+            const statusColor = r.status === 'Live' ? 'color:#059669;font-weight:600' : 'color:#6b7280;font-weight:600';
+            const deptCell = deptRowSpan[i]
+                ? `<td style="font-weight:700;vertical-align:top;text-align:center;padding:0.35rem 0.5rem" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
+                : '';
+
+            let budgetCell, spendCell, remainingCell;
+            if (r.department === 'DSCASC - UG') {
+                if (budgetMergeRowSpan[i]) {
+                    budgetCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:top" rowspan="${budgetMergeRowSpan[i]}">${fmtMoney(r.dept_budget)}</td>`;
+                    spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:top" rowspan="${budgetMergeRowSpan[i]}">${fmtMoney(r.dept_spend)}</td>`;
+                    remainingCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:top" rowspan="${budgetMergeRowSpan[i]}">${fmtMoney(r.dept_remaining)}</td>`;
+                } else {
+                    budgetCell = '';
+                    spendCell = '';
+                    remainingCell = '';
+                }
+            } else {
+                budgetCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(r.budget)}</td>`;
+                spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(r.spend)}</td>`;
+                remainingCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(r.remaining)}</td>`;
+            }
+
+            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-center" style="padding:0.35rem 0.5rem;${statusColor}">${escapeHtml(r.status)}</td>${budgetCell}${spendCell}${remainingCell}</tr>`;
+        }).join('');
 
         $('reportContent').innerHTML = `
             ${dsiTabBar()}
-            <div class="card">
-                <div class="card-header" style="flex-wrap:wrap">
-                    <div class="card-title">Table 5: Budget MIS by Department</div>
+            <div class="card" style="padding:0.75rem">
+                <div class="card-header" style="flex-wrap:wrap;margin-bottom:0.5rem">
+                    <div class="card-title" style="font-size:0.9rem">Table 5: Budget MIS by Department</div>
                     <div style="display:flex;gap:0.5rem">
                         <button class="btn btn-success" onclick="dsiAddBudgetEntry()">+ Add Budget Entry</button>
                     </div>
                 </div>
-                <table class="dsu-table">
-                    <thead><tr><th>Course</th><th class="text-center">Campaign Status</th><th class="text-right">Media Budget Received</th><th class="text-right">Spend</th><th class="text-right">Remaining Budget</th></tr></thead>
+                <div class="dsi-table4-wrap">
+                <table class="dsu-table" style="font-size:0.78rem">
+                    <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-center" style="padding:0.35rem 0.5rem">Status</th><th class="text-right" style="padding:0.35rem 0.5rem">Media Budget Received</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Remaining Budget</th></tr></thead>
                     <tbody>
-                        ${sections.map(renderSection).join('')}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td>${gt.course}</td><td></td><td class="text-right">${fmtMoney(gt.budget)}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${fmtMoney(gt.remaining)}</td></tr>
+                        ${body}
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td colspan="2" style="padding:0.35rem 0.5rem">${gt.course}</td><td style="padding:0.35rem 0.5rem"></td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.budget)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.remaining)}</td></tr>
                     </tbody>
                 </table>
+                </div>
                 <div id="dsiBudgetForm" class="hidden" style="margin-top:1rem;padding:1rem;background:var(--bg-sidebar);border-radius:8px;">
                     <div class="form-row">
                         <div class="form-group"><label>Date</label><input type="date" id="dsiBudgetDate" class="date-input"></div>

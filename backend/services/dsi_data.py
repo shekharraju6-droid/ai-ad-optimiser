@@ -908,38 +908,18 @@ def fetch_dsi_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
 # Table 5: Budget MIS by Department
 # ============================================================================
 
-DSI_T5_SECTIONS = [
-    {"label": "DSCE", "courses": [{"key": "DSCE", "display": "DSCE"}]},
-    {"label": "DSIT", "courses": [{"key": "DSIT", "display": "DSIT"}]},
-    {"label": "DSCA", "courses": [
-        {"key": "Arch", "display": "Arch"},
-        {"key": "Bachelor of Architecture Campus 1", "display": "B. Arch"},
-        {"key": "M.Arch", "display": "M.Arch"},
-    ]},
-    {"label": "DSCASC - UG", "courses": [
-        {"key": "B.Com", "display": "B.Com"},
-        {"key": "B.Com Evening Programs", "display": "B.Com Evening"},
-        {"key": "B.Sc (PCM)", "display": "B.Sc (PCM)"},
-        {"key": "BBA", "display": "BBA"},
-        {"key": "BCA", "display": "BCA"},
-        {"key": "BCA Evening Programs", "display": "BCA Evening"},
-    ]},
-    {"label": "DSCASC - Masters", "courses": [
-        {"key": "MBA", "display": "MBA"},
-        {"key": "MCA", "display": "MCA"},
-        {"key": "M.Com", "display": "M.Com"},
-    ]},
-]
-
-
 def fetch_dsi_budget_mis(start_date: str, end_date: str, db_session=None) -> Dict[str, Any]:
     """Fetch DSI Budget MIS (Table 5).
-    Uses cumulative spend (legacy + live API) + dsi_budget_entries for budgets."""
-    # Use cumulative spend for consistency with Table 2 and Table 4
+    Mirrors Table 1/2/4 course/department layout.  Spend is taken from the
+    cumulative Table 2 data and rolled up to the same course labels.
+    Budgets are stored per department in DsiBudgetEntry; for DSCASC - UG the
+    budget/spend/remaining cells are merged at department level.
+    """
+    # Use cumulative spend for consistency with Table 2
     cumulative_rows = fetch_dsi_cumulative_range(start_date, end_date)
     spend_data = {r["course"]: r["spend"] for r in cumulative_rows}
 
-    # Fetch budgets from DB
+    # Fetch budgets from DB (stored per department/section)
     section_budgets = defaultdict(float)
     if db_session:
         from backend.db.models import DsiBudgetEntry
@@ -948,49 +928,52 @@ def fetch_dsi_budget_mis(start_date: str, end_date: str, db_session=None) -> Dic
             if entry.section:
                 section_budgets[entry.section] += entry.amount
 
-    sections = []
+    all_courses = set(spend_data.keys())
+    rows = []
     grand_budget = 0.0
     grand_spend = 0.0
+    dept_budget_map = {}
+    dept_spend_map = {}
 
-    for section in DSI_T5_SECTIONS:
-        section_rows = []
-        sec_spend = 0
-
-        for c in section["courses"]:
-            spend = round(spend_data.get(c["key"], 0))
-            status = "Live" if spend > 0 else "Paused"
-            section_rows.append({
-                "course": c["display"],
-                "status": status,
-                "spend": spend,
-            })
-            sec_spend += spend
-
-        sec_budget = section_budgets.get(section["label"], 0.0)
-        sec_remaining = sec_budget - sec_spend
-
-        sections.append({
-            "label": section["label"],
-            "rows": section_rows,
-            "total": {
-                "course": "Total",
-                "budget": round(sec_budget),
-                "spend": sec_spend,
-                "remaining": round(sec_remaining),
-            },
+    for course in all_courses:
+        spend = round(spend_data.get(course, 0))
+        dept = _get_dsi_dept(course)
+        status = "Live" if spend > 0 else "Paused"
+        rows.append({
+            "department": dept,
+            "course": course,
+            "status": status,
+            "spend": spend,
         })
+        dept_spend_map[dept] = dept_spend_map.get(dept, 0) + spend
 
-        grand_budget += sec_budget
-        grand_spend += sec_spend
+    rows.sort(key=lambda r: _dept_sort_key(r["course"]))
+
+    # Department budget / remaining (DSCASC - UG is merged)
+    for row in rows:
+        dept = row["department"]
+        if dept not in dept_budget_map:
+            dept_budget_map[dept] = section_budgets.get(dept, 0.0)
+        budget = dept_budget_map[dept]
+        spend = dept_spend_map.get(dept, 0)
+        row["budget"] = round(budget)
+        row["remaining"] = round(budget - spend)
+        row["dept_budget"] = row["budget"]
+        row["dept_spend"] = spend
+        row["dept_remaining"] = row["remaining"]
+
+    for dept, budget in dept_budget_map.items():
+        grand_budget += budget
+    grand_spend = sum(dept_spend_map.values())
 
     grand_total = {
-        "course": "GRAND TOTAL",
+        "course": "TOTAL",
         "budget": round(grand_budget),
         "spend": grand_spend,
         "remaining": round(grand_budget - grand_spend),
     }
 
     return {
-        "sections": sections,
+        "rows": rows,
         "grand_total": grand_total,
     }
