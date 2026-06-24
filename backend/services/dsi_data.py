@@ -854,6 +854,8 @@ def fetch_dsi_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
 
     all_courses = set(submitted_counts.keys()) | set(spend_data.keys())
     rows = []
+    dept_submitted = defaultdict(int)
+    dept_spend = defaultdict(float)
     grand_submitted = 0
     grand_spend = 0
     grand_target = 0
@@ -861,14 +863,16 @@ def fetch_dsi_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
     for course in all_courses:
         submitted = submitted_counts.get(course, 0)
         spend = round(spend_data.get(course, 0))
-        cpa = round(spend / submitted) if submitted > 0 else 0
+        dept = _get_dsi_dept(course)
+        dept_submitted[dept] += submitted
+        dept_spend[dept] += spend
         target = DSI_T4_TARGETS.get(course, 0)
         rows.append({
-            "department": _get_dsi_dept(course),
+            "department": dept,
             "course": course,
             "submitted": submitted,
             "spend": spend,
-            "cpa": cpa,
+            "cpa": round(spend / submitted) if submitted > 0 else 0,
             "target": target,
         })
         grand_submitted += submitted
@@ -876,6 +880,14 @@ def fetch_dsi_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
         grand_target += target
 
     rows.sort(key=lambda r: _dept_sort_key(r["course"]))
+
+    # Department-level CPA/Spend for DSCASC - UG merging
+    for row in rows:
+        dept = row["department"]
+        d_sub = dept_submitted.get(dept, 0)
+        d_spend = round(dept_spend.get(dept, 0))
+        row["dept_cpa"] = round(d_spend / d_sub) if d_sub > 0 else 0
+        row["dept_spend"] = d_spend
 
     grand_cpa = round(grand_spend / grand_submitted) if grand_submitted > 0 else 0
     grand_total = {

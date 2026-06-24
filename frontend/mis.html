@@ -1246,15 +1246,44 @@
         const deptRowSpan = {};
         deptRuns.forEach(run => { deptRowSpan[run.start] = run.count; });
 
+        // For DSCASC - UG, merge CPA and Spend columns at department level
+        const cpaSpendRowSpan = {};
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].department === 'DSCASC - UG') {
+                if (i === 0 || rows[i - 1].department !== 'DSCASC - UG') {
+                    let count = 1;
+                    while (i + count < rows.length && rows[i + count].department === 'DSCASC - UG') count++;
+                    cpaSpendRowSpan[i] = count;
+                }
+            }
+        }
+
         const body = rows.map((r, i) => {
-            const cpa = r.submitted > 0 ? fmtMoney(r.cpa) : '0';
             const submitted = r.submitted > 0 ? fmtNum(r.submitted) : '';
-            const spend = r.spend > 0 ? fmtMoney(r.spend) : '';
             const target = r.target > 0 ? fmtNum(r.target) : '';
             const deptCell = deptRowSpan[i]
                 ? `<td style="font-weight:700;vertical-align:top;text-align:center;padding:0.35rem 0.5rem" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
                 : '';
-            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${submitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${cpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${spend}</td><td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
+
+            let cpaCell, spendCell;
+            if (r.department === 'DSCASC - UG') {
+                if (cpaSpendRowSpan[i]) {
+                    const deptCpa = r.dept_cpa > 0 ? fmtMoney(r.dept_cpa) : '0';
+                    const deptSpend = r.dept_spend > 0 ? fmtMoney(r.dept_spend) : '';
+                    cpaCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:top" rowspan="${cpaSpendRowSpan[i]}">${deptCpa}</td>`;
+                    spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:top" rowspan="${cpaSpendRowSpan[i]}">${deptSpend}</td>`;
+                } else {
+                    cpaCell = '';
+                    spendCell = '';
+                }
+            } else {
+                const cpa = r.submitted > 0 ? fmtMoney(r.cpa) : '0';
+                const spend = r.spend > 0 ? fmtMoney(r.spend) : '';
+                cpaCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${cpa}</td>`;
+                spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${spend}</td>`;
+            }
+
+            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${submitted}</td>${cpaCell}${spendCell}<td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
         }).join('');
 
         const gtCpa = gt.submitted > 0 ? fmtMoney(gt.cpa) : '0';
