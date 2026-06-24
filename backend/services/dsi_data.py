@@ -686,7 +686,26 @@ def fetch_dsi_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]
             })
 
     rows.sort(key=lambda r: _dept_sort_key(r["course"]))
+    _annotate_dept_cpl_spend(rows)
     return rows
+
+
+def _annotate_dept_cpl_spend(rows: List[Dict[str, Any]]) -> None:
+    """Add dept_leads, dept_spend, dept_cpl to each row so the frontend can
+    merge CPL/Spend cells for departments that span multiple courses
+    (e.g. DSCASC - UG where some courses have 0 spend)."""
+    dept_leads = defaultdict(int)
+    dept_spend = defaultdict(float)
+    for r in rows:
+        dept_leads[r["department"]] += r.get("leads", 0)
+        dept_spend[r["department"]] += r.get("spend", 0)
+    for r in rows:
+        d = r["department"]
+        d_leads = dept_leads.get(d, 0)
+        d_spend = dept_spend.get(d, 0)
+        r["dept_leads"] = d_leads
+        r["dept_spend"] = round(d_spend)
+        r["dept_cpl"] = round(d_spend / d_leads) if d_leads else None
 
 
 def fetch_dsi_cumulative_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
@@ -743,6 +762,7 @@ def fetch_dsi_cumulative_range(start_date: str, end_date: str) -> List[Dict[str,
         })
 
     rows.sort(key=lambda r: _dept_sort_key(r["course"]))
+    _annotate_dept_cpl_spend(rows)
     return rows
 
 

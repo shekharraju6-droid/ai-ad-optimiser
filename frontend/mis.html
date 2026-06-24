@@ -1139,13 +1139,40 @@
             const deptRowSpan = {};
             deptRuns.forEach(run => { deptRowSpan[run.start] = run.count; });
 
+            // For DSCASC - UG, merge CPL and Spend cells at department level
+            const cplSpendRowSpan = {};
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i].department === 'DSCASC - UG') {
+                    if (i === 0 || rows[i - 1].department !== 'DSCASC - UG') {
+                        let count = 1;
+                        while (i + count < rows.length && rows[i + count].department === 'DSCASC - UG') count++;
+                        cplSpendRowSpan[i] = count;
+                    }
+                }
+            }
+
             const body = rows.map((r, i) => {
-                const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
-                const spend = fmtMoney(r.spend);
                 const deptCell = deptRowSpan[i]
                     ? `<td style="font-weight:700;vertical-align:top;text-align:center" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
                     : '';
-                return `<tr>${deptCell}<td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td><td class="text-right">${cpl}</td><td class="text-right">${spend}</td></tr>`;
+
+                let cplCell, spendCell;
+                if (r.department === 'DSCASC - UG') {
+                    if (cplSpendRowSpan[i]) {
+                        const deptCpl = r.dept_leads ? fmtMoney(r.dept_cpl) : 'No Leads';
+                        cplCell = `<td class="text-right" style="vertical-align:top" rowspan="${cplSpendRowSpan[i]}">${deptCpl}</td>`;
+                        spendCell = `<td class="text-right" style="vertical-align:top" rowspan="${cplSpendRowSpan[i]}">${fmtMoney(r.dept_spend)}</td>`;
+                    } else {
+                        cplCell = '';
+                        spendCell = '';
+                    }
+                } else {
+                    const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
+                    cplCell = `<td class="text-right">${cpl}</td>`;
+                    spendCell = `<td class="text-right">${fmtMoney(r.spend)}</td>`;
+                }
+
+                return `<tr>${deptCell}<td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td>${cplCell}${spendCell}</tr>`;
             }).join('');
             const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
             return `
