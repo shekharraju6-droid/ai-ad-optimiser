@@ -606,12 +606,12 @@
         const t1Header = `
             <tr><th colspan="4" class="dsu-banner">${data.gst_note || 'MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026'}</th></tr>
             <tr><th colspan="4" class="dsu-mode-row">${dsuT1DateSelector()}</th></tr>
-            <tr><th colspan="4" class="dsu-mis-row">MIS</th></tr>
+            <tr><th colspan="4" class="dsu-mis-row">${t1RangeLabel(dsuT1Range) || 'MIS'}</th></tr>
         `;
         const t2Header = `
             <tr><th colspan="4" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
             <tr><th colspan="4" class="dsu-mode-row">${dsuT2DateSelector()}</th></tr>
-            <tr><th colspan="4" class="dsu-mis-row">MIS</th></tr>
+            <tr><th colspan="4" class="dsu-mis-row">${dsuT2Range.preset === 'custom' ? `${formatHeaderDate(dsuT2Range.start)} - ${formatHeaderDate(dsuT2Range.end)}` : (dsuT2Range.preset === 'inception' ? `28th November 2025 - ${formatHeaderDate(dsuT2Range.end)}` : formatHeaderDate(dsuT2Range.end))}</th></tr>
         `;
 
         $('reportContent').innerHTML = `
