@@ -386,6 +386,13 @@
         else if ([3,23].includes(day)) suffix = 'rd';
         return `${day}${suffix} ${months[d.getMonth()]} ${d.getFullYear()}`;
     };
+    const fmtDDMMMYYYY = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr + 'T00:00:00');
+        if (isNaN(d.getTime())) return '';
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${String(d.getDate()).padStart(2,'0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+    };
     const t1RangeLabel = (rangeObj) => {
         if (rangeObj.preset === 'today') return `Today: ${formatHeaderDate(rangeObj.start)}`;
         if (rangeObj.preset === 'yesterday') return formatHeaderDate(rangeObj.start);
@@ -606,7 +613,7 @@
         const t1Header = `
             <tr><th colspan="4" class="dsu-banner">${data.gst_note || 'MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026'}</th></tr>
             <tr><th colspan="4" class="dsu-mode-row">${dsuT1DateSelector()}</th></tr>
-            <tr><th colspan="4" class="dsu-mis-row">${t1RangeLabel(dsuT1Range) || 'MIS'}</th></tr>
+            <tr><th colspan="4" class="dsu-mis-row">${fmtDDMMMYYYY(dsuT1Range.end)}</th></tr>
         `;
         const t2Header = `
             <tr><th colspan="4" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
