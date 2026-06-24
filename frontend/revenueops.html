@@ -6,76 +6,164 @@
     <title>ChlearSakhaaOps AI - RevenueOps</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root{--bg-base:#f3f4f6;--bg-surface:#fff;--bg-sidebar:#f9fafb;--border:#e5e7eb;--primary:#059669;--primary-light:#d1fae5;--primary-dark:#047857;--secondary:#0891b2;--success:#059669;--warning:#d97706;--danger:#dc2626;--info:#3b82f6;--text-main:#1f2937;--text-muted:#4b5563;--text-light:#6b7280}
+        :root{
+            --bg-base:#f5f6fb;
+            --bg-surface:#fff;
+            --bg-sidebar:#ffffff;
+            --border:#e6e8f0;
+            --primary:#4f46e5;
+            --primary-light:#eef2ff;
+            --primary-dark:#3730a3;
+            --secondary:#7c3aed;
+            --accent:#06b6d4;
+            --success:#10b981;
+            --warning:#f59e0b;
+            --danger:#ef4444;
+            --info:#3b82f6;
+            --text-main:#1e1b2e;
+            --text-muted:#5a5670;
+            --text-light:#8b889f;
+            --grad-1:linear-gradient(135deg,#4f46e5,#7c3aed);
+            --grad-2:linear-gradient(135deg,#06b6d4,#3b82f6);
+            --grad-3:linear-gradient(135deg,#10b981,#06b6d4);
+            --grad-4:linear-gradient(135deg,#f59e0b,#ef4444);
+            --grad-5:linear-gradient(135deg,#ec4899,#8b5cf6);
+            --grad-6:linear-gradient(135deg,#6366f1,#a855f7);
+            --grad-7:linear-gradient(135deg,#0ea5e9,#22d3ee);
+            --shadow-sm:0 1px 2px rgba(30,27,46,.06);
+            --shadow-md:0 4px 12px rgba(30,27,46,.08);
+            --shadow-lg:0 12px 32px rgba(79,70,229,.18);
+        }
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Inter',sans-serif;background:var(--bg-base);color:var(--text-main);height:100vh;overflow:hidden;display:flex}
-        h1,h2,h3,h4,.font-outfit{font-family:'Outfit',sans-serif}
-        ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:rgba(0,0,0,.03)}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px}
-        .sidebar{width:250px;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
-        .sidebar-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem}
-        .brand{display:flex;align-items:center;gap:.5rem;font-size:1.1rem;font-weight:800;text-decoration:none;color:var(--text-main)}
-        .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#059669,#34d399);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem}
-        .nav{flex-grow:1;padding:.75rem 0;overflow-y:auto}
-        .nav-item{display:flex;align-items:center;gap:.55rem;padding:.6rem 1.25rem;cursor:pointer;font-size:.84rem;font-weight:500;color:var(--text-muted);transition:.15s;border-left:3px solid transparent;text-decoration:none}
-        .nav-item:hover{background:rgba(0,0,0,.03);color:var(--text-main)}
-        .nav-item.active{background:#fff;color:var(--primary);border-left-color:var(--primary);font-weight:600}
-        .nav-section{font-size:.65rem;text-transform:uppercase;font-weight:700;color:var(--text-light);letter-spacing:.08em;padding:.5rem 1.25rem .25rem}
-        .nav-back{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;font-size:.78rem;color:var(--text-light);text-decoration:none;cursor:pointer;border-top:1px solid var(--border);margin-top:auto}
+        body{font-family:'Inter',sans-serif;background:var(--bg-base);color:var(--text-main);height:100vh;overflow:hidden;display:flex;-webkit-font-smoothing:antialiased}
+        h1,h2,h3,h4,.font-head{font-family:'Plus Jakarta Sans',sans-serif}
+        ::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(79,70,229,.18);border-radius:8px}::-webkit-scrollbar-thumb:hover{background:rgba(79,70,229,.32)}
+
+        /* SIDEBAR */
+        .sidebar{width:264px;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;box-shadow:var(--shadow-sm)}
+        .sidebar-header{padding:1.1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.65rem}
+        .brand{display:flex;align-items:center;gap:.6rem;font-family:'Plus Jakarta Sans',sans-serif;font-size:1.15rem;font-weight:800;text-decoration:none;color:var(--text-main);letter-spacing:-.01em}
+        .logo-icon{width:34px;height:34px;background:var(--grad-1);border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.88rem;box-shadow:0 4px 10px rgba(79,70,229,.35)}
+        .nav{flex-grow:1;padding:.6rem 0;overflow-y:auto;overflow-x:hidden}
+        .nav-item{display:flex;align-items:center;gap:.6rem;padding:.6rem 1.25rem;cursor:pointer;font-size:.85rem;font-weight:500;color:var(--text-muted);transition:.18s;border-left:3px solid transparent;text-decoration:none}
+        .nav-item:hover{background:var(--primary-light);color:var(--primary)}
+        .nav-item.active{background:var(--primary-light);color:var(--primary);border-left-color:var(--primary);font-weight:600}
+        .nav-back{display:flex;align-items:center;gap:.4rem;padding:.55rem 1.25rem;font-size:.8rem;color:var(--text-light);text-decoration:none;cursor:pointer;border-top:1px solid var(--border);margin-top:auto}
         .nav-back:hover{color:var(--primary)}
+
+        /* ACCORDION */
+        .nav-section{margin-top:.25rem}
+        .nav-section-header{display:flex;align-items:center;gap:.45rem;padding:.55rem 1.25rem;cursor:pointer;font-size:.68rem;text-transform:uppercase;font-weight:700;color:var(--text-light);letter-spacing:.1em;user-select:none;transition:.15s}
+        .nav-section-header:hover{color:var(--primary)}
+        .nav-section-arrow{display:inline-block;width:12px;height:12px;font-size:.7rem;color:var(--text-light);transition:transform .2s ease;line-height:1}
+        .nav-section.open .nav-section-arrow{transform:rotate(90deg)}
+        .nav-section.open .nav-section-header{color:var(--primary)}
+        .nav-section-items{max-height:0;overflow:hidden;transition:max-height .25s ease}
+        .nav-section.open .nav-section-items{max-height:600px}
+        .nav-section-items .nav-item{padding-left:2.4rem;font-size:.83rem}
+
+        /* MAIN */
         .main{flex-grow:1;display:flex;flex-direction:column;min-width:0}
-        .topbar{height:56px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem}
-        .topbar h1{font-size:1.05rem;font-weight:700}
+        .topbar{height:60px;background:var(--bg-surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.75rem;box-shadow:var(--shadow-sm)}
+        .topbar h1{font-size:1.15rem;font-weight:800;letter-spacing:-.01em;background:var(--grad-1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
         .topbar-right{display:flex;align-items:center;gap:.75rem}
-        .user-badge{font-size:.78rem;color:var(--text-muted);padding:.3rem .6rem;background:var(--bg-base);border-radius:4px}
-        .btn{padding:.45rem .85rem;border-radius:6px;font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center;gap:.3rem;transition:.15s;text-decoration:none}
-        .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{filter:brightness(1.1)}
-        .btn-secondary{background:#fff;border-color:var(--border);color:var(--text-muted)}.btn-secondary:hover{background:var(--bg-base);color:var(--text-main)}
-        .btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{filter:brightness(1.1)}
-        .btn-sm{padding:.3rem .55rem;font-size:.78rem}
-        .content{flex-grow:1;overflow-y:auto;padding:1.5rem}
-        .panel{display:none}.panel.active{display:block}
-        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
-        .kpi-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.25rem}
-        .kpi-label{font-size:.7rem;text-transform:uppercase;font-weight:700;color:var(--text-light);letter-spacing:.04em}
-        .kpi-value{font-size:1.5rem;font-weight:800;font-family:'Outfit',sans-serif;margin-top:.2rem}
-        .kpi-sub{font-size:.72rem;color:var(--text-light);margin-top:.15rem}
-        .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem}
+        .user-badge{font-size:.78rem;color:var(--text-muted);padding:.32rem .7rem;background:var(--primary-light);border-radius:20px;font-weight:500}
+
+        /* BUTTONS */
+        .btn{padding:.48rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center;gap:.35rem;transition:.18s;text-decoration:none;font-family:'Inter',sans-serif}
+        .btn-primary{background:var(--grad-1);color:#fff;box-shadow:0 3px 10px rgba(79,70,229,.25)}
+        .btn-primary:hover{filter:brightness(1.08);box-shadow:0 5px 16px rgba(79,70,229,.35)}
+        .btn-secondary{background:#fff;border-color:var(--border);color:var(--text-muted)}
+        .btn-secondary:hover{background:var(--primary-light);color:var(--primary);border-color:var(--primary)}
+        .btn-danger{background:var(--danger);color:#fff;box-shadow:0 3px 10px rgba(239,68,68,.22)}
+        .btn-danger:hover{filter:brightness(1.08)}
+        .btn-sm{padding:.34rem .6rem;font-size:.78rem}
+
+        /* CONTENT */
+        .content{flex-grow:1;overflow-y:auto;padding:1.5rem 1.75rem}
+        .panel{display:none;animation:fadeIn .25s ease}.panel.active{display:block}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+        /* KPI CARDS — gradient tiles */
+        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem;margin-bottom:1.5rem}
+        .kpi-card{border-radius:14px;padding:1.15rem 1.25rem;color:#fff;position:relative;overflow:hidden;box-shadow:var(--shadow-md)}
+        .kpi-card.g1{background:var(--grad-1)}
+        .kpi-card.g2{background:var(--grad-3)}
+        .kpi-card.g3{background:var(--grad-4)}
+        .kpi-card.g4{background:var(--grad-5)}
+        .kpi-card.g5{background:var(--grad-2)}
+        .kpi-card.g6{background:var(--grad-6)}
+        .kpi-card.g7{background:var(--grad-7)}
+        .kpi-card::before{content:'';position:absolute;right:-18px;top:-18px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.14)}
+        .kpi-card::after{content:'';position:absolute;right:8px;bottom:-22px;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.08)}
+        .kpi-icon{font-size:1.05rem;opacity:.85;margin-bottom:.35rem;display:block}
+        .kpi-label{font-size:.68rem;text-transform:uppercase;font-weight:700;letter-spacing:.06em;opacity:.92}
+        .kpi-value{font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;margin-top:.18rem;line-height:1.15}
+        .kpi-sub{font-size:.72rem;opacity:.85;margin-top:.15rem}
+        .stat-bar{height:6px;background:rgba(255,255,255,.25);border-radius:4px;overflow:hidden;margin-top:.4rem}
+        .stat-bar-fill{height:100%;border-radius:4px;background:#fff;transition:width .4s}
+
+        /* CARDS */
+        .card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:1.35rem;margin-bottom:1.25rem;box-shadow:var(--shadow-sm)}
         .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem}
-        .card-title{font-size:1rem;font-weight:700}
+        .card-title{font-size:1.02rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif}
+
+        /* FILTERS */
         .filters{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-        .filter-input{padding:.4rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;font-family:'Inter',sans-serif}
-        .filter-select{padding:.4rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;font-family:'Inter',sans-serif;background:#fff}
-        table{width:100%;border-collapse:collapse;font-size:.82rem}
-        thead{background:var(--bg-base)}
-        th{padding:.65rem .75rem;text-align:left;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-base);z-index:1}
-        td{padding:.6rem .75rem;border-bottom:1px solid var(--border);vertical-align:middle}
-        tr:hover{background:rgba(5,150,105,.03)}
-        .badge{display:inline-block;padding:.2rem .55rem;border-radius:20px;font-size:.7rem;font-weight:600;white-space:nowrap}
-        .badge-green{background:#d1fae5;color:#065f46}.badge-yellow{background:#fef3c7;color:#92400e}.badge-orange{background:#ffedd5;color:#9a3412}
-        .badge-red{background:#fee2e2;color:#991b1b}.badge-dark-red{background:#7f1d1d;color:#fff}.badge-blue{background:#dbeafe;color:#1e40af}
-        .badge-gray{background:#f3f4f6;color:#4b5563}.badge-purple{background:#ede9fe;color:#6d28d9}
-        .table-wrap{overflow-x:auto;max-height:calc(100vh - 280px)}
-        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100}
-        .modal{background:#fff;border-radius:12px;padding:1.5rem;width:560px;max-width:92vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 40px rgba(0,0,0,.2)}
-        .modal h2{font-size:1.1rem;margin-bottom:1rem}
-        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem}
+        .filter-input,.filter-select{padding:.45rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.8rem;font-family:'Inter',sans-serif;background:#fff;transition:.15s;color:var(--text-main)}
+        .filter-input:focus,.filter-select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+
+        /* TABLES */
+        .table-wrap{overflow-x:auto;max-height:calc(100vh - 280px);border-radius:10px}
+        table{width:100%;border-collapse:collapse;font-size:.83rem}
+        thead{background:linear-gradient(180deg,#faf9ff,#f5f6fb)}
+        th{padding:.7rem .8rem;text-align:left;font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1}
+        td{padding:.62rem .8rem;border-bottom:1px solid var(--border);vertical-align:middle}
+        tbody tr{transition:.12s}
+        tbody tr:hover{background:var(--primary-light)}
+
+        /* BADGES */
+        .badge{display:inline-block;padding:.22rem .58rem;border-radius:20px;font-size:.7rem;font-weight:600;white-space:nowrap}
+        .badge-green{background:#d1fae5;color:#065f46}
+        .badge-yellow{background:#fef3c7;color:#92400e}
+        .badge-orange{background:#ffedd5;color:#9a3412}
+        .badge-red{background:#fee2e2;color:#991b1b}
+        .badge-dark-red{background:#7f1d1d;color:#fff}
+        .badge-blue{background:#dbeafe;color:#1e40af}
+        .badge-gray{background:#f1f2f7;color:#5a5670}
+        .badge-purple{background:#ede9fe;color:#6d28d9}
+        .badge-indigo{background:#e0e7ff;color:#3730a3}
+        .badge-cyan{background:#cffafe;color:#155e75}
+
+        /* MODAL */
+        .modal-overlay{position:fixed;inset:0;background:rgba(30,27,46,.5);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:100}
+        .modal{background:#fff;border-radius:16px;padding:1.6rem;width:580px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 48px rgba(30,27,46,.28)}
+        .modal h2{font-size:1.18rem;margin-bottom:1.1rem;font-family:'Plus Jakarta Sans',sans-serif}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.8rem}
         .form-row.full{grid-template-columns:1fr}
-        .form-group{margin-bottom:.75rem}
-        .form-group label{display:block;font-size:.75rem;font-weight:600;color:var(--text-muted);margin-bottom:.2rem}
-        .form-group input,.form-group select,.form-group textarea{width:100%;padding:.5rem .7rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem;font-family:'Inter',sans-serif}
-        .form-group textarea{min-height:60px;resize:vertical}
-        .toast{position:fixed;top:1rem;right:1rem;padding:.75rem 1.25rem;border-radius:8px;font-size:.85rem;font-weight:500;z-index:200;animation:slideIn .3s ease}
-        .toast-success{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
-        .toast-error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
-        @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        .form-group{margin-bottom:.8rem}
+        .form-group label{display:block;font-size:.76rem;font-weight:600;color:var(--text-muted);margin-bottom:.22rem}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:.52rem .75rem;border:1px solid var(--border);border-radius:8px;font-size:.86rem;font-family:'Inter',sans-serif;transition:.15s;background:#fff;color:var(--text-main)}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+        .form-group textarea{min-height:62px;resize:vertical}
+
+        /* TOAST */
+        .toast{position:fixed;top:1rem;right:1rem;padding:.8rem 1.3rem;border-radius:10px;font-size:.85rem;font-weight:500;z-index:200;animation:slideIn .3s ease;box-shadow:var(--shadow-md)}
+        .toast-success{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
+        .toast-error{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff}
+        @keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+        /* MISC */
         .empty-state{text-align:center;padding:3rem 1rem;color:var(--text-light)}
-        .empty-state h3{font-size:1.1rem;margin-bottom:.5rem;color:var(--text-muted)}
+        .empty-state h3{font-size:1.1rem;margin-bottom:.5rem;color:var(--text-muted);font-family:'Plus Jakarta Sans',sans-serif}
         .empty-state p{font-size:.85rem}
-        .stat-bar{height:8px;background:var(--bg-base);border-radius:4px;overflow:hidden;margin-top:.35rem}
-        .stat-bar-fill{height:100%;border-radius:4px;transition:width .3s}
         .actions-cell{display:flex;gap:.3rem}
+        .report-card{border:1px solid var(--border);border-radius:12px;padding:1.1rem;cursor:pointer;transition:.18s;background:#fff}
+        .report-card:hover{border-color:var(--primary);box-shadow:var(--shadow-md);transform:translateY(-2px)}
+        .report-card h4{font-family:'Plus Jakarta Sans',sans-serif;font-size:.95rem;margin-bottom:.3rem;color:var(--text-main)}
+        .report-card p{font-size:.78rem;color:var(--text-light)}
     </style>
 </head>
 <body>
@@ -84,28 +172,76 @@
             <a href="/" class="brand"><div class="logo-icon">CS</div>RevenueOps</a>
         </div>
         <div class="nav">
-            <a class="nav-item" href="/" style="text-decoration:none;border-left:3px solid transparent;">🏠 ChlearSakhaaOps Home</a>
-            <div style="border-bottom:1px solid var(--border);margin:0.5rem 0;"></div>
-            <div class="nav-section">Overview</div>
-            <div class="nav-item active" onclick="showPanel('dashboard')">Dashboard</div>
-            <div class="nav-section">Management</div>
-            <div class="nav-item" onclick="showPanel('clients')">Clients</div>
-            <div class="nav-item" onclick="showPanel('invoices')">Invoices</div>
-            <div class="nav-item" onclick="showPanel('payments')">Payments</div>
-            <div class="nav-item" onclick="showPanel('outstanding')">Outstanding</div>
-            <div class="nav-section">Follow-up</div>
-            <div class="nav-item" onclick="showPanel('reminders')">Reminders</div>
-            <div class="nav-section">Records</div>
-            <div class="nav-item" onclick="showPanel('documents')">Documents</div>
-            <div class="nav-section">Analysis</div>
-            <div class="nav-item" onclick="showPanel('reports')">Reports</div>
-            <div class="nav-item" onclick="showPanel('bms')">BMs</div>
-            <div class="nav-item" onclick="showPanel('bm-view')">BM View</div>
-            <div class="nav-section">System</div>
-            <div class="nav-item" onclick="showPanel('settings')">Settings</div>
-            <div class="nav-item" onclick="showPanel('users')">Users</div>
-        </div>
+            <a class="nav-item" href="/">🏠 ChlearSakhaaOps Home</a>
+            <div style="border-bottom:1px solid var(--border);margin:.5rem 0;"></div>
 
+            <!-- OVERVIEW (open by default) -->
+            <div class="nav-section open" data-section="overview">
+                <div class="nav-section-header" onclick="toggleSection(this)">
+                    <span class="nav-section-arrow">▶</span><span>Overview</span>
+                </div>
+                <div class="nav-section-items">
+                    <div class="nav-item active" onclick="showPanel('dashboard')">📊 Dashboard</div>
+                </div>
+            </div>
+
+            <!-- MANAGEMENT -->
+            <div class="nav-section" data-section="management">
+                <div class="nav-section-header" onclick="toggleSection(this)">
+                    <span class="nav-section-arrow">▶</span><span>Management</span>
+                </div>
+                <div class="nav-section-items">
+                    <div class="nav-item" onclick="showPanel('clients')">👥 Clients</div>
+                    <div class="nav-item" onclick="showPanel('invoices')">🧾 Invoices</div>
+                    <div class="nav-item" onclick="showPanel('payments')">💳 Payments</div>
+                    <div class="nav-item" onclick="showPanel('outstanding')">⏳ Outstanding</div>
+                </div>
+            </div>
+
+            <!-- FOLLOW-UP -->
+            <div class="nav-section" data-section="followup">
+                <div class="nav-section-header" onclick="toggleSection(this)">
+                    <span class="nav-section-arrow">▶</span><span>Follow-up</span>
+                </div>
+                <div class="nav-section-items">
+                    <div class="nav-item" onclick="showPanel('reminders')">🔔 Reminders</div>
+                </div>
+            </div>
+
+            <!-- RECORDS -->
+            <div class="nav-section" data-section="records">
+                <div class="nav-section-header" onclick="toggleSection(this)">
+                    <span class="nav-section-arrow">▶</span><span>Records</span>
+                </div>
+                <div class="nav-section-items">
+                    <div class="nav-item" onclick="showPanel('documents')">📁 Documents</div>
+                </div>
+            </div>
+
+            <!-- ANALYSIS -->
+            <div class="nav-section" data-section="analysis">
+                <div class="nav-section-header" onclick="toggleSection(this)">
+                    <span class="nav-section-arrow">▶</span><span>Analysis</span>
+                </div>
+                <div class="nav-section-items">
+                    <div class="nav-item" onclick="showPanel('reports')">📈 Reports</div>
+                    <div class="nav-item" onclick="showPanel('bms')">🧑‍💼 BMs</div>
+                    <div class="nav-item" onclick="showPanel('bm-view')">👁 BM View</div>
+                </div>
+            </div>
+
+            <!-- SYSTEM -->
+            <div class="nav-section" data-section="system">
+                <div class="nav-section-header" onclick="toggleSection(this)">
+                    <span class="nav-section-arrow">▶</span><span>System</span>
+                </div>
+                <div class="nav-section-items">
+                    <div class="nav-item" onclick="showPanel('settings')">⚙️ Settings</div>
+                    <div class="nav-item" onclick="showPanel('users')">🔐 Users</div>
+                </div>
+            </div>
+        </div>
+        <a href="/" class="nav-back">← Back to Home</a>
     </div>
 
     <div class="main">
@@ -113,7 +249,7 @@
             <h1 id="pageTitle">Dashboard</h1>
             <div class="topbar-right">
                 <span class="user-badge" id="userBadge">Loading...</span>
-                <button class="btn btn-secondary btn-sm" onclick="seedDemo()">Seed Demo Data</button>
+                <button class="btn btn-secondary btn-sm" onclick="seedDemo()">🌱 Seed Demo Data</button>
             </div>
         </div>
         <div class="content" id="content">
@@ -248,14 +384,14 @@
                 <div class="card">
                     <div class="card-header"><span class="card-title">Reports</span></div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;">
-                        <div class="card" style="cursor:pointer" onclick="runReport('monthly-billing')"><h4>Monthly Billing</h4><p style="font-size:.78rem;color:var(--text-light)">All invoices by month</p></div>
-                        <div class="card" style="cursor:pointer" onclick="runReport('outstanding')"><h4>Outstanding Report</h4><p style="font-size:.78rem;color:var(--text-light)">All outstanding receivables</p></div>
-                        <div class="card" style="cursor:pointer" onclick="runReport('bm-wise')"><h4>BM-Wise Report</h4><p style="font-size:.78rem;color:var(--text-light)">Business manager collection</p></div>
-                        <div class="card" style="cursor:pointer" onclick="runReport('invoice-not-raised')"><h4>Invoice Not Raised</h4><p style="font-size:.78rem;color:var(--text-light)">Active clients without invoices</p></div>
+                        <div class="report-card" onclick="runReport('monthly-billing')"><h4>📊 Monthly Billing</h4><p>All invoices by month</p></div>
+                        <div class="report-card" onclick="runReport('outstanding')"><h4>⏳ Outstanding Report</h4><p>All outstanding receivables</p></div>
+                        <div class="report-card" onclick="runReport('bm-wise')"><h4>🧑‍💼 BM-Wise Report</h4><p>Business manager collection</p></div>
+                        <div class="report-card" onclick="runReport('invoice-not-raised')"><h4>🧾 Invoice Not Raised</h4><p>Active clients without invoices</p></div>
                     </div>
                 </div>
                 <div class="card" id="reportResult" style="display:none">
-                    <div class="card-header"><span class="card-title" id="reportTitle">Report</span><button class="btn btn-secondary btn-sm" onclick="exportCSV()">Export CSV</button></div>
+                    <div class="card-header"><span class="card-title" id="reportTitle">Report</span><button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Export CSV</button></div>
                     <div class="table-wrap"><table id="reportTable"><thead></thead><tbody></tbody></table></div>
                 </div>
             </div>
@@ -312,9 +448,9 @@
         </div>
     </div>
     <!-- REMINDER POPUP -->
-    <div id="reminderPopup" style="display:none;position:fixed;top:1rem;right:1rem;width:360px;max-height:80vh;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 24px rgba(0,0,0,.12);z-index:150;padding:1rem;">
+    <div id="reminderPopup" style="display:none;position:fixed;top:1rem;right:1rem;width:360px;max-height:80vh;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);z-index:150;padding:1rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-            <h3 style="font-size:1rem">⏰ Payment Reminders</h3>
+            <h3 style="font-size:1rem;font-family:'Plus Jakarta Sans',sans-serif">⏰ Payment Reminders</h3>
             <button class="btn btn-secondary btn-sm" onclick="closeReminderPopup()">✕</button>
         </div>
         <div id="reminderPopupList"></div>
@@ -334,7 +470,7 @@ let invPageSize=10,invPage=1;
 function $(id){return document.getElementById(id)}
 function fmt(n){return n!=null?'INR '+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}
 function fmtDate(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}catch(e){return d}}
-function statusBadge(s){const m={paid:'badge-green',partially_paid:'badge-yellow',overdue:'badge-red',unpaid:'badge-gray',invoice_raised:'badge-blue',sent_to_client:'badge-blue',not_raised:'badge-gray',disputed:'badge-purple',cancelled:'badge-gray',credit_note_issued:'badge-orange',active:'badge-green',paused:'badge-yellow',closed:'badge-red',on_hold:'badge-orange',open:'badge-blue',snoozed:'badge-yellow',done:'badge-green',low:'badge-green',medium:'badge-yellow',high:'badge-orange',critical:'badge-red'};return `<span class="badge ${m[s]||'badge-gray'}">${s?s.replace(/_/g,' '):''}</span>`}
+function statusBadge(s){const m={paid:'badge-green',partially_paid:'badge-yellow',overdue:'badge-red',unpaid:'badge-gray',invoice_raised:'badge-blue',sent_to_client:'badge-indigo',not_raised:'badge-gray',disputed:'badge-purple',cancelled:'badge-gray',credit_note_issued:'badge-orange',active:'badge-green',paused:'badge-yellow',closed:'badge-red',on_hold:'badge-orange',open:'badge-blue',snoozed:'badge-yellow',done:'badge-green',low:'badge-green',medium:'badge-yellow',high:'badge-orange',critical:'badge-red',bank_transfer:'badge-cyan',upi:'badge-indigo',cheque:'badge-purple',cash:'badge-gray',other:'badge-gray',invoice_pdf:'badge-blue',po:'badge-indigo',sow:'badge-purple',agreement:'badge-orange',payment_proof:'badge-green',credit_note:'badge-red',client_communication:'badge-cyan',other:'badge-gray',admin:'badge-purple',finance:'badge-indigo',business_manager:'badge-cyan',none:'badge-gray'};return `<span class="badge ${m[s]||'badge-gray'}">${s?s.replace(/_/g,' '):''}</span>`}
 function overdueBadge(days){if(days>60)return'<span class="badge badge-dark-red">60+ days</span>';if(days>30)return'<span class="badge badge-red">31-60d</span>';if(days>15)return'<span class="badge badge-orange">16-30d</span>';if(days>7)return'<span class="badge badge-yellow">8-15d</span>';if(days>0)return'<span class="badge badge-yellow">1-7d</span>';if(days>=-3&&days<=0)return'<span class="badge badge-blue">Due soon</span>';return'<span class="badge badge-green">On time</span>'}
 
 async function api(method,path,body){
@@ -347,11 +483,23 @@ async function api(method,path,body){
 
 function toast(msg,type='success'){const d=document.createElement('div');d.className=`toast toast-${type}`;d.textContent=msg;$('toastContainer').appendChild(d);setTimeout(()=>d.remove(),3500)}
 
+/* ACCORDION */
+function toggleSection(headerEl){
+    const section=headerEl.parentElement;
+    section.classList.toggle('open');
+}
+
+/* PANEL SWITCH */
 function showPanel(name){
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
     const panel=$('panel-'+name);if(panel)panel.classList.add('active');
-    const navItems=document.querySelectorAll('.nav-item');navItems.forEach(n=>{if(n.textContent.trim().toLowerCase().replace(/\s+/g,'-').includes(name))n.classList.add('active')});
+    // Highlight the matching nav item
+    const map={dashboard:'📊 Dashboard',clients:'👥 Clients',invoices:'🧾 Invoices',payments:'💳 Payments',outstanding:'⏳ Outstanding',reminders:'🔔 Reminders',documents:'📁 Documents',reports:'📈 Reports',bms:'🧑\u200d💼 BMs','bm-view':'👁 BM View',settings:'⚙️ Settings',users:'🔐 Users'};
+    document.querySelectorAll('.nav-item').forEach(n=>{
+        const txt=n.textContent.trim();
+        if(txt===map[name]){n.classList.add('active');const sec=n.closest('.nav-section');if(sec&&!sec.classList.contains('open'))sec.classList.add('open')}
+    });
     const titles={dashboard:'Dashboard',clients:'Clients',invoices:'Invoices',payments:'Payments',outstanding:'Outstanding',reminders:'Reminders',documents:'Documents',reports:'Reports',bms:'Business Managers','bm-view':'BM View',settings:'Settings',users:'Users'};
     $('pageTitle').textContent=titles[name]||name;
     loadPanel(name);
@@ -386,21 +534,21 @@ async function loadDashboard(){
     try{dashData=await api('GET',url)}catch(e){return}
     const k=dashData;
     $('dashKpis').innerHTML=`
-        <div class="kpi-card"><div class="kpi-label">Total Billed</div><div class="kpi-value">${fmt(k.total_billed)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Total Collected</div><div class="kpi-value" style="color:var(--success)">${fmt(k.total_collected)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Outstanding</div><div class="kpi-value" style="color:var(--warning)">${fmt(k.total_outstanding)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Overdue</div><div class="kpi-value" style="color:var(--danger)">${fmt(k.total_overdue)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Collection %</div><div class="kpi-value">${k.collection_percentage}%</div><div class="stat-bar"><div class="stat-bar-fill" style="width:${k.collection_percentage}%;background:var(--success)"></div></div></div>
-        <div class="kpi-card"><div class="kpi-label">Monthly Billed</div><div class="kpi-value">${fmt(k.monthly_billed)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Monthly Collected</div><div class="kpi-value">${fmt(k.monthly_collected)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Active Clients</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
-        <div class="kpi-card"><div class="kpi-label">Overdue Invoices</div><div class="kpi-value" style="color:var(--danger)">${k.overdue_invoices}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Partially Paid</div><div class="kpi-value">${k.partially_paid_count}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Disputed</div><div class="kpi-value">${k.disputed_count}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Expected This Week</div><div class="kpi-value">${fmt(k.expected_collection_week)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Expected This Month</div><div class="kpi-value">${fmt(k.expected_collection_month)}</div></div>
+        <div class="kpi-card g1"><span class="kpi-icon">💰</span><div class="kpi-label">Total Billed</div><div class="kpi-value">${fmt(k.total_billed)}</div></div>
+        <div class="kpi-card g2"><span class="kpi-icon">✅</span><div class="kpi-label">Total Collected</div><div class="kpi-value">${fmt(k.total_collected)}</div></div>
+        <div class="kpi-card g3"><span class="kpi-icon">⏳</span><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmt(k.total_outstanding)}</div></div>
+        <div class="kpi-card g4"><span class="kpi-icon">🔴</span><div class="kpi-label">Overdue</div><div class="kpi-value">${fmt(k.total_overdue)}</div></div>
+        <div class="kpi-card g5"><span class="kpi-icon">🎯</span><div class="kpi-label">Collection %</div><div class="kpi-value">${k.collection_percentage}%</div><div class="stat-bar"><div class="stat-bar-fill" style="width:${k.collection_percentage}%"></div></div></div>
+        <div class="kpi-card g6"><span class="kpi-icon">📅</span><div class="kpi-label">Monthly Billed</div><div class="kpi-value">${fmt(k.monthly_billed)}</div></div>
+        <div class="kpi-card g7"><span class="kpi-icon">💵</span><div class="kpi-label">Monthly Collected</div><div class="kpi-value">${fmt(k.monthly_collected)}</div></div>
+        <div class="kpi-card g1"><span class="kpi-icon">👥</span><div class="kpi-label">Active Clients</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
+        <div class="kpi-card g4"><span class="kpi-icon">⚠️</span><div class="kpi-label">Overdue Invoices</div><div class="kpi-value">${k.overdue_invoices}</div></div>
+        <div class="kpi-card g3"><span class="kpi-icon">🔶</span><div class="kpi-label">Partially Paid</div><div class="kpi-value">${k.partially_paid_count}</div></div>
+        <div class="kpi-card g5"><span class="kpi-icon">⚡</span><div class="kpi-label">Disputed</div><div class="kpi-value">${k.disputed_count}</div></div>
+        <div class="kpi-card g2"><span class="kpi-icon">📆</span><div class="kpi-label">Expected This Week</div><div class="kpi-value">${fmt(k.expected_collection_week)}</div></div>
+        <div class="kpi-card g6"><span class="kpi-icon">🗓️</span><div class="kpi-label">Expected This Month</div><div class="kpi-value">${fmt(k.expected_collection_month)}</div></div>
     `;
-    $('dashOverdueTable').querySelector('tbody').innerHTML=(k.top_overdue_clients||[]).map(c=>`<tr><td>${c.client_name}</td><td style="color:var(--danger);font-weight:600">${fmt(c.outstanding)}</td></tr>`).join('');
+    $('dashOverdueTable').querySelector('tbody').innerHTML=(k.top_overdue_clients||[]).map(c=>`<tr><td style="font-weight:600">${c.client_name}</td><td style="color:var(--danger);font-weight:600">${fmt(c.outstanding)}</td></tr>`).join('');
     $('dashBillingTable').querySelector('tbody').innerHTML=Object.entries(k.billing_model_dist||{}).map(([t,a])=>`<tr><td>${t.replace(/_/g,' ')}</td><td style="font-weight:600">${fmt(a)}</td></tr>`).join('');
 }
 
@@ -589,7 +737,7 @@ async function checkDueReminders(){
 function showReminderPopup(list){
     const container=$('reminderPopupList');
     container.innerHTML=list.map(r=>`
-        <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.5rem">
+        <div style="border:1px solid var(--border);border-radius:10px;padding:.75rem;margin-bottom:.5rem">
             <div style="font-weight:600;font-size:.9rem">${r.client_name} — ${r.invoice_number||'Invoice'}</div>
             <div style="font-size:.78rem;color:var(--text-muted);margin:.25rem 0">${r.reminder_type.replace(/_/g,' ')} | Due: ${fmt(r.due_amount)}</div>
             <div style="font-size:.75rem;color:var(--text-light);margin-bottom:.5rem">${r.notes||''}</div>
@@ -597,8 +745,8 @@ function showReminderPopup(list){
                 <button class="btn btn-primary btn-sm" onclick="genReminderText(${r.id})" style="margin-right:auto">Copy WhatsApp</button>
                 <button class="btn btn-secondary btn-sm" onclick="markReminder(${r.id},'done')">Done</button>
                 <div style="display:flex;gap:.25rem;align-items:center">
-                    <input type="number" id="snoozeVal_${r.id}" value="2" min="1" style="width:50px;padding:.3rem;border:1px solid var(--border);border-radius:4px;font-size:.78rem">
-                    <select id="snoozeUnit_${r.id}" style="padding:.3rem;border:1px solid var(--border);border-radius:4px;font-size:.78rem">
+                    <input type="number" id="snoozeVal_${r.id}" value="2" min="1" style="width:50px;padding:.3rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem">
+                    <select id="snoozeUnit_${r.id}" style="padding:.3rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem">
                         <option value="hour">Hour(s)</option>
                         <option value="day">Day(s)</option>
                     </select>
@@ -745,10 +893,10 @@ async function loadBMView(){
     if(bmStats.length===0)html='<div class="empty-state"><h3>No Business Manager Data</h3><p>Assign rev_role as business_manager to users and assign them to clients.</p></div>';
     else bmStats.forEach(bm=>{html+=`<div class="card"><div class="card-header"><span class="card-title">${bm.bm_name}</span><span class="badge badge-blue">${bm.client_count} clients</span></div>
         <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">
-        <div class="kpi-card"><div class="kpi-label">Billed</div><div class="kpi-value">${fmt(bm.total_billed)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Collected</div><div class="kpi-value" style="color:var(--success)">${fmt(bm.total_collected)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Outstanding</div><div class="kpi-value" style="color:var(--warning)">${fmt(bm.total_outstanding)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Overdue</div><div class="kpi-value" style="color:var(--danger)">${fmt(bm.overdue_count)}</div></div>
+        <div class="kpi-card g1"><span class="kpi-icon">💰</span><div class="kpi-label">Billed</div><div class="kpi-value">${fmt(bm.total_billed)}</div></div>
+        <div class="kpi-card g3"><span class="kpi-icon">✅</span><div class="kpi-label">Collected</div><div class="kpi-value">${fmt(bm.total_collected)}</div></div>
+        <div class="kpi-card g4"><span class="kpi-icon">⏳</span><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmt(bm.total_outstanding)}</div></div>
+        <div class="kpi-card g5"><span class="kpi-icon">⚠️</span><div class="kpi-label">Overdue</div><div class="kpi-value">${fmt(bm.overdue_count)}</div></div>
         </div></div>`;
     });
     $('bmViewContent').innerHTML=html;

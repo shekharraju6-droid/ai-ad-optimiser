@@ -74,6 +74,10 @@ class Account(Base):
     lsq_secret_key = Column(String, nullable=True)
     lsq_base_url = Column(String, nullable=True)
 
+    # Per-account CRM type + encrypted JSON credentials
+    crm_type = Column(String, default="none")
+    crm_credentials = Column(Text, nullable=True)
+
     # Credentials (encrypted at rest via app-level encryption) - legacy fallback
     credentials = Column(Text, nullable=True)
 
@@ -128,6 +132,8 @@ class Account(Base):
             "lsq_access_key": self.lsq_access_key,
             "lsq_secret_key_masked": bool(self.lsq_secret_key),
             "lsq_base_url": self.lsq_base_url,
+            "crm_type": self.crm_type or "none",
+            "crm_credentials_masked": bool(self.crm_credentials),
             "refresh_interval_minutes": self.refresh_interval_minutes,
             "audit_interval_minutes": self.audit_interval_minutes,
             "is_active": self.is_active,

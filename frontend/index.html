@@ -181,10 +181,6 @@
                     <div class="nav-item active" data-nav="dashboard" onclick="switchPanel('dashboard')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg> Account Dashboard</div>
                     <div class="nav-item" data-nav="accounts" onclick="switchPanel('accounts')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Manage Accounts</div>
                     <div class="nav-item" data-nav="approvals" onclick="switchPanel('approvals')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Approval Queue <span id="pendingBadge" class="pending-badge hidden">0</span></div>
-                    <div class="nav-item" data-nav="settings" onclick="switchPanel('settings')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v10M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m6 0h10M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"></path></svg> Global Settings</div>
-                    <div class="nav-item" data-nav="logs" onclick="switchPanel('logs')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Notification Logs</div>
-                    <div class="nav-item" data-nav="mis" onclick="window.location.href='/insightdesk'"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> InsightDesk</div>
-                    <a class="nav-item" href="/revenueops" style="text-decoration:none;">💰 RevenueOps</a>
                     <div class="nav-item" onclick="logout()" style="color:var(--color-danger);"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg> Logout</div>
                 </div>
             </div>
@@ -231,12 +227,12 @@
                             <h2 class="card-title">Manage Accounts</h2>
                             <div style="display:flex; gap:0.5rem;">
                                 <button class="btn btn-primary" onclick="openAddAccountModal()">Add Account</button>
-                                <button class="btn btn-secondary" onclick="openAddGroupModal()">Add Group</button>
+                                <button class="btn btn-secondary" onclick="openAddGroupModal()">Add Category</button>
                             </div>
                         </div>
                         <div class="table-wrapper">
                             <table>
-                                <thead><tr><th>Name</th><th>Platforms</th><th>Group</th><th>External ID</th><th>Mode</th><th>Status</th><th class="text-right">Spend</th><th class="text-right">Refresh</th><th>Actions</th></tr></thead>
+                                <thead><tr><th>Name</th><th>Platforms</th><th>Category</th><th>External ID</th><th>Mode</th><th>Status</th><th class="text-right">Spend</th><th class="text-right">Refresh</th><th>Actions</th></tr></thead>
                                 <tbody id="accountsTableBody"></tbody>
                             </table>
                         </div>
@@ -283,70 +279,6 @@
                         <div id="pendingActionsContainer"></div>
                     </div>
                 </div>
-
-                <div id="panel-settings" class="panel">
-                    <div class="card">
-                        <div class="card-header"><h2 class="card-title">Global Settings</h2></div>
-                        <div class="form-row">
-                            <div class="form-group"><label>Default Refresh Interval (minutes)</label><input type="number" id="globalRefreshInterval" value="60" min="15"></div>
-                            <div class="form-group"><label>Default Audit Interval (minutes, 0 = off)</label><input type="number" id="globalAuditInterval" value="60" min="0"></div>
-                            <div class="form-group"><label>Currency</label><input type="text" value="INR" disabled></div>
-                        </div>
-                        <button class="btn btn-primary" onclick="saveGlobalSettings()">Save Settings</button>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header"><h2 class="card-title">OAuth App Credentials</h2></div>
-                        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">Configure default Google Ads and Meta Marketing API OAuth apps. These are used when connecting client accounts unless overridden per account.</p>
-                        <div class="form-row">
-                            <div class="form-group"><label>Google Client ID</label><input type="text" id="cfgGoogleClientId" placeholder=""></div>
-                            <div class="form-group"><label>Google Client Secret</label><input type="password" id="cfgGoogleClientSecret" placeholder=""></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>Google Developer Token</label><input type="password" id="cfgGoogleDeveloperToken" placeholder=""></div>
-                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="cfgRedirectBaseUrl" placeholder="http://127.0.0.1:8000"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>Meta App ID</label><input type="text" id="cfgMetaAppId" placeholder=""></div>
-                            <div class="form-group"><label>Meta App Secret</label><input type="password" id="cfgMetaAppSecret" placeholder=""></div>
-                        </div>
-                        <button class="btn btn-primary" onclick="saveOAuthConfig()">Save OAuth Credentials</button>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header"><h2 class="card-title">CRM / Lead Integrations</h2></div>
-                        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">Configure Salesforce and LeadSquared API credentials for lead and opportunity data in MIS reports.</p>
-                        <div class="form-row">
-                            <div class="form-group"><label>Salesforce Instance URL</label><input type="text" id="cfgSalesforceUrl" placeholder="https://yourdomain.my.salesforce.com"></div>
-                            <div class="form-group"><label>Salesforce Client ID</label><input type="text" id="cfgSalesforceClientId" placeholder="Consumer Key"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>Salesforce Client Secret</label><input type="password" id="cfgSalesforceClientSecret" placeholder="Consumer Secret"></div>
-                            <div class="form-group"><label>Salesforce Refresh Token</label><input type="password" id="cfgSalesforceRefreshToken" placeholder="OAuth Refresh Token"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>LeadSquared Access Key</label><input type="text" id="cfgLeadSquaredAccessKey" placeholder="Access Key"></div>
-                            <div class="form-group"><label>LeadSquared Secret Key</label><input type="password" id="cfgLeadSquaredSecretKey" placeholder="Secret Key"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>LeadSquared Base URL</label><input type="text" id="cfgLeadSquaredBaseUrl" placeholder="https://api.leadsquared.com"></div>
-                        </div>
-                        <button class="btn btn-primary" onclick="saveCRMConfig()">Save CRM Credentials</button>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header"><h2 class="card-title">Notifications</h2></div>
-                        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">Enable or disable alert channels. Live dispatch requires provider credentials.</p>
-                        <div id="notificationsContainer"></div>
-                    </div>
-                </div>
-
-                <div id="panel-logs" class="panel">
-                    <div class="card">
-                        <div class="card-header"><h2 class="card-title">Notification Logs</h2><button class="btn btn-secondary btn-sm" onclick="loadNotificationLogs()"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh</button></div>
-                        <div id="notificationLogsContainer"></div>
-                    </div>
-                </div>
             </div>
         </main>
     </div>
@@ -382,7 +314,7 @@
             <h2>Add Account</h2>
             <div class="form-group"><label>Client Name</label><input type="text" id="accName" placeholder="e.g. DSU"></div>
             <div class="form-row">
-                <div class="form-group"><label>Group</label><select id="accGroup"><option value="">None</option></select></div>
+                <div class="form-group"><label>Category</label><select id="accGroup"><option value="">None</option></select></div>
                 <div class="form-group"><label>Refresh Interval (min)</label><input type="number" id="accRefreshInterval" value="60" min="15"></div>
                 <div class="form-group"><label>Audit Interval (min, 0=use global)</label><input type="number" id="accAuditInterval" value="0" min="0"></div>
             </div>
@@ -400,16 +332,8 @@
                     </div>
                     <div class="form-group" style="flex:1;"><label>Currency</label><input type="text" id="accGoogleCurrency" value="INR" disabled></div>
 
-                    <div style="margin:0.75rem 0; padding:0.5rem; background:var(--bg-sidebar); border-radius:6px;">
-                        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; font-weight:600; cursor:pointer;">
-                            <input type="checkbox" id="accGoogleUseGlobal" checked onchange="toggleGoogleUseGlobal()">
-                            <span>Use global OAuth credentials from Settings</span>
-                        </label>
-                        <div id="googleGlobalHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">Client ID / Secret / Developer Token will be taken from Global Settings.</div>
-                    </div>
-
-                    <div id="googleAccountCreds" class="platform-fields hidden" style="margin-top:0.5rem;">
-                        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this specific Google Ads account:</p>
+                    <div id="googleAccountCreds" class="platform-fields" style="margin-top:0.5rem;">
+                        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this Google Ads account:</p>
                         <div class="form-row">
                             <div class="form-group"><label>Client ID *</label><input type="text" id="accGoogleClientId" placeholder="xxx.apps.googleusercontent.com"></div>
                             <div class="form-group"><label>Client Secret *</label><input type="password" id="accGoogleClientSecret" placeholder="GOCSPX-..."></div>
@@ -444,16 +368,8 @@
                     </div>
                     <div class="form-group" style="flex:1;"><label>Currency</label><input type="text" id="accMetaCurrency" value="INR" disabled></div>
 
-                    <div style="margin:0.75rem 0; padding:0.5rem; background:var(--bg-sidebar); border-radius:6px;">
-                        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; font-weight:600; cursor:pointer;">
-                            <input type="checkbox" id="accMetaUseGlobal" checked onchange="toggleMetaUseGlobal()">
-                            <span>Use global OAuth credentials from Settings</span>
-                        </label>
-                        <div id="metaGlobalHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">App ID / App Secret will be taken from Global Settings.</div>
-                    </div>
-
-                    <div id="metaAccountCreds" class="platform-fields hidden" style="margin-top:0.5rem;">
-                        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this specific Meta Ads account:</p>
+                    <div id="metaAccountCreds" class="platform-fields" style="margin-top:0.5rem;">
+                        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this Meta Ads account:</p>
                         <div class="form-row">
                             <div class="form-group"><label>App ID *</label><input type="text" id="accMetaAppId" placeholder="1234567890"></div>
                             <div class="form-group"><label>App Secret *</label><input type="password" id="accMetaAppSecret" placeholder="..."></div>
@@ -475,14 +391,66 @@
             </div>
 
             <div class="oauth-section">
-                <h3 style="font-size:0.9rem; font-weight:700; margin-bottom:0.75rem;">LeadSquared CRM Credentials</h3>
-                <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.75rem;">Enter per-account LSQ credentials. If left blank, global credentials from Settings will be used.</p>
-                <div class="form-row">
-                    <div class="form-group"><label>LSQ Access Key</label><input type="text" id="accLsqAccessKey" placeholder="Access Key"></div>
-                    <div class="form-group"><label>LSQ Secret Key</label><input type="password" id="accLsqSecretKey" placeholder="Secret Key"></div>
+                <h3 style="font-size:0.9rem; font-weight:700; margin-bottom:0.75rem;">CRM Integration</h3>
+                <div class="form-group">
+                    <label>CRM Type</label>
+                    <select id="accCrmType" onchange="toggleCrmFields()">
+                        <option value="none">None</option>
+                        <option value="leadsquared">LeadSquared</option>
+                        <option value="salesforce">Salesforce</option>
+                        <option value="hubspot">HubSpot</option>
+                        <option value="zoho">Zoho</option>
+                        <option value="custom">Custom</option>
+                    </select>
                 </div>
-                <div class="form-row">
-                    <div class="form-group"><label>LSQ Base URL</label><input type="text" id="accLsqBaseUrl" placeholder="https://api-in21.leadsquared.com/v2/"></div>
+
+                <div id="crmLeadsquared" class="crm-fields hidden">
+                    <div class="form-row">
+                        <div class="form-group"><label>LSQ Access Key</label><input type="text" id="crmLsqAccessKey" placeholder="Access Key"></div>
+                        <div class="form-group"><label>LSQ Secret Key</label><input type="password" id="crmLsqSecretKey" placeholder="Secret Key"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>LSQ Base URL</label><input type="text" id="crmLsqBaseUrl" placeholder="https://api-in21.leadsquared.com/v2/"></div>
+                    </div>
+                </div>
+
+                <div id="crmSalesforce" class="crm-fields hidden">
+                    <div class="form-row">
+                        <div class="form-group"><label>Salesforce Instance URL</label><input type="text" id="crmSfUrl" placeholder="https://yourdomain.my.salesforce.com"></div>
+                        <div class="form-group"><label>Salesforce Client ID</label><input type="text" id="crmSfClientId" placeholder="Consumer Key"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Salesforce Client Secret</label><input type="password" id="crmSfClientSecret" placeholder="Consumer Secret"></div>
+                        <div class="form-group"><label>Salesforce Refresh Token</label><input type="password" id="crmSfRefreshToken" placeholder="OAuth Refresh Token"></div>
+                    </div>
+                </div>
+
+                <div id="crmHubspot" class="crm-fields hidden">
+                    <div class="form-row">
+                        <div class="form-group"><label>HubSpot Private App Token</label><input type="password" id="crmHsToken" placeholder="pat-..."></div>
+                        <div class="form-group"><label>HubSpot Portal ID</label><input type="text" id="crmHsPortalId" placeholder="Portal ID (numeric)"></div>
+                    </div>
+                </div>
+
+                <div id="crmZoho" class="crm-fields hidden">
+                    <div class="form-row">
+                        <div class="form-group"><label>Zoho Client ID</label><input type="text" id="crmZoClientId" placeholder="Client ID"></div>
+                        <div class="form-group"><label>Zoho Client Secret</label><input type="password" id="crmZoClientSecret" placeholder="Client Secret"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Zoho Refresh Token</label><input type="password" id="crmZoRefreshToken" placeholder="Refresh Token"></div>
+                        <div class="form-group"><label>Zoho Data Center</label><select id="crmZoDc"><option value="in">.in</option><option value="com">.com</option><option value="eu">.eu</option></select></div>
+                    </div>
+                </div>
+
+                <div id="crmCustom" class="crm-fields hidden">
+                    <div class="form-row">
+                        <div class="form-group"><label>API URL</label><input type="text" id="crmCustomUrl" placeholder="https://your-crm-api.com/api"></div>
+                        <div class="form-group"><label>API Key</label><input type="text" id="crmCustomApiKey" placeholder="API Key"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Secret Key</label><input type="password" id="crmCustomSecretKey" placeholder="Secret Key"></div>
+                    </div>
                 </div>
             </div>
 
@@ -493,11 +461,11 @@
         </div>
     </div>
 
-    <!-- Add Group Modal -->
+    <!-- Add Category Modal -->
     <div id="addGroupModal" class="modal-overlay hidden" onclick="closeAddGroupModal(event)">
         <div class="modal" onclick="event.stopPropagation()">
-            <h2>Add Group</h2>
-            <div class="form-group"><label>Group Name</label><input type="text" id="groupName" placeholder="e.g. Education"></div>
+            <h2>Add Category</h2>
+            <div class="form-group"><label>Category Name</label><input type="text" id="groupName" placeholder="e.g. Education"></div>
             <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
                 <button class="btn btn-secondary" onclick="closeAddGroupModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveGroup()">Save</button>
@@ -640,12 +608,10 @@
         if (panel) panel.classList.add('active');
         const nav = document.querySelector('.nav-item[data-nav="' + name + '"]');
         if (nav) nav.classList.add('active');
-        const titles = { dashboard: 'Account Dashboard', accounts: 'Manage Accounts', approvals: 'Approval Queue', settings: 'Global Settings', logs: 'Notification Logs', 'account-detail': 'Account Detail' };
+        const titles = { dashboard: 'Account Dashboard', accounts: 'Manage Accounts', approvals: 'Approval Queue', 'account-detail': 'Account Detail' };
         $('pageTitle').textContent = titles[name] || 'AdOptima';
         if (name === 'accounts') loadAccounts();
         if (name === 'approvals') loadPendingActions();
-        if (name === 'settings') loadSettings();
-        if (name === 'logs') loadNotificationLogs();
     }
 
     function initApp() {
@@ -785,7 +751,7 @@
             container.appendChild(buildGroupCard(g.group_name, g.accounts));
         });
         if (ungrouped.length) {
-            container.appendChild(buildGroupCard('Ungrouped', ungrouped));
+            container.appendChild(buildGroupCard('Uncategorized', ungrouped));
         }
     }
 
@@ -901,7 +867,7 @@
         try {
             const a = await api('GET', '/accounts/' + id + dateParams(r) + (dateParams(r) ? '&' : '?') + 'platform=' + platform);
             $('detail-account-name').textContent = a.name + ' - ' + (platform === 'google' ? 'Google Ads' : 'Meta Ads');
-            $('detail-account-meta').textContent = (a.external_id || '') + ' | ' + (a.group_name || 'No group');
+            $('detail-account-meta').textContent = (a.external_id || '') + ' | ' + (a.group_name || 'No category');
             $('detail-spend').textContent = formatMoney(a.spend);
             $('detail-conversions').textContent = formatNum(a.conversions);
             $('detail-ctr').textContent = formatPct(a.ctr);
@@ -983,12 +949,11 @@
         $('accHasMeta').checked = false;
         $('accGoogleExternalId').value = '';
         $('accMetaExternalId').value = '';
-        $('accGoogleUseGlobal').checked = true;
-        $('accMetaUseGlobal').checked = true;
-        ['accGoogleClientId','accGoogleClientSecret','accGoogleDeveloperToken','accMetaAppId','accMetaAppSecret','accLsqAccessKey','accLsqSecretKey','accLsqBaseUrl'].forEach(id => $(id).value = '');
+        ['accGoogleClientId','accGoogleClientSecret','accGoogleDeveloperToken','accMetaAppId','accMetaAppSecret'].forEach(id => $(id).value = '');
+        $('accCrmType').value = 'none';
+        ['crmLsqAccessKey','crmLsqSecretKey','crmLsqBaseUrl','crmSfUrl','crmSfClientId','crmSfClientSecret','crmSfRefreshToken','crmHsToken','crmHsPortalId','crmZoClientId','crmZoClientSecret','crmZoRefreshToken','crmCustomUrl','crmCustomApiKey','crmCustomSecretKey'].forEach(id => { const el=$(id); if(el) el.value=''; });
         togglePlatformFields();
-        toggleGoogleUseGlobal();
-        toggleMetaUseGlobal();
+        toggleCrmFields();
         updateOAuthStatus(null);
         $('addAccountModal').classList.remove('hidden');
     }
@@ -1006,21 +971,39 @@
         $('accHasMeta').checked = a.has_meta;
         $('accGoogleExternalId').value = a.google_external_id || '';
         $('accMetaExternalId').value = a.meta_external_id || '';
-        const hasGoogleCreds = !!(a.google_client_id || a.google_client_secret || a.google_developer_token);
-        const hasMetaCreds = !!(a.meta_app_id || a.meta_app_secret);
-        $('accGoogleUseGlobal').checked = !hasGoogleCreds;
-        $('accMetaUseGlobal').checked = !hasMetaCreds;
         $('accGoogleClientId').value = a.google_client_id || '';
         $('accGoogleClientSecret').value = a.google_client_secret ? '●●●●●●●●' + (a.google_client_secret || '').slice(-4) : '';
         $('accGoogleDeveloperToken').value = a.google_developer_token ? '●●●●●●●●' + (a.google_developer_token || '').slice(-4) : '';
         $('accMetaAppId').value = a.meta_app_id || '';
         $('accMetaAppSecret').value = a.meta_app_secret ? '●●●●●●●●' + (a.meta_app_secret || '').slice(-4) : '';
-        $('accLsqAccessKey').value = a.lsq_access_key || '';
-        $('accLsqSecretKey').value = a.lsq_secret_key_masked ? '●●●●●●●●' : '';
-        $('accLsqBaseUrl').value = a.lsq_base_url || '';
+
+        // Load CRM type + creds
+        const crmType = a.crm_type || 'none';
+        $('accCrmType').value = crmType;
+        let crmCreds = {};
+        try { crmCreds = a.crm_credentials ? JSON.parse(a.crm_credentials) : {}; } catch(e) {}
+        // Fallback to legacy LSQ fields if present
+        if (crmType === 'leadsquared' && !crmCreds.access_key && a.lsq_access_key) {
+            crmCreds = { access_key: a.lsq_access_key, secret_key: a.lsq_secret_key_masked ? '●●●●●●●●' : '', base_url: a.lsq_base_url || '' };
+        }
+        setIf('crmLsqAccessKey', crmCreds.access_key);
+        setIf('crmLsqSecretKey', crmCreds.secret_key_masked ? '●●●●●●●●' : crmCreds.secret_key);
+        setIf('crmLsqBaseUrl', crmCreds.base_url);
+        setIf('crmSfUrl', crmCreds.instance_url);
+        setIf('crmSfClientId', crmCreds.client_id);
+        setIf('crmSfClientSecret', crmCreds.client_secret_masked ? '●●●●●●●●' : crmCreds.client_secret);
+        setIf('crmSfRefreshToken', crmCreds.refresh_token_masked ? '●●●●●●●●' : crmCreds.refresh_token);
+        setIf('crmHsToken', crmCreds.private_app_token_masked ? '●●●●●●●●' : crmCreds.private_app_token);
+        setIf('crmHsPortalId', crmCreds.portal_id);
+        setIf('crmZoClientId', crmCreds.client_id);
+        setIf('crmZoClientSecret', crmCreds.client_secret_masked ? '●●●●●●●●' : crmCreds.client_secret);
+        setIf('crmZoRefreshToken', crmCreds.refresh_token_masked ? '●●●●●●●●' : crmCreds.refresh_token);
+        setIf('crmCustomUrl', crmCreds.api_url);
+        setIf('crmCustomApiKey', crmCreds.api_key);
+        setIf('crmCustomSecretKey', crmCreds.secret_key_masked ? '●●●●●●●●' : crmCreds.secret_key);
+
         togglePlatformFields();
-        toggleGoogleUseGlobal();
-        toggleMetaUseGlobal();
+        toggleCrmFields();
         updateOAuthStatus(a);
         $('addAccountModal').classList.remove('hidden');
     }
@@ -1039,17 +1022,15 @@
         if (!g && !m) { $('accHasGoogle').checked = true; $('googleFields').classList.remove('hidden'); }
     }
 
-    function toggleGoogleUseGlobal() {
-        const useGlobal = $('accGoogleUseGlobal').checked;
-        $('googleAccountCreds').classList.toggle('hidden', useGlobal);
-        $('googleGlobalHelp').textContent = useGlobal ? 'Client ID / Secret / Developer Token will be taken from Global Settings.' : 'You must enter account-specific OAuth credentials below.';
+    function toggleCrmFields() {
+        const crmType = $('accCrmType').value;
+        ['crmLeadsquared','crmSalesforce','crmHubspot','crmZoho','crmCustom'].forEach(id => $(id).classList.add('hidden'));
+        const map = { leadsquared: 'crmLeadsquared', salesforce: 'crmSalesforce', hubspot: 'crmHubspot', zoho: 'crmZoho', custom: 'crmCustom' };
+        const target = map[crmType];
+        if (target) $(target).classList.remove('hidden');
     }
 
-    function toggleMetaUseGlobal() {
-        const useGlobal = $('accMetaUseGlobal').checked;
-        $('metaAccountCreds').classList.toggle('hidden', useGlobal);
-        $('metaGlobalHelp').textContent = useGlobal ? 'App ID / App Secret will be taken from Global Settings.' : 'You must enter account-specific OAuth credentials below.';
-    }
+    function setIf(id, val) { const el = $(id); if (el) el.value = val || ''; }
 
     function validateGoogleCustomerId() {
         const val = $('accGoogleExternalId').value.trim();
@@ -1071,19 +1052,17 @@
     }
 
     function validateGoogleAccountCreds() {
-        if ($('accGoogleUseGlobal').checked) return true;
         const cid = $('accGoogleClientId').value.trim();
         const secret = $('accGoogleClientSecret').value.trim();
         const dev = $('accGoogleDeveloperToken').value.trim();
-        if (!cid || !secret || !dev) { toast('Enter Google Client ID, Client Secret, and Developer Token (or use global).', true); return false; }
+        if (!cid || !secret || !dev) { toast('Enter Google Client ID, Client Secret, and Developer Token.', true); return false; }
         return true;
     }
 
     function validateMetaAccountCreds() {
-        if ($('accMetaUseGlobal').checked) return true;
         const appId = $('accMetaAppId').value.trim();
         const secret = $('accMetaAppSecret').value.trim();
-        if (!appId || !secret) { toast('Enter Meta App ID and App Secret (or use global).', true); return false; }
+        if (!appId || !secret) { toast('Enter Meta App ID and App Secret.', true); return false; }
         return true;
     }
 
@@ -1132,32 +1111,57 @@
             meta_external_id: hasMeta ? $('accMetaExternalId').value.trim() : null,
         };
         if (!payload.has_google && !payload.has_meta) { toast('At least one platform must be enabled', true); return; }
-        if (!$('accGoogleUseGlobal').checked) {
-            payload.google_client_id = $('accGoogleClientId').value.trim() || null;
-            const secret = $('accGoogleClientSecret').value;
-            if (secret && !secret.startsWith('●●●●')) payload.google_client_secret = secret;
-            const dev = $('accGoogleDeveloperToken').value;
-            if (dev && !dev.startsWith('●●●●')) payload.google_developer_token = dev;
-            payload.redirect_base_url = 'http://127.0.0.1:8000';
-        } else {
-            payload.google_client_id = null;
-            payload.google_client_secret = null;
-            payload.google_developer_token = null;
-        }
-        if (!$('accMetaUseGlobal').checked) {
+
+        // Google per-account creds (always required now)
+        payload.google_client_id = $('accGoogleClientId').value.trim() || null;
+        const gSecret = $('accGoogleClientSecret').value;
+        if (gSecret && !gSecret.startsWith('●●●●')) payload.google_client_secret = gSecret;
+        const gDev = $('accGoogleDeveloperToken').value;
+        if (gDev && !gDev.startsWith('●●●●')) payload.google_developer_token = gDev;
+        payload.redirect_base_url = 'http://127.0.0.1:8000';
+
+        // Meta per-account creds (always required if Meta enabled)
+        if (hasMeta) {
             payload.meta_app_id = $('accMetaAppId').value.trim() || null;
-            const secret = $('accMetaAppSecret').value;
-            if (secret && !secret.startsWith('●●●●')) payload.meta_app_secret = secret;
-            payload.redirect_base_url = 'http://127.0.0.1:8000';
-        } else {
-            payload.meta_app_id = null;
-            payload.meta_app_secret = null;
+            const mSecret = $('accMetaAppSecret').value;
+            if (mSecret && !mSecret.startsWith('●●●●')) payload.meta_app_secret = mSecret;
         }
-        const lsqSecret = $('accLsqSecretKey').value;
-        payload.lsq_access_key = $('accLsqAccessKey').value.trim() || null;
-        if (lsqSecret && !lsqSecret.startsWith('●●●●')) payload.lsq_secret_key = lsqSecret;
-        else if (!lsqSecret) payload.lsq_secret_key = null;
-        payload.lsq_base_url = $('accLsqBaseUrl').value.trim() || null;
+
+        // CRM type + credentials
+        const crmType = $('accCrmType').value;
+        payload.crm_type = crmType;
+        let crmCreds = {};
+        if (crmType === 'leadsquared') {
+            crmCreds.access_key = $('crmLsqAccessKey').value.trim();
+            const ls = $('crmLsqSecretKey').value;
+            crmCreds.secret_key = (ls && !ls.startsWith('●●●●')) ? ls : '';
+            crmCreds.base_url = $('crmLsqBaseUrl').value.trim();
+        } else if (crmType === 'salesforce') {
+            crmCreds.instance_url = $('crmSfUrl').value.trim();
+            crmCreds.client_id = $('crmSfClientId').value.trim();
+            const sfCs = $('crmSfClientSecret').value;
+            crmCreds.client_secret = (sfCs && !sfCs.startsWith('●●●●')) ? sfCs : '';
+            const sfRt = $('crmSfRefreshToken').value;
+            crmCreds.refresh_token = (sfRt && !sfRt.startsWith('●●●●')) ? sfRt : '';
+        } else if (crmType === 'hubspot') {
+            const hsTok = $('crmHsToken').value;
+            crmCreds.private_app_token = (hsTok && !hsTok.startsWith('●●●●')) ? hsTok : '';
+            crmCreds.portal_id = $('crmHsPortalId').value.trim();
+        } else if (crmType === 'zoho') {
+            crmCreds.client_id = $('crmZoClientId').value.trim();
+            const zoCs = $('crmZoClientSecret').value;
+            crmCreds.client_secret = (zoCs && !zoCs.startsWith('●●●●')) ? zoCs : '';
+            const zoRt = $('crmZoRefreshToken').value;
+            crmCreds.refresh_token = (zoRt && !zoRt.startsWith('●●●●')) ? zoRt : '';
+            crmCreds.data_center = $('crmZoDc').value;
+        } else if (crmType === 'custom') {
+            crmCreds.api_url = $('crmCustomUrl').value.trim();
+            crmCreds.api_key = $('crmCustomApiKey').value.trim();
+            const cuSk = $('crmCustomSecretKey').value;
+            crmCreds.secret_key = (cuSk && !cuSk.startsWith('●●●●')) ? cuSk : '';
+        }
+        payload.crm_credentials = (crmType && crmType !== 'none') ? JSON.stringify(crmCreds) : null;
+
         try {
             if (editingAccountId) {
                 await api('PUT', '/accounts/' + editingAccountId, payload);
@@ -1218,10 +1222,10 @@
     }
     async function saveGroup() {
         const name = $('groupName').value.trim();
-        if (!name) { toast('Group name required', true); return; }
+        if (!name) { toast('Category name required', true); return; }
         try {
             await api('POST', '/account-groups', { name });
-            toast('Group created');
+            toast('Category created');
             closeAddGroupModal();
             loadAccounts();
         } catch (e) { toast(e.message, true); }
@@ -1327,162 +1331,7 @@
     }
 
     // ---------- Settings ----------
-    async function loadSettings() {
-        try {
-            const cfg = await api('GET', '/config');
-            $('cfgGoogleClientId').value = cfg.google_client_id || '';
-            $('cfgGoogleClientSecret').value = cfg.google_client_secret || '';
-            $('cfgGoogleDeveloperToken').value = cfg.google_developer_token || '';
-            $('cfgMetaAppId').value = cfg.meta_app_id || '';
-            $('cfgMetaAppSecret').value = cfg.meta_app_secret || '';
-            $('cfgRedirectBaseUrl').value = cfg.redirect_base_url || 'http://127.0.0.1:8000';
-            $('globalAuditInterval').value = cfg.global_audit_interval_minutes || 60;
-            $('cfgSalesforceUrl').value = cfg.salesforce_url || '';
-            $('cfgSalesforceClientId').value = cfg.salesforce_client_id || '';
-            $('cfgSalesforceClientSecret').value = cfg.salesforce_client_secret ? '●●●●●●●●' + (cfg.salesforce_client_secret || '').slice(-4) : '';
-            $('cfgSalesforceRefreshToken').value = cfg.salesforce_refresh_token ? '●●●●●●●●' + (cfg.salesforce_refresh_token || '').slice(-4) : '';
-            $('cfgLeadSquaredAccessKey').value = cfg.leadsquared_access_key || '';
-            $('cfgLeadSquaredSecretKey').value = cfg.leadsquared_secret_key ? '●●●●●●●●' + (cfg.leadsquared_secret_key || '').slice(-4) : '';
-            $('cfgLeadSquaredBaseUrl').value = cfg.leadsquared_base_url || '';
-            $('systemStatusBadge').innerHTML = '<span class="status-badge live"><span class="status-dot"></span>Live Mode</span>';
-            loadNotificationSettings();
-        } catch (e) { toast(e.message, true); }
-    }
-
-    async function saveOAuthConfig() {
-        try {
-            const current = await api('GET', '/config');
-            const cfg = {
-                google_client_id: $('cfgGoogleClientId').value.trim(),
-                google_client_secret: maskAware(current.google_client_secret, $('cfgGoogleClientSecret').value),
-                google_developer_token: maskAware(current.google_developer_token, $('cfgGoogleDeveloperToken').value),
-                meta_app_id: $('cfgMetaAppId').value.trim(),
-                meta_app_secret: maskAware(current.meta_app_secret, $('cfgMetaAppSecret').value),
-                redirect_base_url: $('cfgRedirectBaseUrl').value.trim() || 'http://127.0.0.1:8000',
-                safe_mode: current.safe_mode,
-            };
-            await api('POST', '/config', cfg);
-            toast('OAuth credentials saved');
-            loadSettings();
-        } catch (e) { toast(e.message, true); }
-    }
-
-    async function saveCRMConfig() {
-        try {
-            const current = await api('GET', '/config');
-            const cfg = {
-                salesforce_url: $('cfgSalesforceUrl').value.trim(),
-                salesforce_client_id: $('cfgSalesforceClientId').value.trim(),
-                salesforce_client_secret: maskAware(current.salesforce_client_secret, $('cfgSalesforceClientSecret').value),
-                salesforce_refresh_token: maskAware(current.salesforce_refresh_token, $('cfgSalesforceRefreshToken').value),
-                leadsquared_access_key: $('cfgLeadSquaredAccessKey').value.trim(),
-                leadsquared_secret_key: maskAware(current.leadsquared_secret_key, $('cfgLeadSquaredSecretKey').value),
-                leadsquared_base_url: $('cfgLeadSquaredBaseUrl').value.trim() || 'https://api.leadsquared.com',
-                safe_mode: current.safe_mode,
-            };
-            await api('POST', '/config', cfg);
-            toast('CRM credentials saved');
-            loadSettings();
-        } catch (e) { toast(e.message, true); }
-    }
-
-    function maskAware(current, val) {
-        if (!val) return '';
-        if (val.includes('●●●●')) return current || '';
-        return val;
-    }
-
-    async function saveGlobalSettings() {
-        try {
-            const current = await api('GET', '/config');
-            const cfg = {
-                refresh_interval_minutes: parseInt($('globalRefreshInterval').value) || 60,
-                global_audit_interval_minutes: parseInt($('globalAuditInterval').value) || 0,
-                safe_mode: current.safe_mode,
-            };
-            await api('POST', '/config', cfg);
-            toast('Global settings saved');
-        } catch (e) { toast(e.message, true); }
-    }
-
-    // ---------- Notifications ----------
-    async function loadNotificationSettings() {
-        try {
-            const settings = await api('GET', '/notification-settings');
-            const container = $('notificationsContainer');
-            container.innerHTML = '';
-            const channels = ['email', 'whatsapp'];
-            channels.forEach(channel => {
-                const s = settings.find(x => x.channel === channel) || {};
-                const cfg = s.config || {};
-                const el = document.createElement('div');
-                el.className = 'oauth-section';
-                el.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-                        <strong style="text-transform:capitalize;">${channel}</strong>
-                        <label class="toggle"><input type="checkbox" id="notif_${channel}_enabled" ${s.enabled ? 'checked' : ''} onchange="toggleNotification('${channel}')"><span class="toggle-slider"></span></label>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label>Provider</label><input type="text" id="notif_${channel}_provider" value="${escapeHtml(cfg.provider || s.provider || '')}" placeholder="e.g. smtp / twilio"></div>
-                        <div class="form-group"><label>Recipient</label><input type="text" id="notif_${channel}_recipient" value="${escapeHtml(cfg.recipient || '')}" placeholder="email / phone"></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label>Config JSON</label><textarea id="notif_${channel}_config" rows="2" placeholder='{"smtp_host":"..."}'>${escapeHtml(JSON.stringify(cfg, null, 2))}</textarea></div>
-                    </div>
-                    <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-                        <button class="btn btn-primary btn-sm" onclick="saveNotificationSetting('${channel}')">Save</button>
-                        <button class="btn btn-secondary btn-sm" onclick="testNotification('${channel}')">Test</button>
-                    </div>`;
-                container.appendChild(el);
-            });
-        } catch (e) { toast(e.message, true); }
-    }
-
-    async function toggleNotification(channel) {
-        const enabled = $('notif_' + channel + '_enabled').checked;
-        try {
-            await api('PUT', '/notification-settings/' + channel, { enabled });
-            toast(channel + ' ' + (enabled ? 'enabled' : 'disabled'));
-        } catch (e) { toast(e.message, true); }
-    }
-
-    async function saveNotificationSetting(channel) {
-        const provider = $('notif_' + channel + '_provider').value.trim();
-        const recipient = $('notif_' + channel + '_recipient').value.trim();
-        let config = {};
-        try {
-            const raw = $('notif_' + channel + '_config').value.trim();
-            if (raw) config = JSON.parse(raw);
-        } catch (e) { toast('Invalid JSON config', true); return; }
-        if (recipient) config.recipient = recipient;
-        if (provider) config.provider = provider;
-        try {
-            await api('PUT', '/notification-settings/' + channel, { provider, config });
-            toast(channel + ' settings saved');
-        } catch (e) { toast(e.message, true); }
-    }
-
-    async function testNotification(channel) {
-        try {
-            await api('POST', '/notification-settings/' + channel + '/test');
-            toast('Test ' + channel + ' sent');
-            loadNotificationLogs();
-        } catch (e) { toast(e.message, true); }
-    }
-
-    async function loadNotificationLogs() {
-        try {
-            const logs = await api('GET', '/notification-logs');
-            const container = $('notificationLogsContainer');
-            if (!logs.length) { container.innerHTML = '<p style="color:var(--text-muted);">No notification logs.</p>'; return; }
-            let html = '<table><thead><tr><th>Time</th><th>Channel</th><th>Event</th><th>Subject</th><th>Status</th></tr></thead><tbody>';
-            logs.forEach(l => {
-                html += `<tr><td>${formatDate(l.created_at)}</td><td>${escapeHtml(l.channel)}</td><td>${escapeHtml(l.event_type)}</td><td>${escapeHtml(l.subject || '')}</td><td><span class="flag-tag ${l.status === 'sent' ? 'flag-success' : 'flag-danger'}">${escapeHtml(l.status)}</span></td></tr>`;
-            });
-            html += '</tbody></table>';
-            container.innerHTML = html;
-        } catch (e) { toast(e.message, true); }
-    }
+    // (Global Settings panel removed — all config is now per-account)
 
     function escapeHtml(str) {
         if (str === undefined || str === null) return '';

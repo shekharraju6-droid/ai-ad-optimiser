@@ -28,6 +28,9 @@ class AccountCreate(BaseModel):
     google_is_live: bool = False
     meta_is_live: bool = False
 
+    crm_type: str = "none"
+    crm_credentials: Optional[str] = None
+
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
@@ -52,6 +55,9 @@ class AccountUpdate(BaseModel):
     lsq_access_key: Optional[str] = None
     lsq_secret_key: Optional[str] = None
     lsq_base_url: Optional[str] = None
+
+    crm_type: Optional[str] = None
+    crm_credentials: Optional[str] = None
 
 
 class GroupCreate(BaseModel):
@@ -152,6 +158,8 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
         refresh_interval_minutes=req.refresh_interval_minutes,
         status=AccountStatus.DISCONNECTED,
         is_live=req.google_is_live or req.meta_is_live,
+        crm_type=req.crm_type or "none",
+        crm_credentials=req.crm_credentials,
     )
     db.add(account)
     db.commit()
@@ -207,6 +215,11 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.lsq_secret_key = req.lsq_secret_key or None
     if req.lsq_base_url is not None:
         account.lsq_base_url = req.lsq_base_url or None
+
+    if req.crm_type is not None:
+        account.crm_type = req.crm_type or "none"
+    if req.crm_credentials is not None:
+        account.crm_credentials = req.crm_credentials or None
 
     # Keep legacy fields in sync
     if account.has_google and account.has_meta:

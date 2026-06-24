@@ -38,6 +38,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "leadsquared_access_key": "",
         "leadsquared_secret_key": "",
         "leadsquared_base_url": "",
+        # Mantri reporting integration
+        "mantri_meta_account_id": "",
+        "mantri_salesforce_url": "",
+        "mantri_salesforce_client_id": "",
+        "mantri_salesforce_client_secret": "",
+        "mantri_salesforce_refresh_token": "",
         # Global auto-audit interval in minutes (0 = disabled)
         "global_audit_interval_minutes": 60,
     }
@@ -99,6 +105,11 @@ def load_config() -> Dict[str, Any]:
         ("leadsquared_access_key", "LEADSQUARED_ACCESS_KEY"),
         ("leadsquared_secret_key", "LEADSQUARED_SECRET_KEY"),
         ("leadsquared_base_url", "LEADSQUARED_BASE_URL"),
+        ("mantri_meta_account_id", "MANTRI_META_ACCOUNT_ID"),
+        ("mantri_salesforce_url", "MANTRI_SALESFORCE_URL"),
+        ("mantri_salesforce_client_id", "MANTRI_SALESFORCE_CLIENT_ID"),
+        ("mantri_salesforce_client_secret", "MANTRI_SALESFORCE_CLIENT_SECRET"),
+        ("mantri_salesforce_refresh_token", "MANTRI_SALESFORCE_REFRESH_TOKEN"),
     ]
     for cfg_key, env_key in env_mappings:
         if env.get(env_key):
@@ -124,7 +135,8 @@ def get_config_for_client() -> Dict[str, Any]:
     masked = config.copy()
     for key in ["client_secret", "refresh_token", "gemini_api_key", "developer_token",
                 "google_client_secret", "google_developer_token", "meta_app_secret",
-                "salesforce_client_secret", "salesforce_refresh_token", "leadsquared_secret_key"]:
+                "salesforce_client_secret", "salesforce_refresh_token", "leadsquared_secret_key",
+                "mantri_salesforce_client_secret", "mantri_salesforce_refresh_token"]:
         val = masked.get(key, "")
         if val and len(val) > 4:
             masked[key] = "●●●●●●●●" + val[-4:]
