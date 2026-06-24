@@ -1231,30 +1231,31 @@
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
         const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
 
-        const sections = data.sections || [];
+        const rows = data.rows || [];
         const gt = data.grand_total || {};
 
-        // Compact: show only non-empty rows + section totals
-        const renderSection = (section) => {
-            const activeRows = (section.rows || []).filter(r => r.submitted > 0 || r.spend > 0 || r.target > 0);
-            if (activeRows.length === 0) return '';
+        // Compute department rowspan for merged cells like Table 1/2
+        const deptRuns = [];
+        for (let i = 0; i < rows.length; i++) {
+            if (i === 0 || rows[i].department !== rows[i - 1].department) {
+                deptRuns.push({ start: i, count: 1, dept: rows[i].department });
+            } else {
+                deptRuns[deptRuns.length - 1].count++;
+            }
+        }
+        const deptRowSpan = {};
+        deptRuns.forEach(run => { deptRowSpan[run.start] = run.count; });
 
-            const body = activeRows.map(r => {
-                const cpa = r.submitted > 0 ? fmtMoney(r.cpa) : '0';
-                const submitted = r.submitted > 0 ? fmtNum(r.submitted) : '';
-                const spend = r.spend > 0 ? fmtMoney(r.spend) : '';
-                const target = r.target > 0 ? fmtNum(r.target) : '';
-                return `<tr><td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${submitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${cpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${spend}</td><td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
-            }).join('');
-            const total = section.total || {};
-            const totalCpa = total.submitted > 0 ? fmtMoney(total.cpa) : '0';
-            const totalSubmitted = total.submitted > 0 ? fmtNum(total.submitted) : '';
-            return `
-                <tr style="background:#e0e7ff;font-weight:700"><td colspan="5" style="padding:0.35rem 0.5rem;font-size:0.76rem">${escapeHtml(section.label)}</td></tr>
-                ${body}
-                <tr class="dsu-total-row"><td style="padding:0.35rem 0.5rem">${total.course || 'Total'}</td><td class="text-right" style="padding:0.35rem 0.5rem">${totalSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${totalCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(total.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${total.target > 0 ? fmtNum(total.target) : ''}</td></tr>
-            `;
-        };
+        const body = rows.map((r, i) => {
+            const cpa = r.submitted > 0 ? fmtMoney(r.cpa) : '0';
+            const submitted = r.submitted > 0 ? fmtNum(r.submitted) : '';
+            const spend = r.spend > 0 ? fmtMoney(r.spend) : '';
+            const target = r.target > 0 ? fmtNum(r.target) : '';
+            const deptCell = deptRowSpan[i]
+                ? `<td style="font-weight:700;vertical-align:top;text-align:center;padding:0.35rem 0.5rem" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
+                : '';
+            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${submitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${cpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${spend}</td><td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
+        }).join('');
 
         const gtCpa = gt.submitted > 0 ? fmtMoney(gt.cpa) : '0';
         const gtSubmitted = gt.submitted > 0 ? fmtNum(gt.submitted) : '';
@@ -1267,10 +1268,10 @@
                 </div>
                 <div class="dsi-table4-wrap">
                 <table class="dsu-table" style="font-size:0.78rem">
-                    <thead><tr><th style="padding:0.35rem 0.5rem">Course</th><th class="text-right" style="padding:0.35rem 0.5rem;white-space:nowrap">Application Submitted</th><th class="text-right" style="padding:0.35rem 0.5rem">CPA</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Target</th></tr></thead>
+                    <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-right" style="padding:0.35rem 0.5rem;white-space:nowrap">Application Submitted</th><th class="text-right" style="padding:0.35rem 0.5rem">CPA</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Target</th></tr></thead>
                     <tbody>
-                        ${sections.map(renderSection).join('')}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td style="padding:0.35rem 0.5rem">${gt.course}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
+                        ${body}
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td colspan="2" style="padding:0.35rem 0.5rem">${gt.course}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
                     </tbody>
                 </table>
                 </div>

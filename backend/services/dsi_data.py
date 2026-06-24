@@ -822,96 +822,64 @@ APPLICATION_SUBMITTED_STATUSES = {
     "partially paid",
 }
 
-# DSI Table 4 sections
-DSI_T4_SECTIONS = [
-    {"label": "DSCE", "courses": [{"key": "DSCE", "display": "DSCE", "target": 0}]},
-    {"label": "DSIT", "courses": [{"key": "DSIT", "display": "DSIT", "target": 0}]},
-    {"label": "DSCA", "courses": [
-        {"key": "Arch", "display": "Arch", "target": 0},
-        {"key": "Bachelor of Architecture Campus 1", "display": "B. Arch", "target": 0},
-        {"key": "M.Arch", "display": "M.Arch", "target": 0},
-    ]},
-    {"label": "DSCASC - UG", "courses": [
-        {"key": "B.Com", "display": "B.Com", "target": 0},
-        {"key": "B.Com Evening Programs", "display": "B.Com Evening", "target": 0},
-        {"key": "B.Sc (PCM)", "display": "B.Sc (PCM)", "target": 0},
-        {"key": "BBA", "display": "BBA", "target": 0},
-        {"key": "BCA", "display": "BCA", "target": 0},
-        {"key": "BCA Evening Programs", "display": "BCA Evening", "target": 0},
-    ]},
-    {"label": "DSCASC - Masters", "courses": [
-        {"key": "MBA", "display": "MBA", "target": 0},
-        {"key": "MCA", "display": "MCA", "target": 0},
-        {"key": "M.Com", "display": "M.Com", "target": 0},
-    ]},
-]
+# Target applications per course (can be updated as needed)
+DSI_T4_TARGETS = {
+    "DSCE": 0,
+    "DSIT - Diploma": 0,
+    "B. Arch": 0,
+    "B.Com": 0,
+    "B.Sc (PCM)": 0,
+    "BBA": 0,
+    "BCA": 0,
+}
 
 
 def fetch_dsi_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
     """Fetch DSI Application MIS (Table 4).
-    Uses cumulative spend (legacy + live API) for consistency with Table 2.
-    Returns sections with rows, section totals, and grand total."""
+    Mirrors Table 1/2 layout: merged department column, one row per course,
+    no per-section subtotals.  Uses cumulative spend for CPA.
+    """
     leads = _fetch_dsi_lsq_leads(start_date, end_date)
 
     submitted_counts = defaultdict(int)
     for lead in leads:
         status_lower = (lead["application_status"] or "").lower().strip()
         if status_lower in APPLICATION_SUBMITTED_STATUSES:
-            course = lead["course"]
+            course = _rollup_to_dept(lead["course"])
             submitted_counts[course] += 1
 
     # Use cumulative spend (legacy + live API) for consistency with Table 2
     cumulative_rows = fetch_dsi_cumulative_range(start_date, end_date)
     spend_data = {r["course"]: r["spend"] for r in cumulative_rows}
 
-    sections = []
+    all_courses = set(submitted_counts.keys()) | set(spend_data.keys())
+    rows = []
     grand_submitted = 0
     grand_spend = 0
     grand_target = 0
 
-    for section in DSI_T4_SECTIONS:
-        section_rows = []
-        sec_submitted = 0
-        sec_spend = 0
-        sec_target = 0
-
-        for c in section["courses"]:
-            submitted = submitted_counts.get(c["key"], 0)
-            spend = round(spend_data.get(c["key"], 0))
-            cpa = round(spend / submitted) if submitted > 0 else 0
-            section_rows.append({
-                "course": c["display"],
-                "submitted": submitted,
-                "spend": spend,
-                "cpa": cpa,
-                "target": c["target"],
-            })
-            sec_submitted += submitted
-            sec_spend += spend
-            sec_target += c["target"]
-
-        sec_cpa = round(sec_spend / sec_submitted) if sec_submitted > 0 else 0
-        section_total = {
-            "course": "Total",
-            "submitted": sec_submitted,
-            "spend": sec_spend,
-            "cpa": sec_cpa,
-            "target": sec_target,
-        }
-
-        sections.append({
-            "label": section["label"],
-            "rows": section_rows,
-            "total": section_total,
+    for course in all_courses:
+        submitted = submitted_counts.get(course, 0)
+        spend = round(spend_data.get(course, 0))
+        cpa = round(spend / submitted) if submitted > 0 else 0
+        target = DSI_T4_TARGETS.get(course, 0)
+        rows.append({
+            "department": _get_dsi_dept(course),
+            "course": course,
+            "submitted": submitted,
+            "spend": spend,
+            "cpa": cpa,
+            "target": target,
         })
+        grand_submitted += submitted
+        grand_spend += spend
+        grand_target += target
 
-        grand_submitted += sec_submitted
-        grand_spend += sec_spend
-        grand_target += sec_target
+    rows.sort(key=lambda r: _dept_sort_key(r["course"]))
 
     grand_cpa = round(grand_spend / grand_submitted) if grand_submitted > 0 else 0
     grand_total = {
-        "course": "GRAND TOTAL",
+        "course": "TOTAL",
         "submitted": grand_submitted,
         "spend": grand_spend,
         "cpa": grand_cpa,
@@ -919,7 +887,7 @@ def fetch_dsi_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
     }
 
     return {
-        "sections": sections,
+        "rows": rows,
         "grand_total": grand_total,
     }
 
