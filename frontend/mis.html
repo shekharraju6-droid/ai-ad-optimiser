@@ -812,6 +812,7 @@
     // DSU Table 7: Monthly Spend Summary and Balance
     // ========================================================================
     let dsuEditingBudgetId = null;
+    let dsiEditingBudgetId = null;
 
     function buildDSUTable7(data) {
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
@@ -1072,8 +1073,11 @@
                 const data = await api('GET', '/reports/dsi/application-mis');
                 buildDSITable4(data);
             } else if (tab === 't5') {
-                const data = await api('GET', '/reports/dsi/budget-mis');
-                buildDSITable5(data);
+                const [budgetData, entries] = await Promise.all([
+                    api('GET', '/reports/dsi/budget-mis'),
+                    api('GET', '/reports/dsi/budget-entries'),
+                ]);
+                buildDSITable5(budgetData, entries);
             }
         } catch (e) {
             toast(e.message, true);
@@ -1308,8 +1312,16 @@
         `;
     }
 
-    function buildDSITable5(data) {
+    function buildDSITable5(data, entries = []) {
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
+        const fmtDate = (dateStr) => {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr + 'T00:00:00');
+            if (isNaN(d.getTime())) return dateStr;
+            const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return `${String(d.getDate()).padStart(2,'0')}-${m[d.getMonth()]}-${d.getFullYear()}`;
+        };
 
         const rows = data.rows || [];
         const gt = data.grand_total || {};
@@ -1364,16 +1376,70 @@
             return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-center" style="padding:0.35rem 0.5rem;${statusColor}">${escapeHtml(r.status)}</td>${budgetCell}${spendCell}${remainingCell}</tr>`;
         }).join('');
 
+        // Budget entries table
+        const formTitle = dsiEditingBudgetId ? 'Edit Budget Received' : 'Add Budget Received';
+        const saveFn = dsiEditingBudgetId ? 'dsiUpdateBudgetEntry()' : 'dsiSaveBudgetEntry()';
+
+        const editingEntry = dsiEditingBudgetId ? (entries || []).find(e => e.id === dsiEditingBudgetId) : null;
+
+        const entryRows = (entries || []).map(e => {
+            const isEditing = dsiEditingBudgetId === e.id;
+            return `<tr style="${isEditing ? 'background:#fef3c7' : ''}">
+                <td style="white-space:nowrap;padding:0.35rem 0.5rem">${escapeHtml(fmtDate(e.date))}</td>
+                <td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(e.amount)}</td>
+                <td style="padding:0.35rem 0.5rem">${escapeHtml(e.invoice || '-')}</td>
+                <td style="padding:0.35rem 0.5rem">${escapeHtml(e.section || '-')}</td>
+                <td class="text-center" style="padding:0.35rem 0.5rem">
+                    <button class="action-btn" title="Edit" onclick="dsiEditBudgetEntry(${e.id})">&#9998;</button>
+                    <button class="action-btn" title="Delete" onclick="dsiDeleteBudgetEntry(${e.id})" style="color:#dc2626">&#10005;</button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        const totalReceived = (entries || []).reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
         $('reportContent').innerHTML = `
             ${dsiTabBar()}
             <div class="card" style="padding:0.75rem">
                 <div class="card-header" style="flex-wrap:wrap;margin-bottom:0.5rem">
                     <div class="card-title" style="font-size:0.9rem">Table 5: Budget MIS by Department</div>
-                    <div style="display:flex;gap:0.5rem">
-                        <button class="btn btn-success" onclick="dsiAddBudgetEntry()">+ Add Budget Entry</button>
+                </div>
+
+                <!-- Budget Received Entry Form -->
+                <div class="dsu-budget-form" style="margin-bottom:0.75rem">
+                    <div class="dsu-budget-form-title">${formTitle}</div>
+                    <div class="form-row" style="align-items:flex-end;">
+                        <div class="form-group dsu-budget-form">
+                            <label>Date</label>
+                            <input type="date" id="dsiBudgetDate" class="date-input" value="${editingEntry ? editingEntry.date : ''}">
+                        </div>
+                        <div class="form-group dsu-budget-form">
+                            <label>Amount Received</label>
+                            <input type="number" id="dsiBudgetAmount" step="0.01" placeholder="0" value="${editingEntry ? editingEntry.amount : ''}">
+                        </div>
+                        <div class="form-group dsu-budget-form">
+                            <label>Invoice #</label>
+                            <input type="text" id="dsiBudgetInvoice" placeholder="Invoice #" value="${editingEntry ? escapeHtml(editingEntry.invoice || '') : ''}">
+                        </div>
+                        <div class="form-group dsu-budget-form">
+                            <label>Section</label>
+                            <select id="dsiBudgetSection">
+                                <option value="DSCE" ${editingEntry && editingEntry.section === 'DSCE' ? 'selected' : ''}>DSCE</option>
+                                <option value="DSIT" ${editingEntry && editingEntry.section === 'DSIT' ? 'selected' : ''}>DSIT</option>
+                                <option value="DSCA" ${editingEntry && editingEntry.section === 'DSCA' ? 'selected' : ''}>DSCA</option>
+                                <option value="DSCASC - UG" ${editingEntry && editingEntry.section === 'DSCASC - UG' ? 'selected' : ''}>DSCASC - UG</option>
+                                <option value="DSCASC - Masters" ${editingEntry && editingEntry.section === 'DSCASC - Masters' ? 'selected' : ''}>DSCASC - Masters</option>
+                            </select>
+                        </div>
+                        <div class="form-group dsu-budget-form" style="flex:0;min-width:auto;display:flex;gap:0.5rem;">
+                            <button class="btn btn-primary" onclick="${saveFn}">${dsiEditingBudgetId ? 'Update' : 'Save'}</button>
+                            ${dsiEditingBudgetId ? `<button class="btn btn-secondary" onclick="dsiCancelBudgetEdit()">Cancel</button>` : ''}
+                        </div>
                     </div>
                 </div>
-                <div class="dsi-table4-wrap">
+
+                <!-- Budget Summary Table -->
+                <div class="dsi-table4-wrap" style="margin-bottom:0.75rem">
                 <table class="dsu-table" style="font-size:0.78rem">
                     <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-center" style="padding:0.35rem 0.5rem">Status</th><th class="text-right" style="padding:0.35rem 0.5rem">Media Budget Received</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Remaining Budget</th></tr></thead>
                     <tbody>
@@ -1382,38 +1448,40 @@
                     </tbody>
                 </table>
                 </div>
-                <div id="dsiBudgetForm" class="hidden" style="margin-top:1rem;padding:1rem;background:var(--bg-sidebar);border-radius:8px;">
-                    <div class="form-row">
-                        <div class="form-group"><label>Date</label><input type="date" id="dsiBudgetDate" class="date-input"></div>
-                        <div class="form-group"><label>Amount</label><input type="number" id="dsiBudgetAmount" step="0.01"></div>
-                        <div class="form-group"><label>Invoice #</label><input type="text" id="dsiBudgetInvoice"></div>
-                        <div class="form-group"><label>Section</label>
-                            <select id="dsiBudgetSection">
-                                <option value="DSCE">DSCE</option>
-                                <option value="DSIT">DSIT</option>
-                                <option value="DSCA">DSCA</option>
-                                <option value="DSCASC - UG">DSCASC - UG</option>
-                                <option value="DSCASC - Masters">DSCASC - Masters</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="flex:0;min-width:auto;">
-                            <button class="btn btn-primary" onclick="dsiSaveBudgetEntry()">Save</button>
-                            <button class="btn btn-secondary" onclick="$('dsiBudgetForm').classList.add('hidden')">Cancel</button>
-                        </div>
-                    </div>
+
+                <!-- Budget Entries List -->
+                <div style="overflow-x:auto;">
+                <table class="dsu-table" style="font-size:0.78rem">
+                    <thead><tr><th style="padding:0.35rem 0.5rem">Date</th><th class="text-right" style="padding:0.35rem 0.5rem">Amount Received</th><th style="padding:0.35rem 0.5rem">Invoice #</th><th style="padding:0.35rem 0.5rem">Section</th><th class="text-center" style="padding:0.35rem 0.5rem">Actions</th></tr></thead>
+                    <tbody>
+                        ${entryRows || '<tr><td colspan="5" style="text-align:center;padding:0.75rem;color:var(--text-muted)">No budget entries yet.</td></tr>'}
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td style="padding:0.35rem 0.5rem">TOTAL RECEIVED</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(totalReceived)}</td><td colspan="3" style="padding:0.35rem 0.5rem"></td></tr>
+                    </tbody>
+                </table>
                 </div>
             </div>
         `;
     }
 
     function dsiAddBudgetEntry() {
-        $('dsiBudgetForm').classList.remove('hidden');
+        dsiEditingBudgetId = null;
         const t = new Date();
         const todayStr = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
         $('dsiBudgetDate').value = todayStr;
         $('dsiBudgetAmount').value = '';
         $('dsiBudgetInvoice').value = '';
         $('dsiBudgetSection').value = 'DSCE';
+        loadDSIReport();
+    }
+
+    function dsiEditBudgetEntry(id) {
+        dsiEditingBudgetId = id;
+        loadDSIReport();
+    }
+
+    function dsiCancelBudgetEdit() {
+        dsiEditingBudgetId = null;
+        loadDSIReport();
     }
 
     async function dsiSaveBudgetEntry() {
@@ -1427,7 +1495,34 @@
         try {
             await api('POST', '/reports/dsi/budget-entries', payload);
             toast('Budget entry added');
-            $('dsiBudgetForm').classList.add('hidden');
+            dsiEditingBudgetId = null;
+            await loadDSIReport();
+        } catch(e) { toast(e.message, true); }
+    }
+
+    async function dsiUpdateBudgetEntry() {
+        if (!dsiEditingBudgetId) return;
+        const payload = {
+            date: $('dsiBudgetDate').value,
+            amount: parseFloat($('dsiBudgetAmount').value) || 0,
+            invoice: $('dsiBudgetInvoice').value,
+            section: $('dsiBudgetSection').value,
+        };
+        if (!payload.date) { toast('Date is required', true); return; }
+        try {
+            await api('PUT', '/reports/dsi/budget-entries/' + dsiEditingBudgetId, payload);
+            toast('Budget entry updated');
+            dsiEditingBudgetId = null;
+            await loadDSIReport();
+        } catch(e) { toast(e.message, true); }
+    }
+
+    async function dsiDeleteBudgetEntry(id) {
+        if (!confirm('Delete this budget entry?')) return;
+        try {
+            await api('DELETE', '/reports/dsi/budget-entries/' + id);
+            toast('Budget entry deleted');
+            if (dsiEditingBudgetId === id) dsiEditingBudgetId = null;
             await loadDSIReport();
         } catch(e) { toast(e.message, true); }
     }
