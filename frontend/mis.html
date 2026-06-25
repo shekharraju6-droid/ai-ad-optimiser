@@ -151,23 +151,11 @@
         .toast.error { background: var(--color-danger); }
         .hidden { display: none !important; }
 
-        /* Mantri reports */
-        .mantri-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-        .mantri-tab { padding: 0.5rem 0.85rem; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border-color); background: #fff; color: var(--text-muted); }
-        .mantri-tab:hover { background: var(--bg-sidebar); color: var(--text-main); }
-        .mantri-tab.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
-        .mantri-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; background: #fff; }
-        .mantri-table th { padding: 0.6rem 0.75rem; border: 1px solid var(--border-color); text-align: left; background: var(--bg-sidebar); font-weight: 600; color: var(--text-muted); }
-        .mantri-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border-color); }
-        .mantri-table td.text-right, .mantri-table th.text-right { text-align: right; }
-        .mantri-table tr.total-row { background: var(--color-primary-glow); font-weight: 700; }
-        .mantri-table tr.total-row td { border-top: 2px solid var(--color-primary); }
-        .mantri-table td.row-label { font-weight: 600; }
-        .mantri-table tr.total-row td.row-label { color: var(--color-primary); }
-        .mantri-table tr:hover td { background: rgba(79,70,229,0.03); }
+        /* Mantri lead status table */
         .mantri-status { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.6rem; border-radius: 20px; }
         .mantri-status.live { background: #d1fae5; color: #065f46; }
         .mantri-status.sample { background: #fef3c7; color: #92400e; }
+        .mantri-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
     </style>
 </head>
 <body>
@@ -185,13 +173,6 @@
             </div>
             <div class="sidebar-section-title">Accounts</div>
             <div id="accountList" class="account-list"></div>
-            <div class="sidebar-section-title">Mantri Reports</div>
-            <div id="mantriList" class="account-list">
-                <div class="account-item" onclick="selectMantri()" id="mantriNavItem">
-                    <div class="account-icon" style="background:linear-gradient(135deg,#4f46e5,#0891b2);color:#fff;">MT</div>
-                    <div>Mantri Reports</div>
-                </div>
-            </div>
         </aside>
 
         <main class="main">
@@ -335,7 +316,6 @@
         selectedAccountId = null;
         $('homeBtn').classList.add('active');
         document.querySelectorAll('.account-item').forEach(el => el.classList.remove('active'));
-        const mn = $('mantriNavItem'); if (mn) mn.classList.remove('active');
         $('reportTitle').textContent = 'MIS Reports';
         $('welcomeState').classList.remove('hidden');
         $('reportContent').classList.add('hidden');
@@ -369,7 +349,6 @@
     async function selectAccount(id) {
         selectedAccountId = id;
         $('homeBtn').classList.remove('active');
-        const mn = $('mantriNavItem'); if (mn) mn.classList.remove('active');
         document.querySelectorAll('.account-item').forEach(el => el.classList.remove('active'));
         const items = $('accountList').children;
         const idx = allAccounts.findIndex(a => a.id === id);
@@ -397,7 +376,7 @@
             return;
         }
         if (a && a.name === 'Mantri Developers') {
-            renderMantriDevelopersContent();
+            renderMantriReport();
             return;
         }
         computeDateRange(reportDateRange.preset || 'last30');
@@ -1953,176 +1932,38 @@
         window.print();
     }
 
-    // ---------- Mantri Reports ----------
-    let mantriCurrentReport = 'lead-status-by-platform';
-
-    const MANTRI_REPORTS = [
-        { id: 'lead-status-by-platform', label: 'Lead Status by Platform' },
-        { id: 'platform-spend-by-project', label: 'Platform Spend by Project' },
-        { id: 'daily-meta', label: 'Daily Meta' },
-        { id: 'daily-google', label: 'Daily Google' },
-        { id: 'daily-combined', label: 'Daily Combined' },
-    ];
-
-    function selectMantri() {
-        selectedAccountId = null;
-        $('homeBtn').classList.remove('active');
-        document.querySelectorAll('.account-item').forEach(el => el.classList.remove('active'));
-        $('mantriNavItem').classList.add('active');
-        $('reportTitle').textContent = 'Mantri Reports';
+    // ---------- Mantri Developers report ----------
+    async function renderMantriReport() {
+        $('reportTitle').textContent = 'Mantri Developers - Lead Status by Platform';
         $('welcomeState').classList.add('hidden');
         $('reportContent').classList.remove('hidden');
         $('reportContent').innerHTML = `
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
-                <div class="mantri-tabs" id="mantriTabs">
-                    ${MANTRI_REPORTS.map(r => `<div class="mantri-tab${r.id === mantriCurrentReport ? ' active' : ''}" onclick="loadMantriReport('${r.id}')">${r.label}</div>`).join('')}
-                </div>
-                <div style="display:flex; align-items:center; gap:0.75rem;">
-                    <span id="mantriModeBadge" class="mantri-status sample"><span class="status-dot"></span>Sample data</span>
-                    <button class="btn btn-success" onclick="exportMantriExcel()">⬇ Export Excel</button>
-                </div>
-            </div>
-            <div class="card" style="margin-bottom:0;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
-                    <div style="font-size:1rem; font-weight:700;" id="mantriReportTitle">Report</div>
-                    <div style="font-size:0.78rem; color:var(--text-muted);" id="mantriReportMeta"></div>
-                </div>
-                <div style="overflow-x:auto;">
-                    <table class="mantri-table" id="mantriTable"><thead><tr></tr></thead><tbody></tbody></table>
-                </div>
-                <div id="mantriEmpty" class="empty-state hidden">No data available.</div>
-            </div>`;
-        loadMantriReport(mantriCurrentReport);
-    }
-
-    function selectMantriDevelopers() {
-        // Kept for backwards compatibility; content is now rendered via account selection.
-        renderMantriDevelopersContent();
-    }
-
-    function renderMantriDevelopersContent() {
-        $('reportTitle').textContent = 'Mantri Developers';
-        $('welcomeState').classList.add('hidden');
-        $('reportContent').classList.remove('hidden');
-        $('reportContent').innerHTML = `
-            <div class="card" style="margin-bottom:1rem;">
-                <div style="font-size:1rem; font-weight:700; margin-bottom:0.5rem;">Mantri Configuration</div>
-                <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:1rem;">Enter the Meta Account ID and Salesforce OAuth credentials used to pull real lead/spend data. Leave blank to continue viewing sample data.</div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
-                    <div class="form-group"><label>Meta Account ID</label><input type="text" id="cfgMetaAccountId" placeholder="act_123456789"></div>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
-                    <div class="form-group"><label>Salesforce Instance URL</label><input type="text" id="cfgSalesforceUrl" placeholder="https://yourdomain.my.salesforce.com"></div>
-                    <div class="form-group"><label>Salesforce Client ID</label><input type="text" id="cfgSalesforceClientId" placeholder="Consumer Key"></div>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
-                    <div class="form-group"><label>Salesforce Client Secret</label><input type="password" id="cfgSalesforceClientSecret" placeholder="Consumer Secret"></div>
-                    <div class="form-group"><label>Salesforce Refresh Token</label><input type="password" id="cfgSalesforceRefreshToken" placeholder="OAuth Refresh Token"></div>
-                </div>
-                <button class="btn btn-primary" onclick="saveMantriConfig()">Save Mantri Credentials</button>
-            </div>
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
                 <div style="font-size:1rem; font-weight:700;">Lead Status by Platform</div>
                 <div style="display:flex; align-items:center; gap:0.75rem;">
-                    <span id="mantriDevModeBadge" class="mantri-status sample"><span class="status-dot"></span>Sample data</span>
+                    <span id="mantriModeBadge" class="mantri-status sample"><span class="mantri-status-dot"></span>Sample data</span>
                     <button class="btn btn-success" onclick="exportMantriExcel()">⬇ Export Excel</button>
                 </div>
             </div>
             <div class="card" style="margin-bottom:0;">
-                <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.75rem;" id="mantriDevReportMeta"></div>
+                <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.75rem;" id="mantriReportMeta"></div>
                 <div style="overflow-x:auto;">
-                    <table class="mantri-table" id="mantriDevTable"><thead><tr></tr></thead><tbody></tbody></table>
+                    <table class="dsu-table" id="mantriTable"><thead><tr></tr></thead><tbody></tbody></table>
                 </div>
-                <div id="mantriDevEmpty" class="empty-state hidden">No data available.</div>
+                <div id="mantriEmpty" class="empty-state hidden">No data available.</div>
             </div>`;
-        loadMantriDevReport();
-        loadMantriDevConfig();
-    }
-
-    async function loadMantriDevConfig() {
-        try {
-            const cfg = await api('GET', '/mantri/config');
-            $('cfgMetaAccountId').value = cfg.meta_account_id || '';
-            $('cfgSalesforceUrl').value = cfg.salesforce_url || '';
-            $('cfgSalesforceClientId').value = cfg.salesforce_client_id || '';
-            $('cfgSalesforceClientSecret').value = cfg.salesforce_client_secret || '';
-            $('cfgSalesforceRefreshToken').value = cfg.salesforce_refresh_token || '';
-        } catch (e) { toast(e.message, true); }
-    }
-
-    async function saveMantriConfig() {
-        try {
-            const current = await api('GET', '/mantri/config');
-            const payload = {
-                meta_account_id: $('cfgMetaAccountId').value.trim(),
-                salesforce_url: $('cfgSalesforceUrl').value.trim(),
-                salesforce_client_id: $('cfgSalesforceClientId').value.trim(),
-                salesforce_client_secret: maskAwareMantri(current.salesforce_client_secret, $('cfgSalesforceClientSecret').value),
-                salesforce_refresh_token: maskAwareMantri(current.salesforce_refresh_token, $('cfgSalesforceRefreshToken').value),
-            };
-            await api('POST', '/mantri/config', payload);
-            toast('Mantri configuration saved');
-            loadMantriDevConfig();
-            loadMantriDevReport();
-        } catch (e) { toast(e.message, true); }
-    }
-
-    function maskAwareMantri(current, val) {
-        if (!val) return '';
-        if (val.includes('●●●●')) return current || '';
-        return val;
-    }
-
-    async function loadMantriDevReport() {
-        const table = $('mantriDevTable');
-        if (!table) return;
-        const tbody = table.querySelector('tbody');
-        const thead = table.querySelector('thead');
-        tbody.innerHTML = '<tr><td colspan="99" style="text-align:center;padding:2rem;color:var(--text-light);">Loading...</td></tr>';
-        $('mantriDevEmpty').classList.add('hidden');
-        try {
-            const data = await api('GET', '/mantri/reports/lead-status-by-platform');
-            const modeText = data.configured ? 'Live data mode' : 'Sample data mode';
-            $('mantriDevReportMeta').textContent = 'Generated: ' + (data.generated_at || 'today') + ' | ' + modeText;
-            const badge = $('mantriDevModeBadge');
-            if (badge) {
-                if (data.configured) { badge.className = 'mantri-status live'; badge.innerHTML = '<span class="status-dot"></span>Live data'; }
-                else { badge.className = 'mantri-status sample'; badge.innerHTML = '<span class="status-dot"></span>Sample data'; }
-            }
-            if (!data.rows || !data.rows.length) {
-                tbody.innerHTML = ''; thead.innerHTML = '';
-                $('mantriDevEmpty').classList.remove('hidden');
-                return;
-            }
-
-            // Two-level header matching the image
-            renderMantriLeadStatusTable(thead, tbody, data.rows);
-        } catch (e) {
-            tbody.innerHTML = '<tr><td colspan="99" style="text-align:center;padding:2rem;color:var(--color-danger);">Error: ' + escapeHtml(e.message) + '</td></tr>';
-            toast(e.message, true);
-        }
-    }
-
-    async function loadMantriReport(reportId) {
-        mantriCurrentReport = reportId;
-        document.querySelectorAll('#mantriTabs .mantri-tab').forEach(t => t.classList.remove('active'));
-        const tabs = document.querySelectorAll('#mantriTabs .mantri-tab');
-        MANTRI_REPORTS.forEach((r, i) => { if (r.id === reportId && tabs[i]) tabs[i].classList.add('active'); });
-
         const table = $('mantriTable');
         const tbody = table.querySelector('tbody');
         const thead = table.querySelector('thead');
         tbody.innerHTML = '<tr><td colspan="99" style="text-align:center;padding:2rem;color:var(--text-light);">Loading...</td></tr>';
         $('mantriEmpty').classList.add('hidden');
-
         try {
-            const data = await api('GET', '/mantri/reports/' + reportId);
-            $('mantriReportTitle').textContent = data.title || 'Report';
+            const data = await api('GET', '/mantri/reports/lead-status-by-platform');
             const modeText = data.configured ? 'Live data mode' : 'Sample data mode';
             $('mantriReportMeta').textContent = 'Generated: ' + (data.generated_at || 'today') + ' | ' + modeText;
             const badge = $('mantriModeBadge');
-            if (data.configured) { badge.className = 'mantri-status live'; badge.innerHTML = '<span class="status-dot"></span>Live data'; }
-            else { badge.className = 'mantri-status sample'; badge.innerHTML = '<span class="status-dot"></span>Sample data'; }
+            if (data.configured) { badge.className = 'mantri-status live'; badge.innerHTML = '<span class="mantri-status-dot"></span>Live data'; }
+            else { badge.className = 'mantri-status sample'; badge.innerHTML = '<span class="mantri-status-dot"></span>Sample data'; }
 
             if (!data.rows || !data.rows.length) {
                 tbody.innerHTML = ''; thead.innerHTML = '';
@@ -2130,92 +1971,60 @@
                 return;
             }
 
-            if (reportId === 'lead-status-by-platform') {
-                renderMantriLeadStatusTable(thead, tbody, data.rows);
-                return;
-            }
+            const border = '1px solid #1f2937';
+            const redFill = '#991b1b';
+            const lightRedFill = '#b91c1c';
+            const whiteText = 'color:#fff;';
+            const cellPad = 'padding:0.15rem 0.25rem;';
+            const fontSize = 'font-size:0.72rem;';
+            const center = 'text-align:center;';
+            const thStyle = `background:${redFill}; ${whiteText} border:${border}; ${center} font-weight:700; ${cellPad} ${fontSize}; white-space:nowrap;`;
+            const subThStyle = `background:${lightRedFill}; ${whiteText} border:${border}; ${center} font-weight:700; ${cellPad} ${fontSize}; white-space:nowrap;`;
 
-            const headers = Object.keys(data.rows[0]);
-            thead.innerHTML = '<tr>' + headers.map(h => {
-                const label = (h === 'disposition') ? 'Disposition' : (h === 'platform') ? 'Platform' : h;
-                const cls = (h !== 'disposition' && h !== 'platform') ? ' class="text-right"' : '';
-                return `<th${cls}>${label}</th>`;
-            }).join('') + '</tr>';
+            thead.innerHTML = `
+                <tr style="background:${redFill}; ${whiteText} ${fontSize}">
+                    <th style="${thStyle}">MANTRI</th>
+                    <th colspan="2" style="${thStyle}">Meta</th>
+                    <th colspan="2" style="${thStyle}">Google</th>
+                    <th colspan="2" style="${thStyle}">Overall</th>
+                </tr>
+                <tr style="background:${lightRedFill}; ${whiteText} ${fontSize}">
+                    <th style="${subThStyle} text-align:left;">Lead Status</th>
+                    <th style="${subThStyle}">Count</th>
+                    <th style="${subThStyle}">Percentage</th>
+                    <th style="${subThStyle}">Count</th>
+                    <th style="${subThStyle}">Percentage</th>
+                    <th style="${subThStyle}">Count</th>
+                    <th style="${subThStyle}">Percentage</th>
+                </tr>`;
 
             tbody.innerHTML = '';
+            const isTotal = (label) => label && String(label).toLowerCase().includes('grand total');
             data.rows.forEach((row, idx) => {
                 const tr = document.createElement('tr');
-                if (idx === data.rows.length - 1) tr.className = 'total-row';
-                tr.innerHTML = headers.map(h => {
-                    const val = row[h];
-                    let formatted = val;
-                    if (h === 'spend') formatted = formatMoney(val);
-                    else if (h === 'ctr') formatted = Number(val || 0).toFixed(2) + '%';
-                    else if (h === 'cpl') formatted = 'Rs ' + Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 });
-                    else if (typeof val === 'number') formatted = Number(val).toLocaleString('en-IN');
-                    const isNum = typeof val === 'number';
-                    const cls = (h === 'disposition' || h === 'platform') ? 'row-label' : (isNum ? 'text-right' : '');
-                    return `<td${cls ? ' class="' + cls + '"' : ''}>${formatted}</td>`;
-                }).join('');
+                const totalRow = isTotal(row.lead_status);
+                if (totalRow) {
+                    tr.style.background = redFill;
+                } else if (idx % 2 === 1) {
+                    tr.style.background = '#f9fafb';
+                }
+                const textStyle = totalRow ? whiteText + ' font-weight:700;' : 'color:#1f2937;';
+                const fmtPct = (val) => (val === '' || val === null || val === undefined) ? '' : Number(val).toFixed(1) + '%';
+                tr.innerHTML = `
+                    <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} font-weight:${totalRow ? '700' : '600'}; white-space:nowrap;">${escapeHtml(row.lead_status)}</td>
+                    <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${Number(row.meta_count || 0).toLocaleString('en-IN')}</td>
+                    <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${fmtPct(row.meta_pct)}</td>
+                    <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${Number(row.google_count || 0).toLocaleString('en-IN')}</td>
+                    <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${fmtPct(row.google_pct)}</td>
+                    <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${Number(row.overall_count || 0).toLocaleString('en-IN')}</td>
+                    <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${fmtPct(row.overall_pct)}</td>
+                `;
                 tbody.appendChild(tr);
             });
         } catch (e) {
             tbody.innerHTML = '<tr><td colspan="99" style="text-align:center;padding:2rem;color:var(--color-danger);">Error: ' + escapeHtml(e.message) + '</td></tr>';
             toast(e.message, true);
         }
-    }
-
-    function renderMantriLeadStatusTable(thead, tbody, rows) {
-        const border = '1px solid #1f2937';
-        const redFill = '#991b1b';
-        const lightRedFill = '#b91c1c';
-        const whiteText = 'color:#fff;';
-        const cellPad = 'padding:0.15rem 0.25rem;';
-        const fontSize = 'font-size:0.72rem;';
-        const center = 'text-align:center;';
-        const thStyle = `background:${redFill}; ${whiteText} border:${border}; ${center} font-weight:700; ${cellPad} ${fontSize}; white-space:nowrap;`;
-        const subThStyle = `background:${lightRedFill}; ${whiteText} border:${border}; ${center} font-weight:700; ${cellPad} ${fontSize}; white-space:nowrap;`;
-
-        thead.innerHTML = `
-            <tr style="background:${redFill}; ${whiteText} ${fontSize}">
-                <th style="${thStyle}">MANTRI</th>
-                <th colspan="2" style="${thStyle}">Meta</th>
-                <th colspan="2" style="${thStyle}">Google</th>
-                <th colspan="2" style="${thStyle}">Overall</th>
-            </tr>
-            <tr style="background:${lightRedFill}; ${whiteText} ${fontSize}">
-                <th style="${subThStyle} text-align:left;">Lead Status</th>
-                <th style="${subThStyle}">Count</th>
-                <th style="${subThStyle}">Percentage</th>
-                <th style="${subThStyle}">Count</th>
-                <th style="${subThStyle}">Percentage</th>
-                <th style="${subThStyle}">Count</th>
-                <th style="${subThStyle}">Percentage</th>
-            </tr>`;
-
-        tbody.innerHTML = '';
-        const isTotal = (label) => label && String(label).toLowerCase().includes('grand total');
-        rows.forEach((row, idx) => {
-            const tr = document.createElement('tr');
-            const totalRow = isTotal(row.lead_status);
-            if (totalRow) {
-                tr.style.background = redFill;
-            } else if (idx % 2 === 1) {
-                tr.style.background = '#f9fafb';
-            }
-            const textStyle = totalRow ? whiteText + ' font-weight:700;' : 'color:#1f2937;';
-            const fmtPct = (val) => (val === '' || val === null || val === undefined) ? '' : Number(val).toFixed(1) + '%';
-            tr.innerHTML = `
-                <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} font-weight:${totalRow ? '700' : '600'}; white-space:nowrap;">${escapeHtml(row.lead_status)}</td>
-                <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${Number(row.meta_count || 0).toLocaleString('en-IN')}</td>
-                <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${fmtPct(row.meta_pct)}</td>
-                <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${Number(row.google_count || 0).toLocaleString('en-IN')}</td>
-                <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${fmtPct(row.google_pct)}</td>
-                <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${Number(row.overall_count || 0).toLocaleString('en-IN')}</td>
-                <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} ${center} white-space:nowrap;">${fmtPct(row.overall_pct)}</td>
-            `;
-            tbody.appendChild(tr);
-        });
     }
 
     function exportMantriExcel() {
