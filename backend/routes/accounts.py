@@ -6,11 +6,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
-from backend.db.models import Account, AccountGroup, AccountType, AccountStatus
+from backend.db.models import Account, AccountGroup, AccountType, AccountStatus, User, UserAccountAssignment
 from backend.services.crypto import encrypt, decrypt
 from backend.services.connectors import get_connector
+from backend.routes.auth import get_current_user_required
 
 router = APIRouter(prefix="/api", tags=["accounts"])
+
+
+def _filter_accounts_for_user(query, user: User):
+    """BM (role=user) sees only assigned accounts. Admin/superadmin see all."""
+    if user.role in ("admin", "superadmin"):
+        return query
+    return query.join(UserAccountAssignment, UserAccountAssignment.account_id == Account.id).filter(
+        UserAccountAssignment.user_id == user.id
+    )
 
 
 def _badges_for_tile(account, platform: str, db: Session) -> dict:
@@ -97,16 +107,21 @@ class GroupCreate(BaseModel):
 
 
 @router.get("/accounts")
-def list_accounts(db: Session = Depends(get_db)):
-    accounts = db.query(Account).all()
+def list_accounts(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    q = db.query(Account)
+    q = _filter_accounts_for_user(q, user)
+    accounts = q.all()
     return [a.to_dict() for a in accounts]
 
 
 @router.get("/accounts/summary")
-def dashboard_summary(start_date: Optional[str] = None, end_date: Optional[str] = None, db: Session = Depends(get_db)):
+def dashboard_summary(start_date: Optional[str] = None, end_date: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     """Grouped dashboard summary across all accounts. Optionally filtered by date range.
-    Only live accounts (DSU, DSI) contribute to totals and tile metrics; non-live accounts show zeros."""
-    accounts = db.query(Account).filter(Account.is_active == True).all()
+    Only live accounts (DSU, DSI) contribute to totals and tile metrics; non-live accounts show zeros.
+    BM users only see their assigned accounts."""
+    q = db.query(Account).filter(Account.is_active == True)
+    q = _filter_accounts_for_user(q, user)
+    accounts = q.all()
     groups = db.query(AccountGroup).all()
 
     live_accounts = [a for a in accounts if a.is_live]
@@ -392,10 +407,12 @@ def refresh_account(account_id: int, start_date: Optional[str] = None, end_date:
 
 
 @router.get("/accounts/{account_id}")
-def get_account(account_id: int, start_date: Optional[str] = None, end_date: Optional[str] = None, platform: Optional[str] = None, db: Session = Depends(get_db)):
+def get_account(account_id: int, start_date: Optional[str] = None, end_date: Optional[str] = None, platform: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
+    if user.role == "user" and account_id not in user.assigned_account_ids():
+        raise HTTPException(status_code=403, detail="Access denied to this account")
     data = account.to_dict()
     # Zero out metrics for non-live accounts
     if not account.is_live:

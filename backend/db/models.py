@@ -281,6 +281,11 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    assigned_accounts = relationship("UserAccountAssignment", back_populates="user", cascade="all, delete-orphan")
+
+    def assigned_account_ids(self):
+        return [a.account_id for a in self.assigned_accounts]
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -293,8 +298,30 @@ class User(Base):
             "access_adpulse": self.access_adpulse,
             "access_insightdesk": self.access_insightdesk,
             "access_revenueops": self.access_revenueops,
+            "assigned_account_ids": self.assigned_account_ids(),
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class UserAccountAssignment(Base):
+    """Many-to-many: which ad accounts a BM (role=user) can see."""
+    __tablename__ = "user_account_assignments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="assigned_accounts")
+    account = relationship("Account")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "account_id": self.account_id,
+            "account_name": self.account.name if self.account else None,
         }
 
 

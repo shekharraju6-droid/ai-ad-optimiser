@@ -306,20 +306,23 @@
                 <div class="logo-icon">AI</div>
                 <span style="font-size:1.4rem;">AdOptima</span>
             </div>
-            <div class="auth-tabs">
-                <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Login</div>
-                <div class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Register</div>
+            <div id="onboardingSection" class="hidden">
+                <h3 style="text-align:center; margin-bottom:1rem;">Welcome — Create Super Admin</h3>
+                <div class="form-group"><label>Full Name</label><input type="text" id="onbName" placeholder="John Doe"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="onbEmail" placeholder="you@example.com"></div>
+                <div class="form-group"><label>Mobile</label><input type="text" id="onbMobile" placeholder="+91 9876543210"></div>
+                <div class="form-group"><label>Password</label><input type="password" id="onbPassword"></div>
+                <button class="btn btn-primary" style="width:100%;" onclick="completeOnboarding()">Create Super Admin</button>
             </div>
-            <div id="auth-login">
-                <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="you@example.com"></div>
-                <div class="form-group"><label>Password</label><input type="password" id="loginPassword"></div>
-                <button class="btn btn-primary" style="width:100%;" onclick="login()">Login</button>
-            </div>
-            <div id="auth-register" class="hidden">
-                <div class="form-group"><label>Full Name</label><input type="text" id="regName" placeholder="John Doe"></div>
-                <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="you@example.com"></div>
-                <div class="form-group"><label>Password</label><input type="password" id="regPassword"></div>
-                <button class="btn btn-primary" style="width:100%;" onclick="register()">Create Account</button>
+            <div id="authLoginSection">
+                <div class="auth-tabs">
+                    <div class="auth-tab active" id="tab-login">Login</div>
+                </div>
+                <div id="auth-login">
+                    <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="you@example.com"></div>
+                    <div class="form-group"><label>Password</label><input type="password" id="loginPassword"></div>
+                    <button class="btn btn-primary" style="width:100%;" onclick="login()">Login</button>
+                </div>
             </div>
         </div>
     </div>
@@ -356,7 +359,7 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group"><label>Developer Token *</label><input type="password" id="accGoogleDeveloperToken" placeholder="From Google Ads API Center"></div>
-                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accGoogleRedirectBaseUrl" value="http://127.0.0.1:8000" disabled></div>
+                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accGoogleRedirectBaseUrl" value="/" disabled></div>
                         </div>
                     </div>
 
@@ -391,7 +394,7 @@
                             <div class="form-group"><label>App Secret *</label><input type="password" id="accMetaAppSecret" placeholder="..."></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accMetaRedirectBaseUrl" value="http://127.0.0.1:8000" disabled></div>
+                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accMetaRedirectBaseUrl" value="/" disabled></div>
                         </div>
                     </div>
 
@@ -490,7 +493,7 @@
     </div>
 
     <script>
-    const API = 'http://127.0.0.1:8000/api';
+    const API = '/api';
     let token = localStorage.getItem('adoptima_token') || '';
     let currentUser = null;
     let allAccounts = [];
@@ -559,7 +562,15 @@
 
     // ---------- Auth ----------
     async function checkAuth() {
-        if (!token) { showAuth(true); return; }
+        if (!token) { 
+            // Check if onboarding is needed (no users yet)
+            try {
+                const r = await fetch(API + '/auth/onboarding-required');
+                const d = await r.json();
+                if (d.onboarding_required) { showOnboarding(); return; }
+            } catch (e) {}
+            showAuth(true); return; 
+        }
         try {
             currentUser = await api('GET', '/auth/me');
             showAuth(false);
@@ -569,15 +580,40 @@
         }
     }
 
-    function showAuth(show) {
-        $('authOverlay').classList.toggle('hidden', !show);
+    function showOnboarding() {
+        $('authOverlay').classList.remove('hidden');
+        $('onboardingSection').classList.remove('hidden');
+        $('authLoginSection').classList.add('hidden');
     }
 
-    function switchAuthTab(tab) {
-        $('tab-login').classList.toggle('active', tab === 'login');
-        $('tab-register').classList.toggle('active', tab === 'register');
-        $('auth-login').classList.toggle('hidden', tab !== 'login');
-        $('auth-register').classList.toggle('hidden', tab !== 'register');
+    async function completeOnboarding() {
+        const full_name = $('onbName').value.trim();
+        const email = $('onbEmail').value.trim();
+        const mobile = $('onbMobile').value.trim();
+        const password = $('onbPassword').value;
+        if (!full_name || !email || !mobile || !password) { toast('All fields are required', true); return; }
+        try {
+            const res = await fetch(API + '/auth/onboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ full_name, email, mobile, password })
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Onboarding failed'); }
+            const data = await res.json();
+            token = data.access_token;
+            currentUser = data.user;
+            localStorage.setItem('adoptima_token', token);
+            showAuth(false);
+            initApp();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function showAuth(show) {
+        $('authOverlay').classList.toggle('hidden', !show);
+        if (show) {
+            $('onboardingSection').classList.add('hidden');
+            $('authLoginSection').classList.remove('hidden');
+        }
     }
 
     async function login() {
@@ -594,18 +630,6 @@
             localStorage.setItem('adoptima_token', token);
             showAuth(false);
             initApp();
-        } catch (e) { toast(e.message, true); }
-    }
-
-    async function register() {
-        const name = $('regName').value.trim();
-        const email = $('regEmail').value.trim();
-        const password = $('regPassword').value;
-        if (!email || !password) { toast('Enter email and password', true); return; }
-        try {
-            await api('POST', '/auth/register', { email, password, full_name: name });
-            toast('Account created. Please login.');
-            switchAuthTab('login');
         } catch (e) { toast(e.message, true); }
     }
 
@@ -633,6 +657,15 @@
     function initApp() {
         computeDateRange('today');
         applyDateInputs();
+        // Hide admin-only nav items for BM (role=user)
+        const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
+        document.querySelectorAll('.nav-item[data-nav="accounts"], .nav-item[data-nav="approvals"]').forEach(el => {
+            el.style.display = isAdmin ? '' : 'none';
+        });
+        // Show/hide add-account button based on role
+        document.querySelectorAll('#panel-accounts .btn-primary').forEach(btn => {
+            if (btn.textContent.includes('Add Account')) btn.style.display = isAdmin ? '' : 'none';
+        });
         loadSummary();
         loadPendingActionsCount();
         switchPanel('dashboard');
@@ -1160,7 +1193,7 @@
         if (gSecret && !gSecret.startsWith('●●●●')) payload.google_client_secret = gSecret;
         const gDev = $('accGoogleDeveloperToken').value;
         if (gDev && !gDev.startsWith('●●●●')) payload.google_developer_token = gDev;
-        payload.redirect_base_url = 'http://127.0.0.1:8000';
+        payload.redirect_base_url = window.location.origin;
 
         // Meta per-account creds (always required if Meta enabled)
         if (hasMeta) {

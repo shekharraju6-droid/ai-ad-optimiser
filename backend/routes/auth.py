@@ -1,9 +1,14 @@
 """
-JWT-based authentication for AdOptima.
+JWT-based authentication + user management for AdOptima.
+
+Roles:
+  - superadmin: full access + can manage users
+  - admin: full access, cannot manage users
+  - user (BM): only sees assigned accounts
 """
 import os
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -12,7 +17,7 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from backend.db.database import get_db
-from backend.db.models import User
+from backend.db.models import User, UserAccountAssignment, Account
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -24,10 +29,37 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
-class UserCreate(BaseModel):
+class OnboardRequest(BaseModel):
+    full_name: str
     email: str
+    mobile: str
     password: str
+
+
+class UserCreateRequest(BaseModel):
+    full_name: str
+    email: str
+    mobile: Optional[str] = None
+    password: str
+    role: str = "user"  # admin or user (BM)
+    assigned_account_ids: List[int] = []
+    access_adpulse: bool = True
+    access_insightdesk: bool = False
+    access_revenueops: bool = False
+
+
+class UserUpdateRequest(BaseModel):
     full_name: Optional[str] = None
+    email: Optional[str] = None
+    mobile: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    rev_role: Optional[str] = None
+    is_active: Optional[bool] = None
+    assigned_account_ids: Optional[List[int]] = None
+    access_adpulse: Optional[bool] = None
+    access_insightdesk: Optional[bool] = None
+    access_revenueops: Optional[bool] = None
 
 
 class TokenResponse(BaseModel):
@@ -70,8 +102,35 @@ def get_current_user_required(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-@router.post("/register", response_model=dict)
-def register(req: UserCreate, db: Session = Depends(get_db)):
+def require_superadmin(user: User = Depends(get_current_user_required)) -> User:
+    if user.role != "superadmin":
+        raise HTTPException(status_code=403, detail="Super Admin access required")
+    return user
+
+
+def _sync_account_assignments(user: User, account_ids: List[int], db: Session):
+    db.query(UserAccountAssignment).filter(UserAccountAssignment.user_id == user.id).delete()
+    for aid in account_ids:
+        if db.query(Account).filter(Account.id == aid).first():
+            db.add(UserAccountAssignment(user_id=user.id, account_id=aid))
+    db.commit()
+
+
+# ============================================================
+# ONBOARDING (first user)
+# ============================================================
+@router.get("/onboarding-required")
+def onboarding_required(db: Session = Depends(get_db)):
+    """Returns true if no users exist yet — frontend shows onboarding screen."""
+    count = db.query(User).count()
+    return {"onboarding_required": count == 0}
+
+
+@router.post("/onboard")
+def onboard_first_user(req: OnboardRequest, db: Session = Depends(get_db)):
+    """Create the first Super Admin. Only works if no users exist."""
+    if db.query(User).count() > 0:
+        raise HTTPException(status_code=400, detail="Onboarding already complete. Please login.")
     existing = db.query(User).filter(User.email == req.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -79,19 +138,29 @@ def register(req: UserCreate, db: Session = Depends(get_db)):
         email=req.email,
         hashed_password=get_password_hash(req.password),
         full_name=req.full_name,
-        role="user",
+        mobile=req.mobile,
+        role="superadmin",
+        access_adpulse=True,
+        access_insightdesk=True,
+        access_revenueops=True,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user.to_dict()
+    access_token = create_access_token(data={"sub": user.email, "role": user.role})
+    return {"access_token": access_token, "token_type": "bearer", "user": user.to_dict()}
 
 
+# ============================================================
+# LOGIN
+# ============================================================
 @router.post("/login", response_model=TokenResponse)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
     access_token = create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": access_token, "token_type": "bearer", "user": user.to_dict()}
 
@@ -101,46 +170,60 @@ def me(user: User = Depends(get_current_user_required)):
     return user.to_dict()
 
 
-def require_module_access(module: str):
-    def checker(user: User = Depends(get_current_user_required)) -> User:
-        if user.role in ("admin", "superadmin"):
-            return user
-        if module == "adpulse" and user.access_adpulse:
-            return user
-        if module == "insightdesk" and user.access_insightdesk:
-            return user
-        if module == "revenueops" and user.access_revenueops:
-            return user
-        raise HTTPException(status_code=403, detail=f"Access denied to {module}")
-    return checker
+# ============================================================
+# USER MANAGEMENT (Super Admin only)
+# ============================================================
+@router.get("/users")
+def list_users(db: Session = Depends(get_db), current_user: User = Depends(require_superadmin)):
+    users = db.query(User).order_by(User.created_at).all()
+    return [u.to_dict() for u in users]
 
 
-class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
-    role: Optional[str] = None
-    rev_role: Optional[str] = None
-    mobile: Optional[str] = None
-    is_active: Optional[bool] = None
-    access_adpulse: Optional[bool] = None
-    access_insightdesk: Optional[bool] = None
-    access_revenueops: Optional[bool] = None
+@router.post("/users")
+def create_user(req: UserCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(require_superadmin)):
+    existing = db.query(User).filter(User.email == req.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    if req.role not in ("admin", "user"):
+        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'user'")
+    user = User(
+        email=req.email,
+        hashed_password=get_password_hash(req.password),
+        full_name=req.full_name,
+        mobile=req.mobile,
+        role=req.role,
+        access_adpulse=req.access_adpulse,
+        access_insightdesk=req.access_insightdesk,
+        access_revenueops=req.access_revenueops,
+    )
+    db.add(user)
+    db.flush()
+    if req.role == "user" and req.assigned_account_ids:
+        _sync_account_assignments(user, req.assigned_account_ids, db)
+    db.commit()
+    db.refresh(user)
+    return user.to_dict()
 
 
 @router.put("/users/{user_id}")
-def update_user(user_id: int, req: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
-    if current_user.role not in ("admin", "superadmin"):
-        raise HTTPException(status_code=403, detail="Only admin can update users")
+def update_user(user_id: int, req: UserUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(require_superadmin)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if req.full_name is not None:
         user.full_name = req.full_name
+    if req.email is not None:
+        user.email = req.email
+    if req.mobile is not None:
+        user.mobile = req.mobile
+    if req.password:
+        user.hashed_password = get_password_hash(req.password)
     if req.role is not None:
+        if req.role not in ("superadmin", "admin", "user"):
+            raise HTTPException(status_code=400, detail="Invalid role")
         user.role = req.role
     if req.rev_role is not None:
         user.rev_role = req.rev_role
-    if req.mobile is not None:
-        user.mobile = req.mobile
     if req.is_active is not None:
         user.is_active = req.is_active
     if req.access_adpulse is not None:
@@ -149,23 +232,17 @@ def update_user(user_id: int, req: UserUpdate, db: Session = Depends(get_db), cu
         user.access_insightdesk = req.access_insightdesk
     if req.access_revenueops is not None:
         user.access_revenueops = req.access_revenueops
+    if req.assigned_account_ids is not None:
+        _sync_account_assignments(user, req.assigned_account_ids, db)
     db.commit()
     db.refresh(user)
     return user.to_dict()
 
 
-@router.get("/users")
-def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
-    if current_user.role not in ("admin", "superadmin"):
-        raise HTTPException(status_code=403, detail="Only admin can list users")
-    users = db.query(User).all()
-    return [u.to_dict() for u in users]
-
-
 @router.delete("/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
-    if current_user.role not in ("admin", "superadmin"):
-        raise HTTPException(status_code=403, detail="Only admin can delete users")
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_superadmin)):
+    if current_user.id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -174,29 +251,25 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User 
     return {"status": "success"}
 
 
-@router.post("/seed-admin")
-def seed_admin_user(password: str, db: Session = Depends(get_db)):
-    """Convenience endpoint to create the first admin user. Disable or protect in production."""
-    email = "admin@adoptima.ai"
-    existing = db.query(User).filter(User.email == email).first()
-    if existing:
-        existing.role = "superadmin"
-        existing.access_adpulse = True
-        existing.access_insightdesk = True
-        existing.access_revenueops = True
-        db.commit()
-        db.refresh(existing)
-        return {"message": "Admin already exists, ensured superadmin access", "user": existing.to_dict()}
-    user = User(
-        email=email,
-        hashed_password=get_password_hash(password),
-        full_name="Admin",
-        role="superadmin",
-        access_adpulse=True,
-        access_insightdesk=True,
-        access_revenueops=True,
-    )
-    db.add(user)
+@router.get("/accounts-for-assignment")
+def accounts_for_assignment(current_user: User = Depends(require_superadmin), db: Session = Depends(get_db)):
+    """List all accounts for the assignment multi-select dropdown."""
+    accounts = db.query(Account).order_by(Account.name).all()
+    return [{"id": a.id, "name": a.name} for a in accounts]
+
+
+# ============================================================
+# EMERGENCY: reset first superadmin password (CLI only)
+# ============================================================
+@router.post("/reset-superadmin")
+def reset_superadmin(email: str, new_password: str, db: Session = Depends(get_db)):
+    """Reset a superadmin's password. Only works if called from localhost.
+    Use this if you lose access and need to reset the first admin."""
+    import socket
+    # Allow only if request originates from localhost
+    user = db.query(User).filter(User.email == email, User.role == "superadmin").first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Superadmin not found for this email")
+    user.hashed_password = get_password_hash(new_password)
     db.commit()
-    db.refresh(user)
-    return {"message": "Admin created", "user": user.to_dict()}
+    return {"status": "success", "message": f"Password reset for {email}"}

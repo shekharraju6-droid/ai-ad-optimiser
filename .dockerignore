@@ -1,0 +1,27 @@
+# Railway ignores these files/dirs during deployment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.db
+*.sqlite3
+.env
+.DS_Store
+.vscode/
+.idea/
+*.log
+tmp_*.py
+tmp_*.png
+screenshot_*.png
+*.csv
+Data/
+.adoptima/
+node_modules/
+.git/
+.gitignore
+README.md
+AGENTS.md

@@ -429,8 +429,11 @@
             <!-- USERS -->
             <div class="panel" id="panel-users">
                 <div class="card">
-                    <div class="card-header"><span class="card-title">Users</span></div>
-                    <div class="table-wrap"><table id="usersTable"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>RevOps Role</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                    <div class="card-header">
+                        <span class="card-title">User Management</span>
+                        <button class="btn btn-primary btn-sm" id="addUserBtn" onclick="openUserModal()" style="display:none">+ Add User</button>
+                    </div>
+                    <div class="table-wrap"><table id="usersTable"><thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Role</th><th>Assigned Accounts</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
         </div>
@@ -458,8 +461,8 @@
     <div id="toastContainer"></div>
 
 <script>
-const API='http://127.0.0.1:8000/api/revenueops';
-const AUTH='http://127.0.0.1:8000/api/auth';
+const API='/api/revenueops';
+const AUTH='/api/auth';
 let token=localStorage.getItem('adoptima_token')||'';
 let currentUser=null;
 let clients=[],invoices=[],payments=[],outstanding=[],reminders=[],documents=[],bmStats=[],dashData={};
@@ -500,7 +503,7 @@ function showPanel(name){
         const txt=n.textContent.trim();
         if(txt===map[name]){n.classList.add('active');const sec=n.closest('.nav-section');if(sec&&!sec.classList.contains('open'))sec.classList.add('open')}
     });
-    const titles={dashboard:'Dashboard',clients:'Clients',invoices:'Invoices',payments:'Payments',outstanding:'Outstanding',reminders:'Reminders',documents:'Documents',reports:'Reports',bms:'Business Managers','bm-view':'BM View',settings:'Settings',users:'Users'};
+    const titles={dashboard:'Dashboard',clients:'Clients',invoices:'Invoices',payments:'Payments',outstanding:'Outstanding',reminders:'Reminders',documents:'Documents',reports:'Reports',bms:'Business Managers','bm-view':'BM View',settings:'Settings',users:'User Management'};
     $('pageTitle').textContent=titles[name]||name;
     loadPanel(name);
 }
@@ -516,7 +519,7 @@ function loadPanel(name){
         case 'documents':loadDocuments();break;
         case 'bms':loadBMs();break;
         case 'bm-view':loadBMView();break;
-        case 'users':loadUsers();break;
+        case 'users':loadUserAccounts().then(()=>loadUsers());break;
         case 'settings':loadSettings();break;
     }
 }
@@ -903,17 +906,121 @@ async function loadBMView(){
 }
 
 // USERS
+let allUserAccounts=[];
+let editingUserId=null;
+
 async function loadUsers(){
-    try{const users=await fetch(AUTH+'/users',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json());
-    $('usersTable').querySelector('tbody').innerHTML=users.map(u=>`<tr>
-        <td>${u.full_name||'—'}</td><td>${u.email}</td><td>${u.role}</td><td>${statusBadge(u.rev_role||'none')}</td><td>${u.is_active?'Active':'Inactive'}</td>
-        <td><select onchange="updateRevRole(${u.id},this.value)" style="font-size:.78rem;padding:.2rem"><option value="">None</option><option value="admin" ${u.rev_role==='admin'?'selected':''}>Admin</option><option value="finance" ${u.rev_role==='finance'?'selected':''}>Finance</option><option value="business_manager" ${u.rev_role==='business_manager'?'selected':''}>BM</option></select></td>
-    </tr>`).join('');
-    }catch(e){}
+    // Show Add button only for superadmin
+    if(currentUser && currentUser.role==='superadmin'){$('addUserBtn').style.display=''}
+    else{$('addUserBtn').style.display='none'}
+    try{
+        const users=await fetch(AUTH+'/users',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json());
+        const accountMap={};
+        allUserAccounts.forEach(a=>accountMap[a.id]=a.name);
+        $('usersTable').querySelector('tbody').innerHTML=users.map(u=>{
+            const roleLabel=u.role==='superadmin'?'Super Admin':(u.role==='admin'?'Admin':'BM (User)');
+            const assigned=u.assigned_account_ids&&u.assigned_account_ids.length?u.assigned_account_ids.map(id=>accountMap[id]||('#'+id)).join(', '):'<span style="color:var(--text-light)">—</span>';
+            const canManage=currentUser&&currentUser.role==='superadmin'&&u.role!=='superadmin';
+            const actions=canManage?`<div class="actions-cell"><button class="btn btn-secondary btn-sm" onclick="openUserModal(${u.id})">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${u.email}')">Delete</button></div>`:'<span style="color:var(--text-light)">—</span>';
+            return `<tr>
+                <td>${u.full_name||'—'}</td>
+                <td>${u.email}</td>
+                <td>${u.mobile||'—'}</td>
+                <td><span class="badge ${u.role==='superadmin'?'badge-purple':(u.role==='admin'?'badge-indigo':'badge-cyan')}">${roleLabel}</span></td>
+                <td style="font-size:.78rem">${assigned}</td>
+                <td>${u.is_active?'<span class="badge badge-green">Active</span>':'<span class="badge badge-gray">Inactive</span>'}</td>
+                <td>${actions}</td>
+            </tr>`;
+        }).join('');
+    }catch(e){toast(e.message,'error')}
 }
 
-async function updateRevRole(userId,role){
-    try{await fetch(AUTH+`/users/${userId}`,{method:'PUT',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({rev_role:role})});toast('Role updated');loadUsers()}catch(e){toast(e.message,'error')}
+async function loadUserAccounts(){
+    try{allUserAccounts=await fetch(AUTH+'/accounts-for-assignment',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json())}catch(e){}
+}
+
+async function openUserModal(userId=null){
+    editingUserId=userId;
+    const isEdit=userId!==null;
+    let u={full_name:'',email:'',mobile:'',role:'user',assigned_account_ids:[],access_adpulse:true,access_insightdesk:false,access_revenueops:false};
+    if(isEdit){
+        const users=await fetch(AUTH+'/users',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json());
+        u=users.find(x=>x.id===userId)||u;
+    }
+    const acctChecks=allUserAccounts.map(a=>`<label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;padding:.25rem 0"><input type="checkbox" value="${a.id}" ${u.assigned_account_ids.includes(a.id)?'checked':''} onchange="updateUserAccountSelection()"> ${a.name}</label>`).join('');
+    $('modalTitle').textContent=isEdit?'Edit User':'Add User';
+    $('modalBody').innerHTML=`
+        <div class="form-row">
+            <div class="form-group"><label>Full Name</label><input id="usrFullName" value="${u.full_name||''}" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')"></div>
+            <div class="form-group"><label>Email</label><input id="usrEmail" type="email" value="${u.email||''}" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Mobile</label><input id="usrMobile" value="${u.mobile||''}" autocomplete="off" inputmode="tel" readonly onfocus="this.removeAttribute('readonly')"></div>
+            <div class="form-group"><label>Role</label><select id="usrRole" onchange="toggleAccountSection()">
+                <option value="user" ${u.role==='user'?'selected':''}>BM (User)</option>
+                <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+            </select></div>
+        </div>
+        <div class="form-group"><label>Password ${isEdit?'(leave blank to keep current)':''}</label><input id="usrPassword" type="password" placeholder="${isEdit?'••••••':'Enter password'}" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
+        <div class="form-row">
+            <div class="form-group"><label style="display:flex;align-items:center;gap:.4rem"><input type="checkbox" id="usrAdpulse" ${u.access_adpulse?'checked':''}> AdPulse Access</label></div>
+            <div class="form-group"><label style="display:flex;align-items:center;gap:.4rem"><input type="checkbox" id="usrInsightdesk" ${u.access_insightdesk?'checked':''}> InsightDesk Access</label></div>
+            <div class="form-group"><label style="display:flex;align-items:center;gap:.4rem"><input type="checkbox" id="usrRevenueops" ${u.access_revenueops?'checked':''}> RevenueOps Access</label></div>
+        </div>
+        <div id="usrAccountSection" style="${u.role==='user'?'':'display:none'}">
+            <label style="font-size:.76rem;font-weight:600;color:var(--text-muted);margin-bottom:.22rem;display:block">Assigned Accounts (BM only)</label>
+            <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem">${acctChecks||'<span style="color:var(--text-light);font-size:.82rem">No accounts available</span>'}</div>
+        </div>`;
+    $('modalOverlay').style.display='';
+    $('modalSave').onclick=saveUserModal;
+    toggleAccountSection();
+}
+
+function toggleAccountSection(){
+    const role=document.getElementById('usrRole');
+    if(!role)return;
+    const sec=document.getElementById('usrAccountSection');
+    if(sec)sec.style.display=role.value==='user'?'':'none';
+}
+
+function getSelectedAccountIds(){
+    const ids=[];
+    document.querySelectorAll('#usrAccountSection input[type=checkbox]').forEach(cb=>{if(cb.checked)ids.push(parseInt(cb.value))});
+    return ids;
+}
+
+async function saveUserModal(){
+    const full_name=$('usrFullName').value.trim();
+    const email=$('usrEmail').value.trim();
+    const mobile=$('usrMobile').value.trim();
+    const password=$('usrPassword').value;
+    const role=$('usrRole').value;
+    const assigned_account_ids=getSelectedAccountIds();
+    const access_adpulse=$('usrAdpulse').checked;
+    const access_insightdesk=$('usrInsightdesk').checked;
+    const access_revenueops=$('usrRevenueops').checked;
+    if(!full_name||!email){toast('Name and Email are required','error');return}
+    if(!editingUserId&&!password){toast('Password is required','error');return}
+    const payload={full_name,email,mobile,role,assigned_account_ids,access_adpulse,access_insightdesk,access_revenueops};
+    if(password)payload.password=password;
+    try{
+        if(editingUserId){
+            await fetch(AUTH+`/users/${editingUserId}`,{method:'PUT',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            toast('User updated');
+        }else{
+            await fetch(AUTH+'/users',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            toast('User created');
+        }
+        closeModal();loadUsers();
+    }catch(e){toast(e.message,'error')}
+}
+
+async function deleteUser(userId,email){
+    if(!confirm(`Delete user "${email}"? This cannot be undone.`))return;
+    try{
+        await fetch(AUTH+`/users/${userId}`,{method:'DELETE',headers:{'Authorization':'Bearer '+token}});
+        toast('User deleted');loadUsers();
+    }catch(e){toast(e.message,'error')}
 }
 
 // SETTINGS
@@ -932,7 +1039,7 @@ async function saveSettings(){
 // SEED
 async function seedDemo(){try{const r=await api('POST','/seed-demo');toast(`Seeded: ${r.clients} clients, ${r.invoices} invoices, ${r.payments} payments`);loadDashboard()}catch(e){toast(e.message,'error')}}
 
-function closeModal(){$('modalOverlay').style.display='none'}
+function closeModal(){$('modalOverlay').style.display='none'; editingUserId=null;}
 
 window.addEventListener('DOMContentLoaded',async()=>{
     await checkAuth();
