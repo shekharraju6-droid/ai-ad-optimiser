@@ -88,6 +88,16 @@
         .dsu-table4-wrap { max-width: 720px; margin: 0 auto; }
         .dsi-table4-wrap { max-width: 720px; margin: 0 auto; }
 
+        /* DSI Table 1 & 2 compact layout */
+        .dsi-t1t2-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+        @media (max-width: 1100px) { .dsi-t1t2-wrap { grid-template-columns: 1fr; } }
+        .dsi-t1t2-wrap .dsu-table { font-size: 0.72rem; }
+        .dsi-t1t2-wrap .dsu-table th { padding: 0.2rem 0.35rem; font-size: 0.68rem; }
+        .dsi-t1t2-wrap .dsu-table td { padding: 0.15rem 0.35rem; }
+        .dsi-t1t2-wrap .dsu-banner { padding: 0.2rem; font-size: 0.62rem; letter-spacing: 0.02em; }
+        .dsi-t1t2-wrap .dsu-mis-row { padding: 0.2rem; font-size: 0.72rem; }
+        .dsi-t1t2-wrap .dsu-total-row td { padding: 0.2rem 0.35rem; }
+
                 .dsu-table7 { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: #fff; border: 2px solid #3730a3; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .dsu-table7 th { padding: 0.6rem 0.7rem; border: 1.5px solid #3730a3; text-align: left; background: #4338ca; color: #fff; font-weight: 700; font-size: 0.8rem; }
         .dsu-table7 td { padding: 0.55rem 0.7rem; border: 1px solid #818cf8; background: #fff; text-align: left; }
@@ -187,7 +197,12 @@
         <main class="main">
             <div class="topbar">
                 <h1 id="reportTitle">MIS Reports</h1>
-                <a href="/" class="btn btn-secondary">Back to Dashboard</a>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <button id="syncLeadsBtn" class="btn btn-primary" onclick="syncLeadsNow()" disabled title="Sync LeadSquared leads for the selected account" style="display:none;">
+                        ↻ Sync Leads Now
+                    </button>
+                    <a href="/" class="btn btn-secondary">Back to Dashboard</a>
+                </div>
             </div>
             <div class="content">
                 <div id="reportContainer" class="card">
@@ -325,6 +340,30 @@
         $('welcomeState').classList.remove('hidden');
         $('reportContent').classList.add('hidden');
         $('reportContent').innerHTML = '';
+        $('syncLeadsBtn').style.display = 'none';
+    }
+
+    let _syncing = false;
+    async function syncLeadsNow() {
+        if (!selectedAccountId || _syncing) return;
+        const btn = $('syncLeadsBtn');
+        _syncing = true;
+        btn.disabled = true;
+        btn.textContent = '↻ Syncing...';
+        try {
+            const result = await api('POST', '/reports/lsq-sync?account_id=' + selectedAccountId);
+            toast('Synced ' + (result.synced_count || 0) + ' leads from LeadSquared');
+            await new Promise(r => setTimeout(r, 500));
+            const a = allAccounts.find(x => x.id === selectedAccountId);
+            if (a && a.name === 'DSU') { await loadDSUReport(); }
+            else if (a && a.name === 'DSI') { await loadDSIReport(); }
+        } catch (e) {
+            toast('Sync failed: ' + e.message, true);
+        } finally {
+            _syncing = false;
+            btn.disabled = false;
+            btn.textContent = '↻ Sync Leads Now';
+        }
     }
 
     async function selectAccount(id) {
@@ -340,6 +379,15 @@
         $('welcomeState').classList.add('hidden');
         $('reportContent').classList.remove('hidden');
         $('reportContent').innerHTML = '<div class="loading-wrap"><div class="spinner"></div> Loading report...</div>';
+        const syncBtn = $('syncLeadsBtn');
+        const isLsqAccount = a && (a.name === 'DSU' || a.name === 'DSI');
+        if (isLsqAccount) {
+            syncBtn.style.display = '';
+            syncBtn.disabled = false;
+            syncBtn.textContent = '↻ Sync Leads Now';
+        } else {
+            syncBtn.style.display = 'none';
+        }
         if (a && a.name === 'DSU') {
             await renderDSUReport();
             return;
@@ -1123,8 +1171,8 @@
             { id: 't4', label: 'Table 4: Application MIS' },
             { id: 't5', label: 'Table 5: Budget MIS' },
         ];
-        return `<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
-            ${tabs.map(t => `<button class="btn ${dsiActiveTab===t.id?'btn-primary':'btn-secondary'}" onclick="dsiSwitchTab('${t.id}')">${t.label}</button>`).join('')}
+        return `<div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+            ${tabs.map(t => `<button class="btn ${dsiActiveTab===t.id?'btn-primary':'btn-secondary'}" onclick="dsiSwitchTab('${t.id}')" style="padding:0.3rem 0.6rem;font-size:0.75rem;">${t.label}</button>`).join('')}
         </div>`;
     }
 
@@ -1234,17 +1282,12 @@
 
         $('reportContent').innerHTML = `
             ${dsiTabBar()}
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">DSI Course Performance Report</div>
+            <div class="dsi-t1t2-wrap">
+                <div style="padding:0">
+                    ${renderDSITable(d.title, d.rows, d.total, t1Header)}
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem">
-                    <div style="padding:0">
-                        ${renderDSITable(d.title, d.rows, d.total, t1Header)}
-                    </div>
-                    <div style="padding:0">
-                        ${renderDSITable(c.title, c.rows, c.total, t2Header)}
-                    </div>
+                <div style="padding:0">
+                    ${renderDSITable(c.title, c.rows, c.total, t2Header)}
                 </div>
             </div>
         `;

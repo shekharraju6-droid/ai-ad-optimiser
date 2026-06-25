@@ -13,6 +13,36 @@ from backend.services.connectors import get_connector
 router = APIRouter(prefix="/api", tags=["accounts"])
 
 
+def _badges_for_tile(account, platform: str, db: Session) -> dict:
+    """Compute API + Performance health badges for a dashboard tile.
+
+    Uses cached metrics + LSQ mirror leads for today. Falls back gracefully
+    if leads cannot be fetched.
+    """
+    from backend.services.health import compute_health_badges
+    from datetime import datetime, timedelta
+
+    today = (datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d")
+    leads_today = 0
+    try:
+        from backend.services.lsq_mirror import count_leads_by_course
+        counts = count_leads_by_course(db, account.id, today, today)
+        leads_today = sum(counts.values())
+    except Exception:
+        pass
+
+    # API success is inferred from whether the account has a live platform with
+    # valid credentials and no last_sync_error.
+    platform_live = account.google_is_live if platform == "google" else account.meta_is_live
+    platform_creds = account.google_credentials if platform == "google" else account.meta_credentials
+    api_success = bool(platform_live and platform_creds and not account.last_sync_error)
+
+    return compute_health_badges(
+        account, api_success=api_success, platform=platform, leads=leads_today,
+        active_start=0, active_end=23,
+    )
+
+
 class AccountCreate(BaseModel):
     name: str
     group_id: Optional[int] = None
@@ -30,6 +60,7 @@ class AccountCreate(BaseModel):
 
     crm_type: str = "none"
     crm_credentials: Optional[str] = None
+    target_cpa: Optional[float] = None
 
 
 class AccountUpdate(BaseModel):
@@ -58,6 +89,7 @@ class AccountUpdate(BaseModel):
 
     crm_type: Optional[str] = None
     crm_credentials: Optional[str] = None
+    target_cpa: Optional[float] = None
 
 
 class GroupCreate(BaseModel):
@@ -114,6 +146,13 @@ def dashboard_summary(start_date: Optional[str] = None, end_date: Optional[str] 
             tile["external_id"] = a.google_external_id if platform == "google" else a.meta_external_id or d.get("external_id")
             tile["is_live"] = a.google_is_live if platform == "google" else a.meta_is_live
             tile["credentials_masked"] = bool(a.google_credentials) if platform == "google" else bool(a.meta_credentials)
+            # Health badges
+            _hb = _badges_for_tile(a, platform, db)
+            tile["api_health"] = _hb["api_health"]
+            tile["perf_health"] = _hb["perf_health"]
+            # Billing chip
+            from backend.services.billing import get_billing_for_account
+            tile["billing"] = get_billing_for_account(a)
             if a.group_id:
                 grouped.setdefault(a.group_id, {"group_id": a.group_id, "group_name": group_map.get(a.group_id, "Unknown"), "accounts": []})
                 grouped[a.group_id]["accounts"].append(tile)
@@ -160,6 +199,7 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
         is_live=req.google_is_live or req.meta_is_live,
         crm_type=req.crm_type or "none",
         crm_credentials=req.crm_credentials,
+        target_cpa=req.target_cpa,
     )
     db.add(account)
     db.commit()
@@ -220,6 +260,8 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.crm_type = req.crm_type or "none"
     if req.crm_credentials is not None:
         account.crm_credentials = req.crm_credentials or None
+    if req.target_cpa is not None:
+        account.target_cpa = req.target_cpa or None
 
     # Keep legacy fields in sync
     if account.has_google and account.has_meta:
@@ -287,13 +329,46 @@ def refresh_account(account_id: int, start_date: Optional[str] = None, end_date:
                     account.conversions = (account.conversions or 0) + metrics.get("conversions", 0)
                 account.ctr = round((account.clicks / account.impressions) * 100, 2) if account.impressions else 0.0
                 account.cpa = round(account.spend / account.conversions, 2) if account.conversions else 0.0
-                account.status = AccountStatus.HEALTHY
+                # Health badges: compute API + Performance health
+                from backend.services.health import compute_health_badges
+                from datetime import datetime as _dt, timedelta as _td
+                _today = (_dt.utcnow() + _td(hours=5, minutes=30)).strftime("%Y-%m-%d")
+                _leads_today = 0
+                try:
+                    from backend.services.lsq_mirror import count_leads_by_course as _clbc
+                    _counts = _clbc(db, account.id, _today, _today)
+                    _leads_today = sum(_counts.values())
+                except Exception:
+                    pass
+                _badges = compute_health_badges(account, api_success=True, platform=target_platform, leads=_leads_today, active_start=0, active_end=23)
+                _api_status = _badges["api_health"]["status"]
+                _perf_status = _badges["perf_health"]["status"]
+                if _api_status == "DISCONNECTED":
+                    account.status = AccountStatus.DISCONNECTED
+                elif _perf_status == "CRITICAL":
+                    account.status = AccountStatus.CRITICAL
+                elif _perf_status in ("WARNING", "UNKNOWN"):
+                    account.status = AccountStatus.WARNING
+                else:
+                    account.status = AccountStatus.HEALTHY
                 account.last_sync_at = __import__('datetime').datetime.utcnow()
                 account.last_sync_error = None
+                # Fetch and cache billing data (best-effort)
+                try:
+                    _billing = connector.fetch_billing()
+                    if _billing:
+                        import json as _json
+                        account.billing_cache = _json.dumps(_billing)
+                except Exception:
+                    pass
                 db.commit()
                 db.refresh(account)
                 data = account.to_dict()
                 data["platform"] = target_platform
+                data["api_health"] = _badges["api_health"]
+                data["perf_health"] = _badges["perf_health"]
+                from backend.services.billing import get_billing_for_account
+                data["billing"] = get_billing_for_account(account)
                 return data
             else:
                 account.last_sync_error = metrics.get("error")
@@ -306,6 +381,13 @@ def refresh_account(account_id: int, start_date: Optional[str] = None, end_date:
     db.refresh(account)
     data = account.to_dict()
     data["platform"] = target_platform
+    # Compute badges even on failure so frontend can show DISCONNECTED / UNKNOWN
+    from backend.services.health import compute_health_badges
+    _badges = compute_health_badges(account, api_success=False, platform=target_platform, active_start=0, active_end=23)
+    data["api_health"] = _badges["api_health"]
+    data["perf_health"] = _badges["perf_health"]
+    from backend.services.billing import get_billing_for_account
+    data["billing"] = get_billing_for_account(account)
     return data
 
 

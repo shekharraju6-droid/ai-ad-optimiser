@@ -119,6 +119,22 @@
         .perf-average { background: rgba(217,119,6,0.1); color: var(--color-warning); }
         .perf-good { background: rgba(5,150,105,0.1); color: var(--color-success); }
         .perf-excellent { background: rgba(79,70,229,0.1); color: var(--color-primary); }
+
+        /* Dual health badges (API + Performance) */
+        .health-badges { display: flex; gap: 0.3rem; align-items: center; }
+        .hb { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.62rem; font-weight: 700; padding: 0.2rem 0.4rem; border-radius: 4px; text-transform: uppercase; white-space: nowrap; }
+        .hb-green { background: rgba(5,150,105,0.1); color: var(--color-success); }
+        .hb-yellow { background: rgba(217,119,6,0.1); color: var(--color-warning); }
+        .hb-red { background: rgba(220,38,38,0.1); color: var(--color-danger); }
+        .hb-grey { background: rgba(107,114,128,0.1); color: var(--text-light); }
+        .hb-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+        /* Billing chip */
+        .bill-chip { display: inline-flex; align-items: center; font-size: 0.6rem; font-weight: 700; padding: 0.15rem 0.35rem; border-radius: 4px; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+        .bill-neutral { background: rgba(107,114,128,0.08); color: var(--text-muted); }
+        .bill-yellow { background: rgba(217,119,6,0.1); color: var(--color-warning); }
+        .bill-red { background: rgba(220,38,38,0.1); color: var(--color-danger); }
+        .bill-grey { background: rgba(107,114,128,0.08); color: var(--text-light); }
         .account-actions { display: flex; gap: 0.4rem; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
@@ -772,14 +788,16 @@
         el.onclick = () => openAccountDetail(a.id, a.platform);
         const platformLabel = a.platform === 'google' ? 'Google' : 'Meta';
         const isLive = a.is_live;
-        const perf = scorePerformance(a);
         el.innerHTML = `
             <div class="account-header">
                 <div>
                     <div class="account-name">${escapeHtml(a.name)}</div>
                     <div style="font-size:0.75rem;color:var(--text-light);margin-top:0.15rem;">${escapeHtml(a.external_id || '')}</div>
                 </div>
-                <span class="account-type ${platformLabel}">${platformLabel}</span>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.2rem;">
+                    <span class="account-type ${platformLabel}">${platformLabel}</span>
+                    ${billChip(a.billing)}
+                </div>
             </div>
             <div class="account-metrics">
                 <div class="metric"><div class="metric-label">Spend</div><div class="metric-value">${formatMoney(a.spend)}</div></div>
@@ -793,7 +811,10 @@
                     <div class="metric-value" id="leads-${a.id}">${isLive ? '...' : '0'}</div>
                 </div>
                 <div style="display:flex; align-items:center;">
-                    <span class="perf-badge perf-${perf.class}">${perf.label}</span>
+                    <div class="health-badges">
+                        ${hbBadge('API', a.api_health)}
+                        ${hbBadge('ADS', a.perf_health)}
+                    </div>
                 </div>
             </div>
             <div class="account-footer">
@@ -819,6 +840,7 @@
     }
 
     function scorePerformance(a) {
+        // Legacy: kept for backward compatibility but no longer the primary badge.
         const ctr = Number(a.ctr || 0);
         const cpa = Number(a.cpa || 0);
         const conversions = Number(a.conversions || 0);
@@ -837,6 +859,26 @@
         if (score >= 3) return { label: 'Good', class: 'good' };
         if (score >= 1) return { label: 'Average', class: 'average' };
         return { label: 'Bad', class: 'bad' };
+    }
+
+    function hbClass(status) {
+        const s = (status || '').toLowerCase();
+        if (s === 'good') return 'hb-green';
+        if (s === 'warning') return 'hb-yellow';
+        if (s === 'critical' || s === 'disconnected') return 'hb-red';
+        return 'hb-grey';
+    }
+    function hbBadge(label, health) {
+        if (!health || !health.status) return '';
+        const cls = hbClass(health.status);
+        const short = label === 'API' ? 'API' : 'ADS';
+        return `<span class="hb ${cls}" title="${escapeHtml(health.reason || '')}"><span class="hb-dot"></span>${short} ${escapeHtml(health.status)}</span>`;
+    }
+
+    function billChip(billing) {
+        if (!billing || !billing.billing_display) return '';
+        const colorClass = 'bill-' + (billing.color || 'neutral');
+        return `<span class="bill-chip ${colorClass}" title="${escapeHtml(billing.billing_type || '')}: ${escapeHtml(String(billing.billing_amount ?? '---'))}">${escapeHtml(billing.billing_display)}</span>`;
     }
 
     async function refreshTile(accountId, platform, btn) {

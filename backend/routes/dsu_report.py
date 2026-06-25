@@ -265,6 +265,28 @@ def dsu_performance_pdf(
 
 
 # ============================================================================
+# LeadSquared mirror sync (manual trigger for InsightDesk)
+# ============================================================================
+
+@router.post("/lsq-sync")
+def trigger_lsq_sync(
+    account_id: int = Query(..., description="Account ID to sync"),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user_required),
+):
+    """Manually sync LeadSquared leads for one account into the local mirror.
+
+    InsightDesk reads lead counts from the local mirror. Use this endpoint
+    before viewing reports if the mirror is stale (e.g. server was down when
+    the scheduled sync ran)."""
+    from backend.services.lsq_mirror import sync_account_leads
+    result = sync_account_leads(account_id, db=db)
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+
+# ============================================================================
 # DSU Table 3: Lead Attribution Pivot
 # ============================================================================
 

@@ -35,6 +35,16 @@ class AdsConnector:
     def update_campaign_budget(self, campaign_id: str, new_budget: float) -> Dict[str, Any]:
         raise NotImplementedError
 
+    def fetch_billing(self) -> Dict[str, Any]:
+        """Fetch billing/balance data. Override in subclasses.
+
+        Returns dict with keys:
+          billing_type: "prepaid" | "postpaid" | "unknown"
+          amount: float | None  (balance for prepaid, used for postpaid)
+          status: "available" | "unavailable"
+        """
+        return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+
 
 class GoogleAdsConnector(AdsConnector):
     def __init__(self, account: Account, start_date: Optional[str] = None, end_date: Optional[str] = None):
@@ -169,6 +179,81 @@ class GoogleAdsConnector(AdsConnector):
             logger.error(f"Google fetch campaigns failed: {e}")
             return []
 
+    def fetch_billing(self) -> Dict[str, Any]:
+        """Fetch billing/balance data from Google Ads API.
+
+        Queries account_budget for the spending limit (total budget) and
+        calculates available balance = adjusted_spending_limit - spend_since_budget_start.
+
+        Falls back to 'unknown' if the API call fails.
+        """
+        if not self.is_valid:
+            return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+        customer_id = (self.account.google_external_id or self.account.external_id or "").replace("-", "")
+        if not customer_id:
+            return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+        try:
+            service = self.client.get_service("GoogleAdsService")
+
+            # Step 1: Fetch active account_budget to get spending limit and start date
+            query_ab = """
+                SELECT
+                  account_budget.id,
+                  account_budget.status,
+                  account_budget.approved_spending_limit_micros,
+                  account_budget.adjusted_spending_limit_micros,
+                  account_budget.approved_start_date_time
+                FROM account_budget
+            """
+            response_ab = service.search(customer_id=customer_id, query=query_ab)
+            active_budget = None
+            for row in response_ab:
+                ab = row.account_budget
+                # status 3 = ACTIVE in v24 enum
+                if str(ab.status).endswith("3") or str(ab.status) == "AccountBudgetStatus.ACTIVE" or ab.status == 3:
+                    active_budget = ab
+                    break
+                if active_budget is None:
+                    active_budget = ab  # fallback to first row
+
+            if not active_budget or not active_budget.adjusted_spending_limit_micros:
+                return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+
+            total_budget = active_budget.adjusted_spending_limit_micros / 1_000_000.0
+            budget_start = active_budget.approved_start_date_time or ""
+
+            # Step 2: Fetch spend since budget start date
+            # Parse start date: "2026-04-02 09:36:11" → "2026-04-02"
+            spend_start = budget_start[:10] if budget_start else "2026-01-01"
+            query_spend = f"""
+                SELECT
+                  metrics.cost_micros
+                FROM customer
+                WHERE segments.date BETWEEN '{spend_start}' AND '{self.end_date or self.start_date or 'today'}'
+            """
+            try:
+                response_spend = service.search(customer_id=customer_id, query=query_spend)
+                total_spend = 0.0
+                for row in response_spend:
+                    total_spend += (row.metrics.cost_micros or 0) / 1_000_000.0
+            except Exception:
+                # Fallback: use account.spend if the spend query fails
+                total_spend = float(getattr(self.account, "spend", 0) or 0)
+
+            # Available balance = total budget - spend since budget start
+            balance = round(total_budget - total_spend, 2)
+            return {
+                "billing_type": "prepaid",
+                "amount": balance,
+                "status": "available",
+                "total_budget": round(total_budget, 2),
+                "spend_since_budget_start": round(total_spend, 2),
+                "budget_start_date": spend_start,
+            }
+        except Exception as e:
+            logger.warning(f"Google fetch billing failed for account {self.account.id}: {e}")
+            return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+
 
 class MetaAdsConnector(AdsConnector):
     def __init__(self, account: Account, start_date: Optional[str] = None, end_date: Optional[str] = None):
@@ -272,6 +357,42 @@ class MetaAdsConnector(AdsConnector):
         except Exception as e:
             logger.error(f"Meta fetch campaigns failed: {e}")
             return []
+
+    def fetch_billing(self) -> Dict[str, Any]:
+        """Fetch billing/balance data from Meta Marketing API.
+
+        Meta doesn't expose a direct 'balance' field. We check:
+        - spend_cap (daily/total spend cap) → postpaid with cap
+        - spend (amount used today) → postpaid
+        - No prepaid balance concept in standard Meta API
+
+        Returns billing_type='postpaid' with spend amount if available.
+        """
+        if not self.is_valid:
+            return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+        try:
+            from facebook_business.adobjects.adaccount import AdAccount
+            account_id = self.account.meta_external_id or self.account.external_id or ""
+            if not account_id:
+                return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+            account = AdAccount(account_id)
+            # Fetch spend cap and current spend
+            fields = ["spend_cap", "spend", "currency", "amount_spent"]
+            try:
+                account_data = account.api_get(fields=fields)
+                spend_cap = float(account_data.get("spend_cap", 0) or 0)
+                amount_spent = float(account_data.get("amount_spent", 0) or 0)
+                if spend_cap > 0:
+                    # Has a spend cap → postpaid with cap
+                    return {"billing_type": "postpaid", "amount": amount_spent, "status": "available"}
+                if amount_spent > 0:
+                    return {"billing_type": "postpaid", "amount": amount_spent, "status": "available"}
+            except Exception as e:
+                logger.warning(f"Meta billing api_get failed for account {self.account.id}: {e}")
+            return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+        except Exception as e:
+            logger.warning(f"Meta fetch billing failed for account {self.account.id}: {e}")
+            return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
 
 
 def get_connector(account: Account, platform: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Optional[AdsConnector]:

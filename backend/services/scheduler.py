@@ -72,13 +72,47 @@ def _auto_refresh_live_metrics():
                                 account.conversions = (account.conversions or 0) + metrics.get("conversions", 0)
                             account.ctr = round((account.clicks / account.impressions) * 100, 2) if account.impressions else 0.0
                             account.cpa = round(account.spend / account.conversions, 2) if account.conversions else 0.0
-                            account.status = AccountStatus.HEALTHY
+                            # Health badges: compute API + Performance health
+                            from backend.services.health import compute_health_badges
+                            from backend.services.lsq_mirror import count_leads_by_course
+                            _leads_today = 0
+                            try:
+                                _counts = count_leads_by_course(db, account.id, today, today)
+                                _leads_today = sum(_counts.values())
+                            except Exception:
+                                pass
+                            _badges = compute_health_badges(account, api_success=True, platform=platform, leads=_leads_today, active_start=0, active_end=23)
+                            _api_status = _badges["api_health"]["status"]
+                            _perf_status = _badges["perf_health"]["status"]
+                            # Map combined health to legacy status enum for backward compatibility
+                            if _api_status == "DISCONNECTED":
+                                account.status = AccountStatus.DISCONNECTED
+                            elif _perf_status == "CRITICAL":
+                                account.status = AccountStatus.CRITICAL
+                            elif _perf_status in ("WARNING", "UNKNOWN"):
+                                account.status = AccountStatus.WARNING
+                            else:
+                                account.status = AccountStatus.HEALTHY
                             account.last_sync_at = datetime.utcnow()
                             account.last_sync_error = None
+                            # Fetch and cache billing data (best-effort, never breaks metrics)
+                            try:
+                                _billing = connector.fetch_billing()
+                                if _billing:
+                                    import json as _json
+                                    account.billing_cache = _json.dumps(_billing)
+                                    logger.info(f"Billing cached for {account.name} ({platform}): type={_billing.get('billing_type')}, amount={_billing.get('amount')}")
+                            except Exception as _be:
+                                logger.warning(f"Billing fetch failed for {account.name} ({platform}): {_be}")
                             db.commit()
-                            logger.info(f"Auto-refreshed {account.name} ({platform}): spend={account.spend}, clicks={account.clicks}")
+                            logger.info(f"Auto-refreshed {account.name} ({platform}): spend={account.spend}, clicks={account.clicks}, api={_api_status}, perf={_perf_status}")
                         else:
                             logger.warning(f"Auto-refresh {account.name} ({platform}) returned error: {metrics.get('error')}")
+                            from backend.services.health import compute_health_badges
+                            _badges = compute_health_badges(account, api_success=False, platform=platform, active_start=0, active_end=23)
+                            account.status = AccountStatus.DISCONNECTED
+                            account.last_sync_error = metrics.get("error")
+                            db.commit()
                 except Exception as e:
                     logger.error(f"Auto-refresh failed for {account.name} ({platform}): {e}")
     except Exception as e:

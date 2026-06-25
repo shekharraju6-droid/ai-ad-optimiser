@@ -99,6 +99,8 @@ class Account(Base):
     cpa = Column(Float, default=0.0)
     budget = Column(Float, default=0.0)
     budget_used_pct = Column(Float, default=0.0)
+    target_cpa = Column(Float, nullable=True)
+    billing_cache = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -149,6 +151,8 @@ class Account(Base):
             "cpa": self.cpa,
             "budget": self.budget,
             "budget_used_pct": self.budget_used_pct,
+            "target_cpa": self.target_cpa,
+            "billing_cache": self.billing_cache,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
