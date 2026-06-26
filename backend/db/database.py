@@ -6,8 +6,12 @@ Falls back to SQLite if PostgreSQL is unreachable.
 import os
 import logging
 from urllib.parse import urlparse, urlunparse
-from sqlalchemy import create_engine
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
+
+# Load environment variables from .env if present
+load_dotenv()
 
 logger = logging.getLogger("AdOptima")
 
@@ -37,7 +41,7 @@ def _create_postgres_engine(url):
 def _test_connection(eng):
     try:
         with eng.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         return True
     except Exception as e:
         logger.warning(f"DB connection test failed: {e}")
