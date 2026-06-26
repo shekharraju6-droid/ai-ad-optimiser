@@ -112,6 +112,16 @@ def get_integrations_ui(request: Request):
     return HTMLResponse(content="<h1>Integrations UI not found.</h1>")
 
 
+@app.get("/onboard", response_class=HTMLResponse)
+def get_onboard_ui(request: Request):
+    frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+    html_path = os.path.join(frontend_dir, "onboard.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Onboarding UI not found.</h1>")
+
+
 if __name__ == "__main__":
     import uvicorn
     host = os.getenv("HOST", "0.0.0.0")

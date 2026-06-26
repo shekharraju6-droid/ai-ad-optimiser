@@ -86,24 +86,26 @@
         .panel{display:none;animation:fadeIn .25s ease}.panel.active{display:block}
         @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
-        /* KPI CARDS — gradient tiles */
-        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem;margin-bottom:1.5rem}
-        .kpi-card{border-radius:14px;padding:1.15rem 1.25rem;color:#fff;position:relative;overflow:hidden;box-shadow:var(--shadow-md)}
-        .kpi-card.g1{background:var(--grad-1)}
-        .kpi-card.g2{background:var(--grad-3)}
-        .kpi-card.g3{background:var(--grad-4)}
-        .kpi-card.g4{background:var(--grad-5)}
-        .kpi-card.g5{background:var(--grad-2)}
-        .kpi-card.g6{background:var(--grad-6)}
-        .kpi-card.g7{background:var(--grad-7)}
-        .kpi-card::before{content:'';position:absolute;right:-18px;top:-18px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.14)}
-        .kpi-card::after{content:'';position:absolute;right:8px;bottom:-22px;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.08)}
-        .kpi-icon{font-size:1.05rem;opacity:.85;margin-bottom:.35rem;display:block}
-        .kpi-label{font-size:.68rem;text-transform:uppercase;font-weight:700;letter-spacing:.06em;opacity:.92}
-        .kpi-value{font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;margin-top:.18rem;line-height:1.15}
-        .kpi-sub{font-size:.72rem;opacity:.85;margin-top:.15rem}
-        .stat-bar{height:6px;background:rgba(255,255,255,.25);border-radius:4px;overflow:hidden;margin-top:.4rem}
-        .stat-bar-fill{height:100%;border-radius:4px;background:#fff;transition:width .4s}
+        /* KPI CARDS — clean professional */
+        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
+        .kpi-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.2rem;position:relative;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;transition:.15s}
+        .kpi-card:hover{box-shadow:var(--shadow-md);border-color:#d1d5f9}
+        .kpi-card::before{display:none}
+        .kpi-card::after{display:none}
+        .kpi-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;margin-bottom:.55rem}
+        .kpi-label{font-size:.68rem;text-transform:uppercase;font-weight:700;letter-spacing:.06em;color:var(--text-light);margin-bottom:.2rem}
+        .kpi-value{font-size:1.45rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text-main);line-height:1.2}
+        .kpi-sub{font-size:.72rem;color:var(--text-muted);margin-top:.25rem}
+        .stat-bar{height:5px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin-top:.55rem}
+        .stat-bar-fill{height:100%;border-radius:4px;background:var(--primary);transition:width .4s}
+        /* KPI accent icon backgrounds */
+        .kpi-card.accent-indigo .kpi-icon{background:#eef2ff;color:#4f46e5}
+        .kpi-card.accent-green .kpi-icon{background:#ecfdf5;color:#059669}
+        .kpi-card.accent-orange .kpi-icon{background:#fff7ed;color:#ea580c}
+        .kpi-card.accent-red .kpi-icon{background:#fef2f2;color:#dc2626}
+        .kpi-card.accent-cyan .kpi-icon{background:#ecfeff;color:#0891b2}
+        .kpi-card.accent-purple .kpi-icon{background:#f5f3ff;color:#7c3aed}
+        .kpi-card.accent-blue .kpi-icon{background:#eff6ff;color:#2563eb}
 
         /* CARDS */
         .card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:1.35rem;margin-bottom:1.25rem;box-shadow:var(--shadow-sm)}
@@ -237,7 +239,6 @@
                 </div>
                 <div class="nav-section-items">
                     <div class="nav-item" onclick="showPanel('settings')">⚙️ Settings</div>
-                    <div class="nav-item" onclick="showPanel('users')">🔐 Users</div>
                 </div>
             </div>
         </div>
@@ -425,17 +426,6 @@
                     <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
                 </div>
             </div>
-
-            <!-- USERS -->
-            <div class="panel" id="panel-users">
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">User Management</span>
-                        <button class="btn btn-primary btn-sm" id="addUserBtn" onclick="openUserModal()" style="display:none">+ Add User</button>
-                    </div>
-                    <div class="table-wrap"><table id="usersTable"><thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Role</th><th>Assigned Accounts</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -498,12 +488,12 @@ function showPanel(name){
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
     const panel=$('panel-'+name);if(panel)panel.classList.add('active');
     // Highlight the matching nav item
-    const map={dashboard:'📊 Dashboard',clients:'👥 Clients',invoices:'🧾 Invoices',payments:'💳 Payments',outstanding:'⏳ Outstanding',reminders:'🔔 Reminders',documents:'📁 Documents',reports:'📈 Reports',bms:'🧑\u200d💼 BMs','bm-view':'👁 BM View',settings:'⚙️ Settings',users:'🔐 Users'};
+    const map={dashboard:'📊 Dashboard',clients:'👥 Clients',invoices:'🧾 Invoices',payments:'💳 Payments',outstanding:'⏳ Outstanding',reminders:'🔔 Reminders',documents:'📁 Documents',reports:'📈 Reports',bms:'🧑\u200d💼 BMs','bm-view':'👁 BM View',settings:'⚙️ Settings'};
     document.querySelectorAll('.nav-item').forEach(n=>{
         const txt=n.textContent.trim();
         if(txt===map[name]){n.classList.add('active');const sec=n.closest('.nav-section');if(sec&&!sec.classList.contains('open'))sec.classList.add('open')}
     });
-    const titles={dashboard:'Dashboard',clients:'Clients',invoices:'Invoices',payments:'Payments',outstanding:'Outstanding',reminders:'Reminders',documents:'Documents',reports:'Reports',bms:'Business Managers','bm-view':'BM View',settings:'Settings',users:'User Management'};
+    const titles={dashboard:'Dashboard',clients:'Clients',invoices:'Invoices',payments:'Payments',outstanding:'Outstanding',reminders:'Reminders',documents:'Documents',reports:'Reports',bms:'Business Managers','bm-view':'BM View',settings:'Settings'};
     $('pageTitle').textContent=titles[name]||name;
     loadPanel(name);
 }
@@ -519,7 +509,6 @@ function loadPanel(name){
         case 'documents':loadDocuments();break;
         case 'bms':loadBMs();break;
         case 'bm-view':loadBMView();break;
-        case 'users':loadUserAccounts().then(()=>loadUsers());break;
         case 'settings':loadSettings();break;
     }
 }
@@ -536,21 +525,21 @@ async function loadDashboard(){
     let url='/dashboard?';if(from)url+=`date_from=${from}&`;if(to)url+=`date_to=${to}&`;
     try{dashData=await api('GET',url)}catch(e){return}
     const k=dashData;
-    $('dashKpis').innerHTML=`
-        <div class="kpi-card g1"><span class="kpi-icon">💰</span><div class="kpi-label">Total Billed</div><div class="kpi-value">${fmt(k.total_billed)}</div></div>
-        <div class="kpi-card g2"><span class="kpi-icon">✅</span><div class="kpi-label">Total Collected</div><div class="kpi-value">${fmt(k.total_collected)}</div></div>
-        <div class="kpi-card g3"><span class="kpi-icon">⏳</span><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmt(k.total_outstanding)}</div></div>
-        <div class="kpi-card g4"><span class="kpi-icon">🔴</span><div class="kpi-label">Overdue</div><div class="kpi-value">${fmt(k.total_overdue)}</div></div>
-        <div class="kpi-card g5"><span class="kpi-icon">🎯</span><div class="kpi-label">Collection %</div><div class="kpi-value">${k.collection_percentage}%</div><div class="stat-bar"><div class="stat-bar-fill" style="width:${k.collection_percentage}%"></div></div></div>
-        <div class="kpi-card g6"><span class="kpi-icon">📅</span><div class="kpi-label">Monthly Billed</div><div class="kpi-value">${fmt(k.monthly_billed)}</div></div>
-        <div class="kpi-card g7"><span class="kpi-icon">💵</span><div class="kpi-label">Monthly Collected</div><div class="kpi-value">${fmt(k.monthly_collected)}</div></div>
-        <div class="kpi-card g1"><span class="kpi-icon">👥</span><div class="kpi-label">Active Clients</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
-        <div class="kpi-card g4"><span class="kpi-icon">⚠️</span><div class="kpi-label">Overdue Invoices</div><div class="kpi-value">${k.overdue_invoices}</div></div>
-        <div class="kpi-card g3"><span class="kpi-icon">🔶</span><div class="kpi-label">Partially Paid</div><div class="kpi-value">${k.partially_paid_count}</div></div>
-        <div class="kpi-card g5"><span class="kpi-icon">⚡</span><div class="kpi-label">Disputed</div><div class="kpi-value">${k.disputed_count}</div></div>
-        <div class="kpi-card g2"><span class="kpi-icon">📆</span><div class="kpi-label">Expected This Week</div><div class="kpi-value">${fmt(k.expected_collection_week)}</div></div>
-        <div class="kpi-card g6"><span class="kpi-icon">🗓️</span><div class="kpi-label">Expected This Month</div><div class="kpi-value">${fmt(k.expected_collection_month)}</div></div>
-    `;
+        $('dashKpis').innerHTML=`
+            <div class="kpi-card accent-indigo"><div class="kpi-icon">💰</div><div class="kpi-label">Total Billed</div><div class="kpi-value">${fmt(k.total_billed)}</div></div>
+            <div class="kpi-card accent-green"><div class="kpi-icon">✅</div><div class="kpi-label">Total Collected</div><div class="kpi-value">${fmt(k.total_collected)}</div></div>
+            <div class="kpi-card accent-orange"><div class="kpi-icon">⏳</div><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmt(k.total_outstanding)}</div></div>
+            <div class="kpi-card accent-red"><div class="kpi-icon">🔴</div><div class="kpi-label">Overdue</div><div class="kpi-value">${fmt(k.total_overdue)}</div></div>
+            <div class="kpi-card accent-purple"><div class="kpi-icon">🎯</div><div class="kpi-label">Collection %</div><div class="kpi-value">${k.collection_percentage}%</div><div class="stat-bar"><div class="stat-bar-fill" style="width:${k.collection_percentage}%"></div></div></div>
+            <div class="kpi-card accent-indigo"><div class="kpi-icon">📅</div><div class="kpi-label">Monthly Billed</div><div class="kpi-value">${fmt(k.monthly_billed)}</div></div>
+            <div class="kpi-card accent-cyan"><div class="kpi-icon">💵</div><div class="kpi-label">Monthly Collected</div><div class="kpi-value">${fmt(k.monthly_collected)}</div></div>
+            <div class="kpi-card accent-blue"><div class="kpi-icon">👥</div><div class="kpi-label">Active Clients</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
+            <div class="kpi-card accent-red"><div class="kpi-icon">⚠️</div><div class="kpi-label">Overdue Invoices</div><div class="kpi-value">${k.overdue_invoices}</div></div>
+            <div class="kpi-card accent-orange"><div class="kpi-icon">🔶</div><div class="kpi-label">Partially Paid</div><div class="kpi-value">${k.partially_paid_count}</div></div>
+            <div class="kpi-card accent-purple"><div class="kpi-icon">⚡</div><div class="kpi-label">Disputed</div><div class="kpi-value">${k.disputed_count}</div></div>
+            <div class="kpi-card accent-green"><div class="kpi-icon">📆</div><div class="kpi-label">Expected This Week</div><div class="kpi-value">${fmt(k.expected_collection_week)}</div></div>
+            <div class="kpi-card accent-indigo"><div class="kpi-icon">🗓️</div><div class="kpi-label">Expected This Month</div><div class="kpi-value">${fmt(k.expected_collection_month)}</div></div>
+        `;
     $('dashOverdueTable').querySelector('tbody').innerHTML=(k.top_overdue_clients||[]).map(c=>`<tr><td style="font-weight:600">${c.client_name}</td><td style="color:var(--danger);font-weight:600">${fmt(c.outstanding)}</td></tr>`).join('');
     $('dashBillingTable').querySelector('tbody').innerHTML=Object.entries(k.billing_model_dist||{}).map(([t,a])=>`<tr><td>${t.replace(/_/g,' ')}</td><td style="font-weight:600">${fmt(a)}</td></tr>`).join('');
 }
@@ -896,131 +885,13 @@ async function loadBMView(){
     if(bmStats.length===0)html='<div class="empty-state"><h3>No Business Manager Data</h3><p>Assign rev_role as business_manager to users and assign them to clients.</p></div>';
     else bmStats.forEach(bm=>{html+=`<div class="card"><div class="card-header"><span class="card-title">${bm.bm_name}</span><span class="badge badge-blue">${bm.client_count} clients</span></div>
         <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">
-        <div class="kpi-card g1"><span class="kpi-icon">💰</span><div class="kpi-label">Billed</div><div class="kpi-value">${fmt(bm.total_billed)}</div></div>
-        <div class="kpi-card g3"><span class="kpi-icon">✅</span><div class="kpi-label">Collected</div><div class="kpi-value">${fmt(bm.total_collected)}</div></div>
-        <div class="kpi-card g4"><span class="kpi-icon">⏳</span><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmt(bm.total_outstanding)}</div></div>
-        <div class="kpi-card g5"><span class="kpi-icon">⚠️</span><div class="kpi-label">Overdue</div><div class="kpi-value">${fmt(bm.overdue_count)}</div></div>
+        <div class="kpi-card accent-indigo"><div class="kpi-icon">💰</div><div class="kpi-label">Billed</div><div class="kpi-value">${fmt(bm.total_billed)}</div></div>
+        <div class="kpi-card accent-green"><div class="kpi-icon">✅</div><div class="kpi-label">Collected</div><div class="kpi-value">${fmt(bm.total_collected)}</div></div>
+        <div class="kpi-card accent-orange"><div class="kpi-icon">⏳</div><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmt(bm.total_outstanding)}</div></div>
+        <div class="kpi-card accent-red"><div class="kpi-icon">⚠️</div><div class="kpi-label">Overdue</div><div class="kpi-value">${fmt(bm.overdue_count)}</div></div>
         </div></div>`;
     });
     $('bmViewContent').innerHTML=html;
-}
-
-// USERS
-let allUserAccounts=[];
-let editingUserId=null;
-
-async function loadUsers(){
-    // Show Add button only for superadmin
-    if(currentUser && currentUser.role==='superadmin'){$('addUserBtn').style.display=''}
-    else{$('addUserBtn').style.display='none'}
-    try{
-        const users=await fetch(AUTH+'/users',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json());
-        const accountMap={};
-        allUserAccounts.forEach(a=>accountMap[a.id]=a.name);
-        $('usersTable').querySelector('tbody').innerHTML=users.map(u=>{
-            const roleLabel=u.role==='superadmin'?'Super Admin':(u.role==='admin'?'Admin':'BM (User)');
-            const assigned=u.assigned_account_ids&&u.assigned_account_ids.length?u.assigned_account_ids.map(id=>accountMap[id]||('#'+id)).join(', '):'<span style="color:var(--text-light)">—</span>';
-            const canManage=currentUser&&currentUser.role==='superadmin'&&u.role!=='superadmin';
-            const actions=canManage?`<div class="actions-cell"><button class="btn btn-secondary btn-sm" onclick="openUserModal(${u.id})">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${u.email}')">Delete</button></div>`:'<span style="color:var(--text-light)">—</span>';
-            return `<tr>
-                <td>${u.full_name||'—'}</td>
-                <td>${u.email}</td>
-                <td>${u.mobile||'—'}</td>
-                <td><span class="badge ${u.role==='superadmin'?'badge-purple':(u.role==='admin'?'badge-indigo':'badge-cyan')}">${roleLabel}</span></td>
-                <td style="font-size:.78rem">${assigned}</td>
-                <td>${u.is_active?'<span class="badge badge-green">Active</span>':'<span class="badge badge-gray">Inactive</span>'}</td>
-                <td>${actions}</td>
-            </tr>`;
-        }).join('');
-    }catch(e){toast(e.message,'error')}
-}
-
-async function loadUserAccounts(){
-    try{allUserAccounts=await fetch(AUTH+'/accounts-for-assignment',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json())}catch(e){}
-}
-
-async function openUserModal(userId=null){
-    editingUserId=userId;
-    const isEdit=userId!==null;
-    let u={full_name:'',email:'',mobile:'',role:'user',assigned_account_ids:[],access_adpulse:true,access_insightdesk:false,access_revenueops:false};
-    if(isEdit){
-        const users=await fetch(AUTH+'/users',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json());
-        u=users.find(x=>x.id===userId)||u;
-    }
-    const acctChecks=allUserAccounts.map(a=>`<label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;padding:.25rem 0"><input type="checkbox" value="${a.id}" ${u.assigned_account_ids.includes(a.id)?'checked':''} onchange="updateUserAccountSelection()"> ${a.name}</label>`).join('');
-    $('modalTitle').textContent=isEdit?'Edit User':'Add User';
-    $('modalBody').innerHTML=`
-        <div class="form-row">
-            <div class="form-group"><label>Full Name</label><input id="usrFullName" value="${u.full_name||''}" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')"></div>
-            <div class="form-group"><label>Email</label><input id="usrEmail" type="email" value="${u.email||''}" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')"></div>
-        </div>
-        <div class="form-row">
-            <div class="form-group"><label>Mobile</label><input id="usrMobile" value="${u.mobile||''}" autocomplete="off" inputmode="tel" readonly onfocus="this.removeAttribute('readonly')"></div>
-            <div class="form-group"><label>Role</label><select id="usrRole" onchange="toggleAccountSection()">
-                <option value="user" ${u.role==='user'?'selected':''}>BM (User)</option>
-                <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
-            </select></div>
-        </div>
-        <div class="form-group"><label>Password ${isEdit?'(leave blank to keep current)':''}</label><input id="usrPassword" type="password" placeholder="${isEdit?'••••••':'Enter password'}" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
-        <div class="form-row">
-            <div class="form-group"><label style="display:flex;align-items:center;gap:.4rem"><input type="checkbox" id="usrAdpulse" ${u.access_adpulse?'checked':''}> AdPulse Access</label></div>
-            <div class="form-group"><label style="display:flex;align-items:center;gap:.4rem"><input type="checkbox" id="usrInsightdesk" ${u.access_insightdesk?'checked':''}> InsightDesk Access</label></div>
-            <div class="form-group"><label style="display:flex;align-items:center;gap:.4rem"><input type="checkbox" id="usrRevenueops" ${u.access_revenueops?'checked':''}> RevenueOps Access</label></div>
-        </div>
-        <div id="usrAccountSection" style="${u.role==='user'?'':'display:none'}">
-            <label style="font-size:.76rem;font-weight:600;color:var(--text-muted);margin-bottom:.22rem;display:block">Assigned Accounts (BM only)</label>
-            <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem">${acctChecks||'<span style="color:var(--text-light);font-size:.82rem">No accounts available</span>'}</div>
-        </div>`;
-    $('modalOverlay').style.display='';
-    $('modalSave').onclick=saveUserModal;
-    toggleAccountSection();
-}
-
-function toggleAccountSection(){
-    const role=document.getElementById('usrRole');
-    if(!role)return;
-    const sec=document.getElementById('usrAccountSection');
-    if(sec)sec.style.display=role.value==='user'?'':'none';
-}
-
-function getSelectedAccountIds(){
-    const ids=[];
-    document.querySelectorAll('#usrAccountSection input[type=checkbox]').forEach(cb=>{if(cb.checked)ids.push(parseInt(cb.value))});
-    return ids;
-}
-
-async function saveUserModal(){
-    const full_name=$('usrFullName').value.trim();
-    const email=$('usrEmail').value.trim();
-    const mobile=$('usrMobile').value.trim();
-    const password=$('usrPassword').value;
-    const role=$('usrRole').value;
-    const assigned_account_ids=getSelectedAccountIds();
-    const access_adpulse=$('usrAdpulse').checked;
-    const access_insightdesk=$('usrInsightdesk').checked;
-    const access_revenueops=$('usrRevenueops').checked;
-    if(!full_name||!email){toast('Name and Email are required','error');return}
-    if(!editingUserId&&!password){toast('Password is required','error');return}
-    const payload={full_name,email,mobile,role,assigned_account_ids,access_adpulse,access_insightdesk,access_revenueops};
-    if(password)payload.password=password;
-    try{
-        if(editingUserId){
-            await fetch(AUTH+`/users/${editingUserId}`,{method:'PUT',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
-            toast('User updated');
-        }else{
-            await fetch(AUTH+'/users',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
-            toast('User created');
-        }
-        closeModal();loadUsers();
-    }catch(e){toast(e.message,'error')}
-}
-
-async function deleteUser(userId,email){
-    if(!confirm(`Delete user "${email}"? This cannot be undone.`))return;
-    try{
-        await fetch(AUTH+`/users/${userId}`,{method:'DELETE',headers:{'Authorization':'Bearer '+token}});
-        toast('User deleted');loadUsers();
-    }catch(e){toast(e.message,'error')}
 }
 
 // SETTINGS

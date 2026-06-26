@@ -30,11 +30,37 @@
         .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; }
         .topbar-right { display: flex; align-items: center; gap: 1rem; }
         .user-info { font-size: 0.85rem; color: var(--text-muted); }
+        .user-badge { display:inline-flex; align-items:center; gap:0.35rem; font-size:0.78rem; font-weight:600; color:var(--color-primary); background:#eef2ff; padding:0.32rem 0.65rem; border-radius:20px; }
         .btn { padding: 0.55rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 0.35rem; transition: 0.15s; text-decoration: none; }
         .btn-primary { background: var(--color-primary); color: white; }
         .btn-primary:hover { filter: brightness(1.1); }
         .btn-secondary { background: white; border-color: var(--border-color); color: var(--text-muted); }
         .btn-secondary:hover { background: var(--bg-base); color: var(--text-main); }
+
+        /* User Management Modal */
+        .um-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 200; }
+        .um-overlay.hidden { display: none; }
+        .um-modal { background: white; border-radius: 12px; padding: 1.5rem; width: 90%; max-width: 720px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .um-modal h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem; }
+        .um-section { margin-bottom: 1.25rem; }
+        .um-section-title { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; }
+        .um-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .um-form.full { grid-template-columns: 1fr; }
+        .um-checks { display: flex; flex-wrap: wrap; gap: 1rem; }
+        .um-check { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+        .um-check input { width: 16px; height: 16px; }
+        .um-assign { max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; }
+        .um-assign label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; margin-bottom: 0.35rem; }
+        .um-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .um-table th, .um-table td { padding: 0.55rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .um-table th { background: var(--bg-base); font-weight: 600; color: var(--text-muted); }
+        .um-link-box { background: #f9fafb; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.6rem; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; word-break: break-all; }
+        .um-link-box button { flex-shrink: 0; }
+        .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        .badge-green { background: #d1fae5; color: #065f46; }
+        .badge-orange { background: #ffedd5; color: #9a3412; }
+        .badge-gray { background: #f1f2f7; color: #5a5670; }
 
         .hero { padding: 3rem 2rem; text-align: center; background: linear-gradient(135deg, #f5f3ff, #ecfeff); border-bottom: 1px solid var(--border-color); }
         .hero h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 0.5rem; }
@@ -69,6 +95,8 @@
         <div class="brand"><div class="logo-icon">CS</div>ChlearSakhaaOps AI</div>
         <div class="topbar-right">
             <span class="user-info" id="userInfo">Checking session...</span>
+            <span class="user-badge hidden" id="userBadge"></span>
+            <button class="btn btn-secondary hidden" id="umBtn" onclick="openUserManagement()">👤 User Management</button>
             <a class="btn btn-secondary" id="integrationsBtn" href="/integrations" style="display:none">Integrations</a>
             <button class="btn btn-secondary" id="loginBtn" onclick="showAuth()">Login</button>
             <button class="btn btn-secondary hidden" id="logoutBtn" onclick="logout()">Logout</button>
@@ -119,6 +147,57 @@
         </div>
     </div>
 
+    <!-- User Management Modal -->
+    <div id="umOverlay" class="um-overlay hidden" onclick="closeUserManagement(event)">
+        <div class="um-modal" onclick="event.stopPropagation()">
+            <h2>User Management</h2>
+
+            <div class="um-section">
+                <div class="um-section-title">Add / Edit User</div>
+                <input type="hidden" id="umUserId">
+                <div class="um-form">
+                    <div class="form-group"><label>Full Name</label><input type="text" id="umFullName" placeholder="John Doe"></div>
+                    <div class="form-group"><label>Email</label><input type="email" id="umEmail" placeholder="john@company.com"></div>
+                    <div class="form-group"><label>Mobile</label><input type="text" id="umMobile" placeholder="+91 9876543210"></div>
+                    <div class="form-group"><label>Role</label>
+                        <select id="umRole">
+                            <option value="user">BM (User)</option>
+                            <option value="admin">Admin</option>
+                            <option value="superadmin" class="superadmin-option">Super Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="um-checks" style="margin-top:0.75rem;">
+                    <label class="um-check"><input type="checkbox" id="umAccessAdPulse"> AdPulse Access</label>
+                    <label class="um-check"><input type="checkbox" id="umAccessInsightDesk"> InsightDesk Access</label>
+                    <label class="um-check"><input type="checkbox" id="umAccessRevenueOps"> RevenueOps Access</label>
+                </div>
+                <div class="um-section" id="umAssignSection">
+                    <div class="um-section-title">Assigned Accounts (for BM/User)</div>
+                    <div class="um-assign" id="umAssignAccounts"></div>
+                </div>
+                <div id="umLinkBox" class="um-link-box hidden">
+                    <span id="umSetupLink"></span>
+                    <button class="btn btn-secondary btn-sm" onclick="copySetupLink()">Copy Link</button>
+                </div>
+                <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
+                    <button class="btn btn-secondary" onclick="resetUserForm()">Reset</button>
+                    <button class="btn btn-primary" id="umSaveBtn" onclick="saveUser()">Save User</button>
+                </div>
+            </div>
+
+            <div class="um-section">
+                <div class="um-section-title">Existing Users</div>
+                <div style="overflow-x:auto;">
+                    <table class="um-table">
+                        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Access</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody id="umTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="footer">© 2026 ChlearSakhaaOps AI. Built for Chlear Digital.</div>
 
     <script>
@@ -164,22 +243,35 @@
                 $('userInfo').textContent = user.full_name || user.email;
                 $('loginBtn').classList.add('hidden');
                 $('logoutBtn').classList.remove('hidden');
-                if (user.role === 'admin' || user.role === 'superadmin' || user.rev_role === 'admin' || user.rev_role === 'finance') {
-                    $('integrationsBtn').style.display = 'inline-flex';
-                }
+                $('userBadge').textContent = (user.role === 'user' ? 'BM' : user.role).toUpperCase();
+                $('userBadge').classList.remove('hidden');
                 const isAdmin = user.role === 'admin' || user.role === 'superadmin';
+                if (isAdmin) {
+                    $('umBtn').classList.remove('hidden');
+                    $('integrationsBtn').style.display = 'inline-flex';
+                } else {
+                    $('umBtn').classList.add('hidden');
+                    $('integrationsBtn').style.display = 'none';
+                }
+                // Only Super Admin can create another superadmin
+                if (user.role !== 'superadmin') {
+                    document.querySelectorAll('.superadmin-option').forEach(el => el.style.display = 'none');
+                }
                 setCardAccess('AdPulse', isAdmin || user.access_adpulse);
                 setCardAccess('InsightDesk', isAdmin || user.access_insightdesk);
                 setCardAccess('RevenueOps', isAdmin || user.access_revenueops);
             } else {
-            $('userInfo').textContent = 'Not logged in';
-            $('loginBtn').classList.remove('hidden');
-            $('logoutBtn').classList.add('hidden');
-            setCardAccess('AdPulse', false);
-            setCardAccess('InsightDesk', false);
-            setCardAccess('RevenueOps', false);
+                $('userInfo').textContent = 'Not logged in';
+                $('loginBtn').classList.remove('hidden');
+                $('logoutBtn').classList.add('hidden');
+                $('userBadge').classList.add('hidden');
+                $('umBtn').classList.add('hidden');
+                $('integrationsBtn').style.display = 'none';
+                setCardAccess('AdPulse', false);
+                setCardAccess('InsightDesk', false);
+                setCardAccess('RevenueOps', false);
+            }
         }
-    }
 
     function setCardAccess(name, allowed) {
         const card = $('card' + name);
@@ -232,6 +324,133 @@
         localStorage.removeItem('adoptima_token');
         currentUser = null;
         updateUI(null);
+    }
+
+    // User Management
+    let umAccounts = [];
+    let umUsers = [];
+
+    function openUserManagement() { $('umOverlay').classList.remove('hidden'); loadUsers(); loadAccountsForAssignment(); }
+    function closeUserManagement(e) { if (e && e.target !== $('umOverlay')) return; $('umOverlay').classList.add('hidden'); }
+
+    async function loadUsers() {
+        try {
+            umUsers = await api('GET', '/auth/users');
+            renderUserTable();
+        } catch (e) { alert(e.message); }
+    }
+
+    async function loadAccountsForAssignment() {
+        try {
+            umAccounts = await api('GET', '/auth/accounts-for-assignment');
+            renderAssignList([]);
+        } catch (e) { console.error(e); }
+    }
+
+    function renderAssignList(selectedIds) {
+        if (!umAccounts.length) { $('umAssignSection').style.display = 'none'; return; }
+        $('umAssignSection').style.display = '';
+        $('umAssignAccounts').innerHTML = umAccounts.map(a => {
+            const checked = selectedIds.includes(a.id) ? 'checked' : '';
+            return `<label><input type="checkbox" value="${a.id}" ${checked}> ${escapeHtml(a.name)}</label>`;
+        }).join('');
+    }
+
+    function roleBadge(role) {
+        const cls = role === 'superadmin' ? 'badge-blue' : (role === 'admin' ? 'badge-green' : 'badge-orange');
+        const text = role === 'user' ? 'BM (User)' : role;
+        return `<span class="badge ${cls}">${text}</span>`;
+    }
+
+    function escapeHtml(s) {
+        if (!s) return '';
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function renderUserTable() {
+        $('umTableBody').innerHTML = umUsers.map(u => {
+            const access = [];
+            if (u.access_adpulse) access.push('AdPulse');
+            if (u.access_insightdesk) access.push('InsightDesk');
+            if (u.access_revenueops) access.push('RevenueOps');
+            const status = u.onboarding_completed !== false ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Pending setup</span>';
+            return `<tr>
+                <td>${escapeHtml(u.full_name || '-')}</td>
+                <td>${escapeHtml(u.email)}</td>
+                <td>${roleBadge(u.role)}</td>
+                <td>${access.join(', ') || '-'}</td>
+                <td>${status}</td>
+                <td><button class="btn btn-secondary btn-sm" onclick="editUser(${u.id})">Edit</button> <button class="btn btn-secondary btn-sm" onclick="deleteUser(${u.id})">Delete</button></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function resetUserForm() {
+        $('umUserId').value = '';
+        $('umFullName').value = '';
+        $('umEmail').value = '';
+        $('umMobile').value = '';
+        $('umRole').value = 'user';
+        $('umAccessAdPulse').checked = true;
+        $('umAccessInsightDesk').checked = false;
+        $('umAccessRevenueOps').checked = false;
+        $('umLinkBox').classList.add('hidden');
+        $('umSetupLink').textContent = '';
+        renderAssignList([]);
+    }
+
+    function editUser(id) {
+        const u = umUsers.find(x => x.id === id);
+        if (!u) return;
+        $('umUserId').value = u.id;
+        $('umFullName').value = u.full_name || '';
+        $('umEmail').value = u.email || '';
+        $('umMobile').value = u.mobile || '';
+        $('umRole').value = u.role || 'user';
+        $('umAccessAdPulse').checked = u.access_adpulse;
+        $('umAccessInsightDesk').checked = u.access_insightdesk;
+        $('umAccessRevenueOps').checked = u.access_revenueops;
+        $('umLinkBox').classList.add('hidden');
+        renderAssignList(u.assigned_account_ids || []);
+    }
+
+    async function saveUser() {
+        const id = $('umUserId').value;
+        const body = {
+            full_name: $('umFullName').value.trim(),
+            email: $('umEmail').value.trim(),
+            mobile: $('umMobile').value.trim(),
+            role: $('umRole').value,
+            access_adpulse: $('umAccessAdPulse').checked,
+            access_insightdesk: $('umAccessInsightDesk').checked,
+            access_revenueops: $('umAccessRevenueOps').checked,
+            assigned_account_ids: Array.from($('umAssignAccounts').querySelectorAll('input:checked')).map(cb => parseInt(cb.value))
+        };
+        if (!body.full_name || !body.email) { alert('Name and email are required'); return; }
+        try {
+            if (id) {
+                await api('PUT', '/auth/users/' + id, body);
+                alert('User updated');
+            } else {
+                const res = await api('POST', '/auth/users', body);
+                $('umLinkBox').classList.remove('hidden');
+                $('umSetupLink').textContent = res.setup_link;
+                alert('User created. Copy the setup link below to share with the user.');
+            }
+            loadUsers();
+            resetUserForm();
+        } catch (e) { alert(e.message); }
+    }
+
+    function copySetupLink() {
+        const link = $('umSetupLink').textContent;
+        if (!link) return;
+        navigator.clipboard.writeText(link).then(() => alert('Setup link copied'));
+    }
+
+    async function deleteUser(id) {
+        if (!confirm('Delete this user?')) return;
+        try { await api('DELETE', '/auth/users/' + id); loadUsers(); } catch (e) { alert(e.message); }
     }
 
     window.addEventListener('DOMContentLoaded', checkAuth);

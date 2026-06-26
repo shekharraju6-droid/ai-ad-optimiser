@@ -7,6 +7,8 @@ Roles:
   - user (BM): only sees assigned accounts
 """
 import os
+import secrets
+import re
 from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -24,6 +26,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 SECRET_KEY = os.getenv("ADOPTIMA_JWT_SECRET", "change-me-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
+ONBOARDING_TOKEN_EXPIRE_HOURS = 72
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
@@ -40,8 +43,7 @@ class UserCreateRequest(BaseModel):
     full_name: str
     email: str
     mobile: Optional[str] = None
-    password: str
-    role: str = "user"  # admin or user (BM)
+    role: str = "user"  # superadmin, admin, or user (BM)
     assigned_account_ids: List[int] = []
     access_adpulse: bool = True
     access_insightdesk: bool = False
@@ -52,7 +54,6 @@ class UserUpdateRequest(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
     mobile: Optional[str] = None
-    password: Optional[str] = None
     role: Optional[str] = None
     rev_role: Optional[str] = None
     is_active: Optional[bool] = None
@@ -60,6 +61,10 @@ class UserUpdateRequest(BaseModel):
     access_adpulse: Optional[bool] = None
     access_insightdesk: Optional[bool] = None
     access_revenueops: Optional[bool] = None
+
+
+class SetPasswordRequest(BaseModel):
+    password: str
 
 
 class TokenResponse(BaseModel):
@@ -105,6 +110,12 @@ def get_current_user_required(user: User = Depends(get_current_user)) -> User:
 def require_superadmin(user: User = Depends(get_current_user_required)) -> User:
     if user.role != "superadmin":
         raise HTTPException(status_code=403, detail="Super Admin access required")
+    return user
+
+
+def require_admin_or_superadmin(user: User = Depends(get_current_user_required)) -> User:
+    if user.role not in ("superadmin", "admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
 
@@ -167,34 +178,47 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 @router.get("/me", response_model=dict)
 def me(user: User = Depends(get_current_user_required)):
-    return user.to_dict()
+    data = user.to_dict()
+    # For legacy users created before onboarding flow, treat active+completed as fully onboarded.
+    if not hasattr(user, "onboarding_completed") or user.onboarding_completed is None:
+        data["onboarding_completed"] = user.is_active
+    return data
 
 
 # ============================================================
-# USER MANAGEMENT (Super Admin only)
+# USER MANAGEMENT (Super Admin or Admin)
 # ============================================================
 @router.get("/users")
-def list_users(db: Session = Depends(get_db), current_user: User = Depends(require_superadmin)):
+def list_users(db: Session = Depends(get_db), current_user: User = Depends(require_admin_or_superadmin)):
     users = db.query(User).order_by(User.created_at).all()
     return [u.to_dict() for u in users]
 
 
 @router.post("/users")
-def create_user(req: UserCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(require_superadmin)):
+def create_user(req: UserCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(require_admin_or_superadmin)):
     existing = db.query(User).filter(User.email == req.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    if req.role not in ("admin", "user"):
-        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'user'")
+    if req.role not in ("superadmin", "admin", "user"):
+        raise HTTPException(status_code=400, detail="Role must be 'superadmin', 'admin', or 'user'")
+    # Only superadmin can create another superadmin
+    if req.role == "superadmin" and current_user.role != "superadmin":
+        raise HTTPException(status_code=403, detail="Only Super Admin can create superadmin users")
+    token = secrets.token_urlsafe(32)
+    token_expires = datetime.utcnow() + timedelta(hours=ONBOARDING_TOKEN_EXPIRE_HOURS)
     user = User(
         email=req.email,
-        hashed_password=get_password_hash(req.password),
+        hashed_password=get_password_hash(secrets.token_urlsafe(16)),  # random temp password
         full_name=req.full_name,
         mobile=req.mobile,
         role=req.role,
         access_adpulse=req.access_adpulse,
         access_insightdesk=req.access_insightdesk,
         access_revenueops=req.access_revenueops,
+        onboarding_token=token,
+        onboarding_token_expires_at=token_expires,
+        onboarding_completed=False,
+        is_active=False,
     )
     db.add(user)
     db.flush()
@@ -202,14 +226,46 @@ def create_user(req: UserCreateRequest, db: Session = Depends(get_db), current_u
         _sync_account_assignments(user, req.assigned_account_ids, db)
     db.commit()
     db.refresh(user)
-    return user.to_dict()
+    base_url = os.getenv("ADOPTIMA_PUBLIC_BASE_URL", "")
+    setup_path = f"/onboard.html?token={token}"
+    setup_link = f"{base_url.rstrip('/')}{setup_path}" if base_url else setup_path
+    return {"user": user.to_dict(), "setup_link": setup_link}
+
+
+@router.get("/onboard/{token}")
+def get_onboarding_user(token: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.onboarding_token == token).first()
+    if not user or not user.onboarding_token_expires_at or user.onboarding_token_expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired setup link")
+    return {"email": user.email, "full_name": user.full_name, "role": user.role}
+
+
+@router.post("/onboard/{token}")
+def set_onboarding_password(token: str, req: SetPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.onboarding_token == token).first()
+    if not user or not user.onboarding_token_expires_at or user.onboarding_token_expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired setup link")
+    if len(req.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    user.hashed_password = get_password_hash(req.password)
+    user.onboarding_completed = True
+    user.is_active = True
+    user.onboarding_token = None
+    user.onboarding_token_expires_at = None
+    db.commit()
+    db.refresh(user)
+    access_token = create_access_token(data={"sub": user.email, "role": user.role})
+    return {"access_token": access_token, "token_type": "bearer", "user": user.to_dict()}
 
 
 @router.put("/users/{user_id}")
-def update_user(user_id: int, req: UserUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(require_superadmin)):
+def update_user(user_id: int, req: UserUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(require_admin_or_superadmin)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # Only superadmin can create/modify superadmin users
+    if current_user.role != "superadmin" and (req.role == "superadmin" or user.role == "superadmin"):
+        raise HTTPException(status_code=403, detail="Only Super Admin can manage superadmin users")
     if req.full_name is not None:
         user.full_name = req.full_name
     if req.email is not None:
@@ -240,7 +296,7 @@ def update_user(user_id: int, req: UserUpdateRequest, db: Session = Depends(get_
 
 
 @router.delete("/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_superadmin)):
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin_or_superadmin)):
     if current_user.id == user_id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     user = db.query(User).filter(User.id == user_id).first()
@@ -252,7 +308,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User 
 
 
 @router.get("/accounts-for-assignment")
-def accounts_for_assignment(current_user: User = Depends(require_superadmin), db: Session = Depends(get_db)):
+def accounts_for_assignment(current_user: User = Depends(require_admin_or_superadmin), db: Session = Depends(get_db)):
     """List all accounts for the assignment multi-select dropdown."""
     accounts = db.query(Account).order_by(Account.name).all()
     return [{"id": a.id, "name": a.name} for a in accounts]

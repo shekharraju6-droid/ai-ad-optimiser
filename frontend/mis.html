@@ -1102,7 +1102,7 @@
             case 'last15': start.setDate(end.getDate() - 14); break;
             case 'last30': start.setDate(end.getDate() - 29); break;
             case 'thisMonth': start.setDate(1); break;
-            case 'inception': start = new Date('2026-01-08'); break;
+            case 'inception': start = new Date('2026-01-08'); end.setDate(end.getDate() - 1); break;
             case 'custom': return;
         }
         rangeObj.preset = preset;
@@ -1367,7 +1367,7 @@
                 spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${spend}</td>`;
             }
 
-            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${submitted}</td>${cpaCell}${spendCell}<td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
+            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-center" style="padding:0.35rem 0.5rem">${submitted}</td>${cpaCell}${spendCell}<td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
         }).join('');
 
         const gtCpa = gt.submitted > 0 ? fmtMoney(gt.cpa) : '0';
@@ -1381,10 +1381,10 @@
                 </div>
                 <div class="dsi-table4-wrap">
                 <table class="dsu-table" style="font-size:0.78rem">
-                    <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-right" style="padding:0.35rem 0.5rem;white-space:nowrap">Application Submitted</th><th class="text-right" style="padding:0.35rem 0.5rem">CPA</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Target</th></tr></thead>
+                    <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-center" style="padding:0.35rem 0.5rem;white-space:nowrap">Application Submitted</th><th class="text-right" style="padding:0.35rem 0.5rem">CPA</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Target</th></tr></thead>
                     <tbody>
                         ${body}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td colspan="2" style="padding:0.35rem 0.5rem">${gt.course}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td colspan="2" style="padding:0.35rem 0.5rem">${gt.course}</td><td class="text-center" style="padding:0.35rem 0.5rem">${gtSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -1465,13 +1465,13 @@
         const entryRows = (entries || []).map(e => {
             const isEditing = dsiEditingBudgetId === e.id;
             return `<tr style="${isEditing ? 'background:#fef3c7' : ''}">
-                <td style="white-space:nowrap;padding:0.35rem 0.5rem">${escapeHtml(fmtDate(e.date))}</td>
-                <td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(e.amount)}</td>
-                <td style="padding:0.35rem 0.5rem">${escapeHtml(e.invoice || '-')}</td>
-                <td style="padding:0.35rem 0.5rem">${escapeHtml(e.section || '-')}</td>
-                <td class="text-center" style="padding:0.35rem 0.5rem">
-                    <button class="action-btn" title="Edit" onclick="dsiEditBudgetEntry(${e.id})">&#9998;</button>
-                    <button class="action-btn" title="Delete" onclick="dsiDeleteBudgetEntry(${e.id})" style="color:#dc2626">&#10005;</button>
+                <td style="white-space:nowrap;padding:0.25rem 0.4rem">${escapeHtml(fmtDate(e.date))}</td>
+                <td class="text-center" style="white-space:nowrap;padding:0.25rem 0.4rem">${fmtMoney(e.amount)}</td>
+                <td style="padding:0.25rem 0.4rem">${escapeHtml(e.invoice || '-')}</td>
+                <td style="padding:0.25rem 0.4rem">${escapeHtml(e.section || '-')}</td>
+                <td class="text-center" style="padding:0.25rem 0.4rem;white-space:nowrap">
+                    <button class="action-btn" title="Edit" style="padding:0 0.15rem" onclick="dsiEditBudgetEntry(${e.id})">&#9998;</button>
+                    <button class="action-btn" title="Delete" style="padding:0 0.15rem;color:#dc2626" onclick="dsiDeleteBudgetEntry(${e.id})">&#10005;</button>
                 </td>
             </tr>`;
         }).join('');
@@ -1530,12 +1530,12 @@
                 </div>
 
                 <!-- Budget Entries List -->
-                <div style="overflow-x:auto;">
-                <table class="dsu-table" style="font-size:0.78rem">
-                    <thead><tr><th style="padding:0.35rem 0.5rem">Date</th><th class="text-right" style="padding:0.35rem 0.5rem">Amount Received</th><th style="padding:0.35rem 0.5rem">Invoice #</th><th style="padding:0.35rem 0.5rem">Section</th><th class="text-center" style="padding:0.35rem 0.5rem">Actions</th></tr></thead>
+                <div class="dsi-table4-wrap">
+                <table class="dsu-table" style="font-size:0.75rem;width:auto">
+                    <thead><tr><th style="padding:0.25rem 0.4rem;white-space:nowrap">Date</th><th class="text-center" style="padding:0.25rem 0.4rem;white-space:nowrap">Amount Received</th><th style="padding:0.25rem 0.4rem">Invoice #</th><th style="padding:0.25rem 0.4rem">Section</th><th class="text-center" style="padding:0.25rem 0.4rem;white-space:nowrap">Actions</th></tr></thead>
                     <tbody>
                         ${entryRows || '<tr><td colspan="5" style="text-align:center;padding:0.75rem;color:var(--text-muted)">No budget entries yet.</td></tr>'}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td style="padding:0.35rem 0.5rem">TOTAL RECEIVED</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(totalReceived)}</td><td colspan="3" style="padding:0.35rem 0.5rem"></td></tr>
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td style="padding:0.25rem 0.4rem">TOTAL RECEIVED</td><td class="text-center" style="padding:0.25rem 0.4rem;white-space:nowrap">${fmtMoney(totalReceived)}</td><td colspan="3" style="padding:0.25rem 0.4rem"></td></tr>
                     </tbody>
                 </table>
                 </div>
