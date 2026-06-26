@@ -1,43 +1,80 @@
 """
 Database setup using SQLAlchemy.
 Supports SQLite (local dev) and PostgreSQL (Supabase/Railway).
+Falls back to SQLite if PostgreSQL is unreachable.
 """
 import os
 import logging
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 logger = logging.getLogger("AdOptima")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DB_PATH = os.getenv("ADOPTIMA_DB_PATH", os.path.join(ROOT_DIR, "adoptima.db"))
+if os.path.dirname(DB_PATH):
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+else:
+    DB_PATH = os.path.join(ROOT_DIR, DB_PATH)
+    os.makedirs(ROOT_DIR, exist_ok=True)
+
+
+def _create_sqlite_engine():
+    return create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+
+
+def _create_postgres_engine(url):
+    return create_engine(
+        url,
+        connect_args={"sslmode": "require", "connect_timeout": 10},
+        pool_pre_ping=True,
+        pool_recycle=300,
+    )
+
+
+def _test_connection(eng):
+    try:
+        with eng.connect() as conn:
+            conn.execute("SELECT 1")
+        return True
+    except Exception as e:
+        logger.warning(f"DB connection test failed: {e}")
+        return False
+
+
+engine = None
+active_db = "unknown"
 
 if DATABASE_URL:
-    # Supabase / PostgreSQL
-    # Force IPv4 and SSL for Railway -> Supabase connectivity
-    parsed = urlparse(DATABASE_URL)
-    if parsed.hostname and not parsed.hostname.startswith("127."):
-        engine = create_engine(
-            DATABASE_URL,
-            connect_args={
-                "sslmode": "require",
-                "connect_timeout": 10,
-            },
-            pool_pre_ping=True,
-            pool_recycle=300,
-        )
+    # Try PostgreSQL first
+    pg_engine = _create_postgres_engine(DATABASE_URL)
+    if _test_connection(pg_engine):
+        engine = pg_engine
+        active_db = "postgresql"
+        logger.info("Using PostgreSQL database")
     else:
-        engine = create_engine(DATABASE_URL)
-else:
-    # SQLite fallback (local dev)
-    ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    DB_PATH = os.getenv("ADOPTIMA_DB_PATH", os.path.join(ROOT_DIR, "adoptima.db"))
-    if os.path.dirname(DB_PATH):
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    else:
-        DB_PATH = os.path.join(ROOT_DIR, DB_PATH)
-        os.makedirs(ROOT_DIR, exist_ok=True)
-    engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+        # Try Supabase transaction pooler (port 6543) as fallback
+        try:
+            parsed = urlparse(DATABASE_URL)
+            if parsed.port == 5432:
+                pooler_parts = parsed._replace(netloc=f"{parsed.username}:{parsed.password}@{parsed.hostname}:6543")
+                pooler_url = urlunparse(pooler_parts)
+                pooler_engine = _create_postgres_engine(pooler_url)
+                if _test_connection(pooler_engine):
+                    engine = pooler_engine
+                    active_db = "postgresql-pooler"
+                    logger.info("Using Supabase connection pooler")
+        except Exception as e:
+            logger.warning(f"Pooler fallback failed: {e}")
+
+if engine is None:
+    engine = _create_sqlite_engine()
+    active_db = "sqlite"
+    if DATABASE_URL:
+        logger.warning("PostgreSQL unreachable, falling back to SQLite")
+    logger.info(f"Using SQLite database at {DB_PATH}")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -61,7 +98,11 @@ def init_db():
     import backend.db.revenueops_models  # noqa: F401
     try:
         Base.metadata.create_all(bind=engine)
-        logger.info("Database initialized")
+        logger.info(f"Database initialized ({active_db})")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise
+
+
+def get_active_db():
+    return active_db
