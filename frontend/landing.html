@@ -229,13 +229,58 @@
     }
 
     async function checkAuth() {
-        if (!token) { updateUI(null); return; }
+        if (!token) {
+            // Check if onboarding is needed (no users yet)
+            try {
+                const r = await fetch(API + '/auth/onboarding-required');
+                const d = await r.json();
+                if (d.onboarding_required) { showOnboarding(); return; }
+            } catch (e) {}
+            updateUI(null);
+            return;
+        }
         try {
             currentUser = await api('GET', '/auth/me');
             updateUI(currentUser);
         } catch (e) {
             updateUI(null);
         }
+    }
+
+    function showOnboarding() {
+        $('authOverlay').classList.remove('hidden');
+        $('authOverlay').querySelector('.modal h2').textContent = 'Welcome — Create Super Admin';
+        $('authOverlay').querySelector('.modal').innerHTML = `
+            <h2>Welcome — Create Super Admin</h2>
+            <div class="form-group"><label>Full Name</label><input type="text" id="onbName" placeholder="John Doe"></div>
+            <div class="form-group"><label>Email</label><input type="email" id="onbEmail" placeholder="you@example.com"></div>
+            <div class="form-group"><label>Mobile</label><input type="text" id="onbMobile" placeholder="+91 9876543210"></div>
+            <div class="form-group"><label>Password</label><input type="password" id="onbPassword"></div>
+            <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="completeOnboarding()">Create Super Admin</button>
+            <p style="color:var(--text-muted); font-size:0.8rem; margin-top:0.75rem; text-align:center;">This creates the first Super Admin account.</p>
+        `;
+    }
+
+    async function completeOnboarding() {
+        const full_name = $('onbName').value.trim();
+        const email = $('onbEmail').value.trim();
+        const mobile = $('onbMobile').value.trim();
+        const password = $('onbPassword').value;
+        if (!full_name || !email || !mobile || !password) { alert('All fields are required'); return; }
+        try {
+            const res = await fetch(API + '/auth/onboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ full_name, email, mobile, password })
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Onboarding failed'); }
+            const data = await res.json();
+            token = data.access_token;
+            currentUser = data.user;
+            localStorage.setItem('adoptima_token', token);
+            $('authOverlay').classList.add('hidden');
+            updateUI(currentUser);
+        } catch (e) { alert(e.message); }
     }
 
         function updateUI(user) {
