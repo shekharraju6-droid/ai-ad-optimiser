@@ -18,6 +18,7 @@ COPY . .
 # Railway provides PORT env variable
 ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
+ENV PORT=8000
 
 EXPOSE 8000
 

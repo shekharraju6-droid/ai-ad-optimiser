@@ -15,11 +15,12 @@ Go to your Railway service → **Variables** tab and add:
 ```
 ADOPTIMA_JWT_SECRET=your-long-random-secret-key-here
 ADOPTIMA_DB_PATH=/app/data/adoptima.db
+ADOPTIMA_PUBLIC_BASE_URL=https://your-railway-domain.com
 HOST=0.0.0.0
 PORT=8000
 ```
 
-**Important:** Generate a secure `ADOPTIMA_JWT_SECRET` (32+ random characters).
+**Important:** Generate a secure `ADOPTIMA_JWT_SECRET` (32+ random characters). Update `ADOPTIMA_PUBLIC_BASE_URL` with your actual Railway domain so onboarding setup links work.
 
 ## 4. Add a persistent volume (SQLite data will survive redeploys)
 1. In Railway, go to your service → **Volumes** tab
