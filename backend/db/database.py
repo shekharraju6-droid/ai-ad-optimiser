@@ -3,14 +3,31 @@ Database setup using SQLAlchemy.
 Supports SQLite (local dev) and PostgreSQL (Supabase/Railway).
 """
 import os
+import logging
+from urllib.parse import urlparse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+
+logger = logging.getLogger("AdOptima")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
     # Supabase / PostgreSQL
-    engine = create_engine(DATABASE_URL)
+    # Force IPv4 and SSL for Railway -> Supabase connectivity
+    parsed = urlparse(DATABASE_URL)
+    if parsed.hostname and not parsed.hostname.startswith("127."):
+        engine = create_engine(
+            DATABASE_URL,
+            connect_args={
+                "sslmode": "require",
+                "connect_timeout": 10,
+            },
+            pool_pre_ping=True,
+            pool_recycle=300,
+        )
+    else:
+        engine = create_engine(DATABASE_URL)
 else:
     # SQLite fallback (local dev)
     ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,4 +59,9 @@ def get_db():
 def init_db():
     import backend.db.models  # noqa: F401
     import backend.db.revenueops_models  # noqa: F401
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        raise
