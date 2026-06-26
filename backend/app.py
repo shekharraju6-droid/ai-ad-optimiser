@@ -5,7 +5,7 @@ FastAPI application entry point.
 import os
 import logging
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routes import config, campaigns, search_terms, negatives, optimizations, logs, chat, auth, reports, accounts, audits, notifications, oauth, crm, revenueops, dsu_report, dsi_report, mantri
@@ -47,9 +47,29 @@ app.include_router(revenueops.router)
 app.include_router(mantri.router)
 
 
-# Initialize database tables and scheduler
+# Initialize database tables only at import time; scheduler starts lazily on first request
 init_db()
-start_scheduler()
+_scheduler_started = False
+
+def ensure_scheduler():
+    global _scheduler_started
+    if not _scheduler_started:
+        try:
+            start_scheduler()
+            _scheduler_started = True
+        except Exception as e:
+            logger.error(f"Failed to start scheduler: {e}")
+
+
+@app.middleware("http")
+async def lazy_start_scheduler(request, call_next):
+    ensure_scheduler()
+    return await call_next(request)
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "port": os.getenv("PORT", "8000")}
 
 
 @app.get("/favicon.ico")
