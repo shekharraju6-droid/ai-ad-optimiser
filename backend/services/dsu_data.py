@@ -4,15 +4,21 @@ Pulls campaign spend from Google Ads API and leads from LeadSquared.
 Maps both to the DSU course taxonomy.
 """
 import json
-import sqlite3
 import logging
+import os
 from datetime import date, timedelta
 from collections import defaultdict
 from typing import Dict, Any, List, Optional
 
 from backend.services.crypto import decrypt
+from backend.db.database import get_raw_connection
 
 logger = logging.getLogger("AdOptima")
+
+
+def _db_connect():
+    """Return a DB-API connection. Works for SQLite and PostgreSQL."""
+    return get_raw_connection()
 
 # Cache for LSQ lead counts (keyed by "start_date_end_date")
 _LSQ_CACHE: Dict[str, Dict[str, int]] = {}
@@ -124,7 +130,7 @@ def _map_campaign_to_course(name: str) -> Optional[str]:
 
 def _get_dsu_account_creds() -> Dict[str, Any]:
     """Load DSU's Google Ads credentials from the DB."""
-    c = sqlite3.connect("adoptima.db")
+    c = _db_connect()
     cur = c.cursor()
     cur.execute("SELECT google_credentials FROM accounts WHERE name='DSU'")
     row = cur.fetchone()
@@ -240,7 +246,7 @@ def _fetch_lsq_leads_direct(start_date: str, end_date: str, account_id: int = No
     base_url = ""
 
     if account_id:
-        c = sqlite3.connect("adoptima.db")
+        c = _db_connect()
         cur = c.cursor()
         cur.execute("SELECT lsq_access_key, lsq_secret_key, lsq_base_url FROM accounts WHERE id=?", (account_id,))
         row = cur.fetchone()
@@ -451,7 +457,7 @@ def _fetch_lsq_lead_details_direct(start_date: str, end_date: str, account_id: i
     base_url = ""
 
     if account_id:
-        c = sqlite3.connect("adoptima.db")
+        c = _db_connect()
         cur = c.cursor()
         cur.execute("SELECT lsq_access_key, lsq_secret_key, lsq_base_url FROM accounts WHERE id=?", (account_id,))
         row = cur.fetchone()

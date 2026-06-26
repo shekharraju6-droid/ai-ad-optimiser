@@ -4,15 +4,20 @@ Pulls campaign spend from Google Ads API and leads from LeadSquared.
 Maps both to the DSI department/course taxonomy with department rollup.
 """
 import json
-import sqlite3
 import logging
 from datetime import date, timedelta, datetime
 from collections import defaultdict
 from typing import Dict, Any, List, Optional, Tuple
 
 from backend.services.crypto import decrypt
+from backend.db.database import get_raw_connection
 
 logger = logging.getLogger("AdOptima")
+
+
+def _db_connect():
+    """Return a DB-API connection. Works for SQLite and PostgreSQL."""
+    return get_raw_connection()
 
 DSI_ACCOUNT_ID = 2
 DSI_CUSTOMER_ID = "1917462211"
@@ -250,7 +255,7 @@ def _rollup_to_dept(course: str) -> str:
 
 def _get_dsi_account_creds() -> Dict[str, Any]:
     """Load DSI's Google Ads credentials from the DB."""
-    c = sqlite3.connect("adoptima.db")
+    c = _db_connect()
     cur = c.cursor()
     cur.execute("SELECT google_credentials FROM accounts WHERE name='DSI'")
     row = cur.fetchone()
@@ -501,8 +506,8 @@ def _fetch_dsi_lsq_leads_direct(start_date: str, end_date: str) -> List[Dict[str
     secret_key = ""
     base_url = ""
 
-    c = sqlite3.connect("adoptima.db")
-    cur = c.cursor()
+        c = _db_connect()
+        cur = c.cursor()
     cur.execute("SELECT lsq_access_key, lsq_secret_key, lsq_base_url FROM accounts WHERE id=?", (DSI_ACCOUNT_ID,))
     row = cur.fetchone()
     c.close()

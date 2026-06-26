@@ -14,13 +14,16 @@ Go to your Railway service → **Variables** tab and add:
 
 ```
 ADOPTIMA_JWT_SECRET=your-long-random-secret-key-here
-ADOPTIMA_DB_PATH=/app/data/adoptima.db
-ADOPTIMA_PUBLIC_BASE_URL=https://your-railway-domain.com
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.mfmtilbrpigxlstzgmzd.supabase.co:5432/postgres
+ADOPTIMA_PUBLIC_BASE_URL=https://your-railway-domain.up.railway.app
 HOST=0.0.0.0
 PORT=8000
 ```
 
-**Important:** Generate a secure `ADOPTIMA_JWT_SECRET` (32+ random characters). Update `ADOPTIMA_PUBLIC_BASE_URL` with your actual Railway domain so onboarding setup links work.
+**Important:**
+- Generate a secure `ADOPTIMA_JWT_SECRET` (32+ random characters).
+- Replace `YOUR_PASSWORD` in `DATABASE_URL` with your actual Supabase database password.
+- If `DATABASE_URL` is set, the app uses Supabase PostgreSQL. Otherwise it falls back to SQLite at `ADOPTIMA_DB_PATH`.
 
 ## 4. Add a persistent volume (SQLite data will survive redeploys)
 1. In Railway, go to your service → **Volumes** tab
