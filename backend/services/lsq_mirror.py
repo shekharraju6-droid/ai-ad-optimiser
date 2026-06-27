@@ -663,6 +663,108 @@ def count_leads_by_course(
     return counts
 
 
+def fetch_realtime_lead_counts(
+    account: Account,
+    start_date: str,
+    end_date: str,
+) -> Dict[str, int]:
+    """Fetch GGL/Programmatic lead counts directly from LeadSquared API.
+
+    Bypasses the local mirror so dashboard tile counts are always real-time.
+    """
+    access_key, secret_key, base_url = _get_lsq_credentials(account)
+    if not access_key or not secret_key or not base_url:
+        logger.warning(f"LeadSquared credentials not configured for account {account.id}")
+        return {}
+
+    from backend.services.dsu_data import EXCLUDED_SOURCES
+
+    url = f"{base_url}/LeadManagement.svc/Leads.RecentlyModified"
+    course_leads: Dict[str, int] = {}
+    page = 1
+    max_pages = 100
+    total_records = None
+    total_fetched = 0
+
+    # Search up to tomorrow so we catch leads modified today
+    search_to = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    while page <= max_pages:
+        payload = {
+            "Parameter": {
+                "FromDate": f"{start_date} 00:00:00",
+                "ToDate": f"{search_to} 23:59:59",
+            },
+            "Columns": {
+                "Include_CSV": "ProspectID,Source,SourceCampaign,CreatedOn,mx_Student_Source,mx_Application_Status,mx_Latest_Source,mx_Secondary_Source"
+            },
+            "Paging": {"PageIndex": page, "PageSize": 1000},
+            "Sorting": {"ColumnName": "ProspectAutoId", "Direction": "1"},
+        }
+        success = False
+        for attempt in range(3):
+            try:
+                r = requests.post(
+                    url,
+                    params={"accessKey": access_key, "secretKey": secret_key},
+                    json=payload,
+                    timeout=120,
+                )
+                r.raise_for_status()
+                resp = r.json()
+                success = True
+                break
+            except Exception as e:
+                logger.warning(f"Realtime LSQ page {page} attempt {attempt + 1} failed: {e}")
+                time_module.sleep(5)
+        if not success:
+            logger.error(f"Realtime LSQ page {page} failed after 3 retries")
+            break
+
+        if total_records is None:
+            total_records = resp.get("RecordCount", 0)
+            logger.info(f"Realtime LSQ total modified leads {start_date} to {search_to}: {total_records}")
+
+        records = resp.get("Leads", [])
+        if not records:
+            break
+
+        for rec in records:
+            props = {}
+            for item in rec.get("LeadPropertyList", []):
+                props[item.get("Attribute", "")] = item.get("Value", "")
+
+            created = (props.get("CreatedOn") or "")[:10]
+            if not (start_date <= created <= end_date):
+                continue
+
+            source = (props.get("Source") or "")
+            if source in EXCLUDED_SOURCES:
+                continue
+
+            student_source = (props.get("mx_Student_Source") or "")
+            latest_source = (props.get("mx_Latest_Source") or "")
+            secondary_source = (props.get("mx_Secondary_Source") or "")
+            source_combined = " ".join([source, student_source, latest_source, secondary_source]).upper()
+            if "GGL" not in source_combined and "PROGRAMMATIC" not in source_combined:
+                continue
+
+            course = SOURCE_TO_COURSE.get(source) or _map_campaign_to_course(source) or source or "Unknown"
+            course_leads[course] = course_leads.get(course, 0) + 1
+
+        total_fetched += len(records)
+        logger.info(
+            f"Realtime LSQ page {page}: fetched {len(records)} "
+            f"(total: {total_fetched}/{total_records}), ggl/prog leads: {sum(course_leads.values())}"
+        )
+        if len(records) < 1000:
+            break
+        page += 1
+
+    logger.info(f"Realtime LSQ lead counts for account {account.id}: {course_leads}")
+    return course_leads
+
+
 def get_lead_details(
     db: Session,
     account_id: int,
