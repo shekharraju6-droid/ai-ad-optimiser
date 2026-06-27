@@ -150,7 +150,7 @@ def get_meta_auth_url(account_id: int) -> str:
         "response_type": "code",
         "state": state,
     }
-    return "https://www.facebook.com/v18.0/dialog/oauth?" + urllib.parse.urlencode(params)
+    return "https://www.facebook.com/v20.0/dialog/oauth?" + urllib.parse.urlencode(params)
 
 
 def exchange_meta_code(code: str, redirect_uri: str, account_id: int) -> Optional[Dict[str, Any]]:
@@ -164,10 +164,14 @@ def exchange_meta_code(code: str, redirect_uri: str, account_id: int) -> Optiona
         "redirect_uri": redirect_uri,
         "code": code,
     }
-    url = "https://graph.facebook.com/v18.0/oauth/access_token?" + urllib.parse.urlencode(params)
+    url = "https://graph.facebook.com/v20.0/oauth/access_token?" + urllib.parse.urlencode(params)
     try:
         with urllib.request.urlopen(url) as resp:
             return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        logger.error(f"Meta token exchange failed: HTTP {e.code} {body}")
+        return None
     except Exception as e:
         logger.error(f"Meta token exchange failed: {e}")
         return None
@@ -185,11 +189,15 @@ def extend_meta_token(short_lived_token: str, account_id: int) -> Optional[str]:
         "client_secret": app_secret,
         "fb_exchange_token": short_lived_token,
     }
-    url = "https://graph.facebook.com/v18.0/oauth/access_token?" + urllib.parse.urlencode(params)
+    url = "https://graph.facebook.com/v20.0/oauth/access_token?" + urllib.parse.urlencode(params)
     try:
         with urllib.request.urlopen(url) as resp:
             data = json.loads(resp.read().decode())
             return data.get("access_token", short_lived_token)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        logger.error(f"Meta long-lived token exchange failed: HTTP {e.code} {body}; using short-lived token")
+        return short_lived_token
     except Exception as e:
         logger.error(f"Meta long-lived token exchange failed: {e}; using short-lived token")
         return short_lived_token
