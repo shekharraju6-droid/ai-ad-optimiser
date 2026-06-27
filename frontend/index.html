@@ -796,11 +796,15 @@
     function renderDashboardGroups(groups, ungrouped) {
         const container = $('dashboardGroups');
         container.innerHTML = '';
-        groups.forEach(g => {
-            container.appendChild(buildGroupCard(g.group_name, g.accounts));
+        // Sort groups alphabetically by group name, and accounts within each group by account name
+        const sortedGroups = [...groups].sort((a, b) => (a.group_name || '').localeCompare(b.group_name || ''));
+        sortedGroups.forEach(g => {
+            const sortedAccounts = [...(g.accounts || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            container.appendChild(buildGroupCard(g.group_name, sortedAccounts));
         });
         if (ungrouped.length) {
-            container.appendChild(buildGroupCard('Uncategorized', ungrouped));
+            const sortedUngrouped = [...ungrouped].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            container.appendChild(buildGroupCard('Uncategorized', sortedUngrouped));
         }
     }
 
@@ -975,7 +979,9 @@
     function renderAccountsTable() {
         const tbody = $('accountsTableBody');
         tbody.innerHTML = '';
-        allAccounts.forEach(a => {
+        // Sort accounts alphabetically by name
+        const sortedAccounts = [...allAccounts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        sortedAccounts.forEach(a => {
             const platforms = [];
             if (a.has_google) platforms.push('Google');
             if (a.has_meta) platforms.push('Meta');
