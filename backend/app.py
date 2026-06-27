@@ -142,6 +142,37 @@ def get_onboard_ui(request: Request):
     return HTMLResponse(content="<h1>Onboarding UI not found.</h1>")
 
 
+@app.get("/privacy", response_class=HTMLResponse)
+def get_privacy(request: Request):
+    return HTMLResponse(content="""<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+    <meta charset=\"UTF-8\">
+    <title>Privacy Policy - ChlearSakhaaOps AI</title>
+    <style>body{font-family:Arial,sans-serif;max-width:800px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#333}</style>
+</head>
+<body>
+    <h1>Privacy Policy</h1>
+    <p><strong>ChlearSakhaaOps AI</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) operates the ChlearSakhaaOps AI advertising-optimisation platform.</p>
+    <h2>1. Information We Collect</h2>
+    <p>We collect information you provide when registering an account, connecting advertising accounts (Google Ads, Meta Ads), and configuring integrations. This may include account IDs, OAuth tokens, campaign metrics, and CRM data.</p>
+    <h2>2. How We Use Information</h2>
+    <p>We use the information to provide optimisation recommendations, reports, dashboards, notifications, and to keep connected accounts synchronised.</p>
+    <h2>3. Data Sharing</h2>
+    <p>We do not sell personal information. Data is shared only with the advertising platforms and CRM systems you authorise (Google, Meta, LeadSquared, Salesforce, HubSpot, Zoho, etc.).</p>
+    <h2>4. Data Security</h2>
+    <p>OAuth tokens and credentials are encrypted at rest. Access to the platform is protected by authentication and authorisation controls.</p>
+    <h2>5. Your Rights</h2>
+    <p>You may disconnect advertising accounts, delete your account, or contact us to request data deletion.</p>
+    <h2>6. Changes</h2>
+    <p>We may update this policy. Continued use after changes constitutes acceptance.</p>
+    <h2>7. Contact</h2>
+    <p>For privacy questions, contact <a href=\"mailto:shekharraju6@gmail.com\">shekharraju6@gmail.com</a>.</p>
+    <p style=\"margin-top:2rem;color:#666;font-size:0.9rem;\">Last updated: June 2026</p>
+</body>
+</html>""")
+
+
 if __name__ == "__main__":
     import uvicorn
     host = os.getenv("HOST", "0.0.0.0")
