@@ -359,8 +359,9 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group"><label>Developer Token *</label><input type="password" id="accGoogleDeveloperToken" placeholder="From Google Ads API Center"></div>
-                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accGoogleRedirectBaseUrl" value="/" disabled></div>
+                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accGoogleRedirectBaseUrl" value="https://ai-ad-optimiser-production.up.railway.app/" disabled></div>
                         </div>
+                        <p style="font-size:0.72rem; color:var(--text-muted); margin:0.4rem 0 0.2rem;">Make sure this URL is added as an Authorized redirect URI in your Google Cloud OAuth client: <code>https://ai-ad-optimiser-production.up.railway.app/api/oauth/google/callback</code></p>
                     </div>
 
                     <div id="googleOAuthStatus" class="oauth-status disconnected">
@@ -394,8 +395,9 @@
                             <div class="form-group"><label>App Secret *</label><input type="password" id="accMetaAppSecret" placeholder="..."></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accMetaRedirectBaseUrl" value="/" disabled></div>
+                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accMetaRedirectBaseUrl" value="https://ai-ad-optimiser-production.up.railway.app/" disabled></div>
                         </div>
+                        <p style="font-size:0.72rem; color:var(--text-muted); margin:0.4rem 0 0.2rem;">Make sure this URL is added as a Valid OAuth Redirect URI in your Meta app: <code>https://ai-ad-optimiser-production.up.railway.app/api/oauth/meta/callback</code></p>
                     </div>
 
                     <div id="metaOAuthStatus" class="oauth-status disconnected">

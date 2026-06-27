@@ -50,7 +50,10 @@ def _require(oauth_cfg: Dict[str, Any], key: str) -> str:
 
 
 def _redirect_base(oauth_cfg: Dict[str, Any]) -> str:
-    return oauth_cfg.get("redirect_base_url", "http://127.0.0.1:8000").rstrip("/")
+    base = oauth_cfg.get("redirect_base_url", "")
+    if not base or not base.startswith("http"):
+        base = "https://ai-ad-optimiser-production.up.railway.app"
+    return base.rstrip("/")
 
 
 # ---------------------------------------------------------------------------
