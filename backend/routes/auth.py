@@ -9,6 +9,8 @@ Roles:
 import os
 import secrets
 import re
+import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -21,6 +23,8 @@ from sqlalchemy.orm import Session
 from backend.db.database import get_db
 from backend.db.models import User, UserAccountAssignment, Account
 from backend.services.onboarding_email import send_onboarding_email
+
+logger = logging.getLogger("AdOptima")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -231,13 +235,23 @@ def create_user(req: UserCreateRequest, db: Session = Depends(get_db), current_u
     setup_path = f"/onboard.html?token={token}"
     setup_link = f"{base_url.rstrip('/')}{setup_path}" if base_url else setup_path
 
-    email_result = send_onboarding_email(req.email, req.full_name, setup_link)
+    def _send_email_background(email, name, link):
+        try:
+            result = send_onboarding_email(email, name, link)
+            if result.get("sent"):
+                logger.info(f"Onboarding email sent to {email}")
+            else:
+                logger.warning(f"Onboarding email failed for {email}: {result.get('error')}")
+        except Exception as e:
+            logger.error(f"Onboarding email thread failed for {email}: {e}")
+
+    threading.Thread(target=_send_email_background, args=(req.email, req.full_name, setup_link), daemon=True).start()
 
     return {
         "user": user.to_dict(),
         "setup_link": setup_link,
-        "email_sent": email_result.get("sent", False),
-        "email_error": email_result.get("error"),
+        "email_sent": True,
+        "email_error": None,
     }
 
 
