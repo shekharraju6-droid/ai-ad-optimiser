@@ -239,23 +239,29 @@ def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(
     def _send_email_background(email, name, link, result_holder):
         try:
             result = send_onboarding_email(email, name, link)
+            result_holder.clear()
             result_holder.update(result)
             if result.get("sent"):
-                logger.info(f"Onboarding email sent to {email}")
+                logger.info(f"Onboarding email thread: ACCEPTED for {email} (msgid={result.get('message_id')}, smtp={result.get('smtp_host')})")
             else:
-                logger.warning(f"Onboarding email failed for {email}: {result.get('error')}")
+                logger.error(f"Onboarding email thread: FAILED for {email}: {result.get('error')}")
         except Exception as e:
-            logger.error(f"Onboarding email thread failed for {email}: {e}")
-            result_holder.update({"sent": False, "error": str(e)})
+            logger.exception(f"Onboarding email thread crashed for {email}: {e}")
+            result_holder.clear()
+            result_holder.update({"sent": False, "error": f"Background send crashed: {e}"})
 
-    email_result = {"sent": False, "error": "Email send timed out; copy the setup link below to share manually."}
+    email_result = {"sent": False, "error": "Waiting for SMTP response..."}
     email_thread = threading.Thread(
         target=_send_email_background,
         args=(req.email, req.full_name, setup_link, email_result),
         daemon=True,
     )
     email_thread.start()
-    email_thread.join(timeout=10)
+    email_thread.join(timeout=45)
+    if email_thread.is_alive():
+        logger.error(f"Onboarding email thread timed out after 45s for {req.email}")
+        email_result.clear()
+        email_result.update({"sent": False, "error": "Email send timed out; copy the setup link below to share manually."})
 
     return {
         "user": user.to_dict(),

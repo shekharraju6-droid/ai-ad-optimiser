@@ -69,6 +69,16 @@ class Account(Base):
     meta_app_secret = Column(String, nullable=True)
     redirect_base_url = Column(String, nullable=True)
 
+    # Link to RevenueOps client (auto-created when account is added centrally)
+    rev_client_id = Column(Integer, nullable=True)
+
+    # Contact info (shared with RevenueOps client)
+    brand_name = Column(String, nullable=True)
+    contact_person = Column(String, nullable=True)
+    contact_email = Column(String, nullable=True)
+    contact_phone = Column(String, nullable=True)
+    business_manager_id = Column(Integer, nullable=True)
+
     # Per-account CRM (LeadSquared) credentials
     lsq_access_key = Column(String, nullable=True)
     lsq_secret_key = Column(String, nullable=True)
@@ -153,6 +163,12 @@ class Account(Base):
             "budget_used_pct": self.budget_used_pct,
             "target_cpa": self.target_cpa,
             "billing_cache": self.billing_cache,
+            "rev_client_id": self.rev_client_id,
+            "brand_name": self.brand_name,
+            "contact_person": self.contact_person,
+            "contact_email": self.contact_email,
+            "contact_phone": self.contact_phone,
+            "business_manager_id": self.business_manager_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

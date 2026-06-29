@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
 from backend.db.models import Account, AccountGroup, AccountType, AccountStatus, User, UserAccountAssignment
+from backend.db.revenueops_models import RevClient, RevClientStatus
 from backend.services.crypto import encrypt, decrypt
 from backend.services.connectors import get_connector
 from backend.routes.auth import get_current_user_required
@@ -72,6 +73,12 @@ class AccountCreate(BaseModel):
     crm_credentials: Optional[str] = None
     target_cpa: Optional[float] = None
 
+    brand_name: Optional[str] = None
+    contact_person: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    business_manager_id: Optional[int] = None
+
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
@@ -100,6 +107,12 @@ class AccountUpdate(BaseModel):
     crm_type: Optional[str] = None
     crm_credentials: Optional[str] = None
     target_cpa: Optional[float] = None
+
+    brand_name: Optional[str] = None
+    contact_person: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    business_manager_id: Optional[int] = None
 
 
 class GroupCreate(BaseModel):
@@ -215,8 +228,33 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
         crm_type=req.crm_type or "none",
         crm_credentials=req.crm_credentials,
         target_cpa=req.target_cpa,
+        brand_name=req.brand_name,
+        contact_person=req.contact_person,
+        contact_email=req.contact_email,
+        contact_phone=req.contact_phone,
+        business_manager_id=req.business_manager_id,
     )
     db.add(account)
+    db.flush()
+
+    # Auto-create or link a RevenueOps client
+    existing_client = db.query(RevClient).filter(RevClient.client_name == req.name).first()
+    if existing_client:
+        account.rev_client_id = existing_client.id
+    else:
+        rev_client = RevClient(
+            client_name=req.name,
+            brand_name=req.brand_name,
+            contact_person=req.contact_person,
+            contact_email=req.contact_email,
+            contact_phone=req.contact_phone,
+            business_manager_id=req.business_manager_id,
+            client_status=RevClientStatus.ACTIVE.value,
+        )
+        db.add(rev_client)
+        db.flush()
+        account.rev_client_id = rev_client.id
+
     db.commit()
     db.refresh(account)
     return account.to_dict()
@@ -278,6 +316,17 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
     if req.target_cpa is not None:
         account.target_cpa = req.target_cpa or None
 
+    if req.brand_name is not None:
+        account.brand_name = req.brand_name or None
+    if req.contact_person is not None:
+        account.contact_person = req.contact_person or None
+    if req.contact_email is not None:
+        account.contact_email = req.contact_email or None
+    if req.contact_phone is not None:
+        account.contact_phone = req.contact_phone or None
+    if req.business_manager_id is not None:
+        account.business_manager_id = req.business_manager_id or None
+
     # Keep legacy fields in sync
     if account.has_google and account.has_meta:
         account.account_type = AccountType.BOTH
@@ -288,19 +337,41 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
     account.external_id = account.google_external_id or account.meta_external_id or ""
     account.is_live = account.google_is_live or account.meta_is_live
 
+    # Sync contact fields to linked RevenueOps client
+    if account.rev_client_id:
+        rev_client = db.query(RevClient).filter(RevClient.id == account.rev_client_id).first()
+        if rev_client:
+            if req.name is not None:
+                rev_client.client_name = req.name
+            if req.brand_name is not None:
+                rev_client.brand_name = req.brand_name or None
+            if req.contact_person is not None:
+                rev_client.contact_person = req.contact_person or None
+            if req.contact_email is not None:
+                rev_client.contact_email = req.contact_email or None
+            if req.contact_phone is not None:
+                rev_client.contact_phone = req.contact_phone or None
+            if req.business_manager_id is not None:
+                rev_client.business_manager_id = req.business_manager_id or None
+
     db.commit()
     db.refresh(account)
     return account.to_dict()
 
 
 @router.delete("/accounts/{account_id}")
-def delete_account(account_id: int, db: Session = Depends(get_db)):
+def delete_account(account_id: int, delete_revops: bool = False, db: Session = Depends(get_db)):
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
+    rev_client_id = account.rev_client_id
     db.delete(account)
+    if delete_revops and rev_client_id:
+        rev_client = db.query(RevClient).filter(RevClient.id == rev_client_id).first()
+        if rev_client:
+            db.delete(rev_client)
     db.commit()
-    return {"status": "success"}
+    return {"status": "success", "rev_client_deleted": delete_revops and bool(rev_client_id)}
 
 
 @router.post("/accounts/{account_id}/refresh")

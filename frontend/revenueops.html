@@ -287,10 +287,10 @@
                             <select class="filter-select" id="clientStatusFilter" onchange="loadClients()">
                                 <option value="">All Status</option><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option><option value="on_hold">On Hold</option>
                             </select>
-                            <button class="btn btn-primary btn-sm" onclick="openClientModal()">+ Add Client</button>
+                            <span style="font-size:0.78rem;color:var(--text-light);">Manage clients from the main page →</span>
                         </div>
                     </div>
-                    <div class="table-wrap"><table id="clientsTable"><thead><tr><th>Name</th><th>Brand</th><th>BM</th><th>Status</th><th>Invoice Day</th><th>Due Days</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="clientsTable"><thead><tr><th>Name</th><th>Brand</th><th>BM</th><th>Status</th><th>Invoice Day</th><th>Due Days</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
 
@@ -564,7 +564,6 @@ async function loadClients(){
     $('clientsTable').querySelector('tbody').innerHTML=clients.map(c=>`<tr>
         <td style="font-weight:600">${c.client_name}</td><td>${c.brand_name||'—'}</td><td>${c.business_manager_name||'—'}</td>
         <td>${statusBadge(c.client_status)}</td><td>${c.invoice_day||'—'}</td><td>${c.default_due_days||'—'}d</td>
-        <td class="actions-cell"><button class="btn btn-secondary btn-sm" onclick="editClient(${c.id})">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id})">Del</button></td>
     </tr>`).join('');
 }
 
