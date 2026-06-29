@@ -2,17 +2,12 @@
 Onboarding invitation email sender.
 
 Priority:
-  1. Resend API (HTTPS, works from Railway)
-  2. SendGrid API (HTTPS, works from Railway)
-  3. Mailgun API (HTTPS, works from Railway)
-  4. SMTP fallback (may be blocked on Railway / cloud hosts)
+  1. SendGrid API (HTTPS, works from Railway, no domain verification needed for free tier)
+  2. SMTP fallback (may be blocked on Railway / cloud hosts)
 
 Environment variables:
-  RESEND_API_KEY         -> Resend API key
-  RESEND_FROM            -> sender address verified in Resend (default SMTP_FROM or SMTP_USER)
   SENDGRID_API_KEY       -> SendGrid API key
-  MAILGUN_API_KEY        -> Mailgun API key
-  MAILGUN_DOMAIN         -> Mailgun sending domain
+  SENDGRID_FROM          -> sender address (any address works on free tier)
   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS -> legacy SMTP fallback
 """
 import os
@@ -121,43 +116,6 @@ def _http_post(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeo
         return {"error": str(e)}
 
 
-def _send_via_resend(
-    recipient_email: str, full_name: str, setup_link: str, api_key: str, sender: str, sender_name: str
-) -> Dict[str, Any]:
-    logger.info(f"Sending onboarding email via Resend API to {recipient_email} from {sender}")
-    payloads = _build_email_payloads(recipient_email, full_name, setup_link, sender_name)
-    payload = {
-        "from": f"{sender_name} <{sender}>",
-        "to": [recipient_email],
-        "subject": payloads["subject"],
-        "html": payloads["html"],
-        "text": payloads["text"],
-    }
-    result = _http_post(
-        "https://api.resend.com/emails",
-        payload,
-        {"Authorization": f"Bearer {api_key}"},
-        timeout=30,
-    )
-    if result.get("error"):
-        err = f"Resend API error: {result['error']}"
-        logger.error(err)
-        return {"sent": False, "error": err}
-    status = result.get("status", 0)
-    body = result.get("body", "")
-    if status in (200, 202):
-        try:
-            data = json.loads(body)
-            message_id = data.get("id")
-        except Exception:
-            message_id = None
-        logger.info(f"Resend accepted email for {recipient_email} (id={message_id})")
-        return {"sent": True, "error": None, "provider": "resend", "message_id": message_id}
-    err = f"Resend API returned {status}: {body[:500]}"
-    logger.error(err)
-    return {"sent": False, "error": err}
-
-
 def _send_via_sendgrid(
     recipient_email: str, full_name: str, setup_link: str, api_key: str, sender: str, sender_name: str
 ) -> Dict[str, Any]:
@@ -188,47 +146,6 @@ def _send_via_sendgrid(
         return {"sent": True, "error": None, "provider": "sendgrid"}
     body = result.get("body", "")
     err = f"SendGrid API returned {status}: {body[:500]}"
-    logger.error(err)
-    return {"sent": False, "error": err}
-
-
-def _send_via_mailgun(
-    recipient_email: str, full_name: str, setup_link: str, api_key: str, domain: str, sender: str, sender_name: str
-) -> Dict[str, Any]:
-    logger.info(f"Sending onboarding email via Mailgun API to {recipient_email} from {sender}")
-    payloads = _build_email_payloads(recipient_email, full_name, setup_link, sender_name)
-    data = {
-        "from": f"{sender_name} <{sender}>",
-        "to": recipient_email,
-        "subject": payloads["subject"],
-        "html": payloads["html"],
-        "text": payloads["text"],
-    }
-    encoded = urllib.parse.urlencode(data).encode("utf-8")
-    url = f"https://api.mailgun.net/v3/{domain}/messages"
-    req = urllib.request.Request(
-        url,
-        data=encoded,
-        headers={"Authorization": f"Basic {api_key}"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            body = resp.read().decode("utf-8")
-            status = resp.status
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8")
-        status = e.code
-        err = f"Mailgun API returned {status}: {body[:500]}"
-        logger.error(err)
-        return {"sent": False, "error": err}
-    except Exception as e:
-        return {"sent": False, "error": f"Mailgun error: {e}"}
-
-    if status in (200, 201, 202):
-        logger.info(f"Mailgun accepted email for {recipient_email}")
-        return {"sent": True, "error": None, "provider": "mailgun"}
-    err = f"Mailgun API returned {status}: {body[:500]}"
     logger.error(err)
     return {"sent": False, "error": err}
 
@@ -321,33 +238,21 @@ def send_onboarding_email(
     """
     Send a setup-link email to a newly created user.
 
-    Uses Resend/SendGrid/Mailgun HTTPS API first (works from Railway/cloud),
-    falls back to SMTP only if no API credentials are configured.
+    Uses SendGrid HTTPS API first (works from Railway/cloud without domain verification),
+    falls back to SMTP only if no API key is configured.
 
     Returns a dict with keys:
       - sent: bool
       - error: str | None
-      - provider: str (resend|sendgrid|mailgun|smtp)
+      - provider: str (sendgrid|smtp)
       - message_id, smtp_host, smtp_from for debugging
     """
-    # Prefer HTTPS email APIs because cloud hosts (Railway, Render, etc.) often block SMTP ports.
     sender_name = os.getenv("SMTP_SENDER_NAME", "ChlearSakhaaOps AI").strip()
-
-    resend_key = os.getenv("RESEND_API_KEY", "").strip()
-    resend_from = os.getenv("RESEND_FROM", os.getenv("SMTP_FROM", os.getenv("SMTP_USER", ""))).strip()
-    if resend_key and resend_from:
-        return _send_via_resend(recipient_email, full_name, setup_link, resend_key, resend_from, sender_name)
 
     sendgrid_key = os.getenv("SENDGRID_API_KEY", "").strip()
     sendgrid_from = os.getenv("SENDGRID_FROM", os.getenv("SMTP_FROM", os.getenv("SMTP_USER", ""))).strip()
     if sendgrid_key and sendgrid_from:
         return _send_via_sendgrid(recipient_email, full_name, setup_link, sendgrid_key, sendgrid_from, sender_name)
 
-    mailgun_key = os.getenv("MAILGUN_API_KEY", "").strip()
-    mailgun_domain = os.getenv("MAILGUN_DOMAIN", "").strip()
-    mailgun_from = os.getenv("MAILGUN_FROM", os.getenv("SMTP_FROM", os.getenv("SMTP_USER", ""))).strip()
-    if mailgun_key and mailgun_domain and mailgun_from:
-        return _send_via_mailgun(recipient_email, full_name, setup_link, mailgun_key, mailgun_domain, mailgun_from, sender_name)
-
-    logger.warning("No HTTPS email API credentials found; falling back to SMTP (may fail on Railway)")
+    logger.warning("No SendGrid API key found; falling back to SMTP (may fail on Railway)")
     return _send_via_smtp(recipient_email, full_name, setup_link, timeout=timeout)
