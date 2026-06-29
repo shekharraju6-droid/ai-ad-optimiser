@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 
 from backend.db.database import get_db
-from backend.db.models import User
+from sqlalchemy import false
+from backend.db.models import User, Account, UserAccountAssignment
 from backend.db.revenueops_models import (
     RevClient, RevClientStatus, ClientBillingModel, BillingModelType, BillingFrequency,
     RevInvoice, InvoiceStatus, PaymentStatus, PaymentMode,
@@ -39,11 +40,27 @@ def _check_rev_role(user: User, allowed_roles: list):
 
 
 def _bm_client_filter(query, user: User):
+    """Filter RevClient visibility by role.
+
+    - superadmin/admin: see all clients.
+    - business_manager: see only clients where business_manager_id == user.id.
+    - regular user (role=user) without rev_role: see clients whose linked central
+      account is in the user's assigned_account_ids. Empty assignment list = no clients.
+    """
     if user.role in ("admin", "superadmin"):
         return query
     if user.rev_role == "business_manager":
         return query.filter(RevClient.business_manager_id == user.id)
-    return query
+    # Regular user: restrict to assigned accounts. RevClient is linked to Account
+    # via Account.rev_client_id.
+    assigned_ids = user.assigned_account_ids()
+    if not assigned_ids:
+        return query.filter(false())
+    return query.join(
+        Account,
+        Account.rev_client_id == RevClient.id,
+        isouter=False,
+    ).filter(Account.id.in_(assigned_ids))
 
 
 def _bm_filter(query, user: User, bm_col):
