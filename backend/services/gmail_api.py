@@ -7,17 +7,23 @@ This bypasses SMTP port blocking / timeouts on cloud hosts like Railway.
 import os
 import base64
 import logging
+import secrets
+import json
+import urllib.parse
+import urllib.request
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 from typing import Dict, Any, Optional
 
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 
 logger = logging.getLogger("AdOptima")
+
+_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
 
 
 def _get_oauth_config() -> Dict[str, Any]:
@@ -30,13 +36,9 @@ def _get_oauth_config() -> Dict[str, Any]:
     if not redirect_uri:
         return {"error": "GMAIL_REDIRECT_URI must be set"}
     return {
-        "installed": {
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [redirect_uri],
-        }
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
     }
 
 
@@ -45,43 +47,66 @@ def _scopes() -> list:
 
 
 def build_authorization_url(redirect_uri: Optional[str] = None) -> Dict[str, Any]:
-    """Build the Google OAuth URL for the admin to authorize Gmail sending."""
+    """Build the Google OAuth URL for the admin to authorize Gmail sending.
+
+    No PKCE so we don't need to track a code_verifier across requests.
+    """
     cfg = _get_oauth_config()
     if cfg.get("error"):
         return cfg
     if redirect_uri:
-        cfg["installed"]["redirect_uris"] = [redirect_uri]
-    try:
-        flow = Flow.from_client_config(cfg, scopes=_scopes())
-        flow.redirect_uri = cfg["installed"]["redirect_uris"][0]
-        url, state = flow.authorization_url(
-            access_type="offline",
-            include_granted_scopes="true",
-            prompt="consent",
-        )
-        return {"url": url, "state": state}
-    except Exception as e:
-        logger.exception(f"Failed to build Gmail authorization URL: {e}")
-        return {"error": str(e)}
+        cfg["redirect_uri"] = redirect_uri
+    state = secrets.token_urlsafe(24)
+    params = {
+        "response_type": "code",
+        "client_id": cfg["client_id"],
+        "redirect_uri": cfg["redirect_uri"],
+        "scope": " ".join(_scopes()),
+        "access_type": "offline",
+        "include_granted_scopes": "true",
+        "prompt": "consent",
+        "state": state,
+    }
+    url = _AUTH_URL + "?" + urllib.parse.urlencode(params)
+    return {"url": url, "state": state}
 
 
 def exchange_code_for_token(code: str, redirect_uri: Optional[str] = None) -> Dict[str, Any]:
-    """Exchange OAuth authorization code for refresh token."""
+    """Exchange OAuth authorization code for refresh token via direct HTTP POST.
+
+    No PKCE code_verifier required.
+    """
     cfg = _get_oauth_config()
     if cfg.get("error"):
         return cfg
     if redirect_uri:
-        cfg["installed"]["redirect_uris"] = [redirect_uri]
+        cfg["redirect_uri"] = redirect_uri
+    data = {
+        "code": code,
+        "client_id": cfg["client_id"],
+        "client_secret": cfg["client_secret"],
+        "redirect_uri": cfg["redirect_uri"],
+        "grant_type": "authorization_code",
+    }
     try:
-        flow = Flow.from_client_config(cfg, scopes=_scopes())
-        flow.redirect_uri = cfg["installed"]["redirect_uris"][0]
-        flow.fetch_token(code=code)
-        creds = flow.credentials
+        body = urllib.parse.urlencode(data).encode("utf-8")
+        req = urllib.request.Request(
+            _TOKEN_URL,
+            data=body,
+            method="POST",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
         return {
-            "refresh_token": creds.refresh_token,
-            "token": creds.token,
-            "expiry": creds.expiry.isoformat() if creds.expiry else None,
+            "refresh_token": payload.get("refresh_token"),
+            "token": payload.get("access_token"),
+            "expiry": None,
         }
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        logger.error(f"Gmail token exchange HTTP {e.code}: {err_body}")
+        return {"error": f"(HTTP {e.code}) {err_body}"}
     except Exception as e:
         logger.exception(f"Failed to exchange Gmail OAuth code: {e}")
         return {"error": str(e)}
