@@ -328,6 +328,21 @@
 
     function $(id) { return document.getElementById(id); }
 
+    function _setSaving(btn, text) {
+        if (!btn) return;
+        if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = text || 'Saving...';
+    }
+    function _resetSaving(btn) {
+        if (!btn) return;
+        btn.disabled = false;
+        if (btn.dataset.originalText) {
+            btn.textContent = btn.dataset.originalText;
+            delete btn.dataset.originalText;
+        }
+    }
+
     async function api(method, path, body) {
         const opts = { method, headers: {} };
         if (token) opts.headers['Authorization'] = 'Bearer ' + token;
@@ -587,19 +602,21 @@
     }
 
     async function saveUser() {
-        const id = $('umUserId').value;
-        const body = {
-            full_name: $('umFullName').value.trim(),
-            email: $('umEmail').value.trim(),
-            mobile: $('umMobile').value.trim(),
-            role: $('umRole').value,
-            access_adpulse: $('umAccessAdPulse').checked,
-            access_insightdesk: $('umAccessInsightDesk').checked,
-            access_revenueops: $('umAccessRevenueOps').checked,
-            assigned_account_ids: Array.from($('umAssignAccounts').querySelectorAll('input:checked')).map(cb => parseInt(cb.value))
-        };
-        if (!body.full_name || !body.email) { alert('Name and email are required'); return; }
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
         try {
+            const id = $('umUserId').value;
+            const body = {
+                full_name: $('umFullName').value.trim(),
+                email: $('umEmail').value.trim(),
+                mobile: $('umMobile').value.trim(),
+                role: $('umRole').value,
+                access_adpulse: $('umAccessAdPulse').checked,
+                access_insightdesk: $('umAccessInsightDesk').checked,
+                access_revenueops: $('umAccessRevenueOps').checked,
+                assigned_account_ids: Array.from($('umAssignAccounts').querySelectorAll('input:checked')).map(cb => parseInt(cb.value))
+            };
+            if (!body.full_name || !body.email) { alert('Name and email are required'); return; }
             if (id) {
                 await api('PUT', '/auth/users/' + id, body);
                 alert('User updated');
@@ -616,6 +633,7 @@
             loadUsers();
             resetUserForm();
         } catch (e) { alert(e.message); }
+        finally { _resetSaving(btn); }
     }
 
     function copySetupLink() {
@@ -692,24 +710,27 @@
     }
 
     async function saveCentralAccount() {
-        const name = $('caName').value.trim();
-        if (!name) { alert('Client name is required'); return; }
-        const body = {
-            name,
-            group_id: $('caGroup').value ? parseInt($('caGroup').value) : null,
-            brand_name: $('caBrand').value.trim() || null,
-            contact_person: $('caContactPerson').value.trim() || null,
-            contact_email: $('caContactEmail').value.trim() || null,
-            contact_phone: $('caContactPhone').value.trim() || null,
-            has_google: $('caHasGoogle').checked,
-            has_meta: $('caHasMeta').checked,
-        };
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
         try {
+            const name = $('caName').value.trim();
+            if (!name) { alert('Client name is required'); return; }
+            const body = {
+                name,
+                group_id: $('caGroup').value ? parseInt($('caGroup').value) : null,
+                brand_name: $('caBrand').value.trim() || null,
+                contact_person: $('caContactPerson').value.trim() || null,
+                contact_email: $('caContactEmail').value.trim() || null,
+                contact_phone: $('caContactPhone').value.trim() || null,
+                has_google: $('caHasGoogle').checked,
+                has_meta: $('caHasMeta').checked,
+            };
             await api('POST', '/accounts', body);
             alert('Account created');
             closeCentralAccountModal();
             loadCentralAccounts();
         } catch (e) { alert(e.message); }
+        finally { _resetSaving(btn); }
     }
 
     function openCentralEditAccount(id) {
@@ -756,35 +777,38 @@
     }
 
     async function updateCentralAccount() {
-        const id = $('caEditId').value;
-        const body = {
-            name: $('caEditName').value.trim(),
-            group_id: $('caEditGroup').value ? parseInt($('caEditGroup').value) : null,
-            brand_name: $('caEditBrand').value.trim() || null,
-            contact_person: $('caEditContactPerson').value.trim() || null,
-            contact_email: $('caEditContactEmail').value.trim() || null,
-            contact_phone: $('caEditContactPhone').value.trim() || null,
-            business_manager_id: $('caEditBM').value ? parseInt($('caEditBM').value) : null,
-            has_google: $('caEditHasGoogle').checked,
-            has_meta: $('caEditHasMeta').checked,
-            google_external_id: $('caEditGoogleCustId').value.trim() || null,
-            meta_external_id: $('caEditMetaAdId').value.trim() || null,
-        };
-        const googleSecret = $('caEditGoogleClientSecret').value.trim();
-        if (googleSecret) { body.google_client_id = $('caEditGoogleClientId').value.trim() || null; body.google_client_secret = googleSecret; body.google_developer_token = $('caEditGoogleDevToken').value.trim() || null; }
-        const metaSecret = $('caEditMetaAppSecret').value.trim();
-        if (metaSecret) { body.meta_app_id = $('caEditMetaAppId').value.trim() || null; body.meta_app_secret = metaSecret; }
-        const lsqSecret = $('caEditLsqSecretKey').value.trim();
-        body.crm_type = $('caEditCrmType').value;
-        if ($('caEditLsqAccessKey').value.trim()) body.lsq_access_key = $('caEditLsqAccessKey').value.trim();
-        if (lsqSecret) body.lsq_secret_key = lsqSecret;
-        if ($('caEditLsqBaseUrl').value.trim()) body.lsq_base_url = $('caEditLsqBaseUrl').value.trim();
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
         try {
+            const id = $('caEditId').value;
+            const body = {
+                name: $('caEditName').value.trim(),
+                group_id: $('caEditGroup').value ? parseInt($('caEditGroup').value) : null,
+                brand_name: $('caEditBrand').value.trim() || null,
+                contact_person: $('caEditContactPerson').value.trim() || null,
+                contact_email: $('caEditContactEmail').value.trim() || null,
+                contact_phone: $('caEditContactPhone').value.trim() || null,
+                business_manager_id: $('caEditBM').value ? parseInt($('caEditBM').value) : null,
+                has_google: $('caEditHasGoogle').checked,
+                has_meta: $('caEditHasMeta').checked,
+                google_external_id: $('caEditGoogleCustId').value.trim() || null,
+                meta_external_id: $('caEditMetaAdId').value.trim() || null,
+            };
+            const googleSecret = $('caEditGoogleClientSecret').value.trim();
+            if (googleSecret) { body.google_client_id = $('caEditGoogleClientId').value.trim() || null; body.google_client_secret = googleSecret; body.google_developer_token = $('caEditGoogleDevToken').value.trim() || null; }
+            const metaSecret = $('caEditMetaAppSecret').value.trim();
+            if (metaSecret) { body.meta_app_id = $('caEditMetaAppId').value.trim() || null; body.meta_app_secret = metaSecret; }
+            const lsqSecret = $('caEditLsqSecretKey').value.trim();
+            body.crm_type = $('caEditCrmType').value;
+            if ($('caEditLsqAccessKey').value.trim()) body.lsq_access_key = $('caEditLsqAccessKey').value.trim();
+            if (lsqSecret) body.lsq_secret_key = lsqSecret;
+            if ($('caEditLsqBaseUrl').value.trim()) body.lsq_base_url = $('caEditLsqBaseUrl').value.trim();
             await api('PUT', '/accounts/' + id, body);
             alert('Account updated');
             closeCentralAccountModal();
             loadCentralAccounts();
         } catch (e) { alert(e.message); }
+        finally { _resetSaving(btn); }
     }
 
     function closeCentralAccountModal(e) {

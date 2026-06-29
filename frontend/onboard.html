@@ -76,6 +76,21 @@
 
     function $(id) { return document.getElementById(id); }
 
+    function _setSaving(btn, text) {
+        if (!btn) return;
+        if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = text || 'Saving...';
+    }
+    function _resetSaving(btn) {
+        if (!btn) return;
+        btn.disabled = false;
+        if (btn.dataset.originalText) {
+            btn.textContent = btn.dataset.originalText;
+            delete btn.dataset.originalText;
+        }
+    }
+
     async function api(method, path, body) {
         const opts = { method, headers: { 'Content-Type': 'application/json' } };
         if (body) opts.body = JSON.stringify(body);
@@ -105,25 +120,25 @@
     }
 
     async function setPassword() {
-        const password = $('password').value;
-        const confirm = $('confirmPassword').value;
-        const msg = $('message');
-        msg.classList.add('hidden');
-        if (!password || password.length < 6) {
-            msg.textContent = 'Password must be at least 6 characters.';
-            msg.className = 'error';
-            msg.classList.remove('hidden');
-            return;
-        }
-        if (password !== confirm) {
-            msg.textContent = 'Passwords do not match.';
-            msg.className = 'error';
-            msg.classList.remove('hidden');
-            return;
-        }
-        $('saveBtn').disabled = true;
-        $('saveBtn').textContent = 'Activating...';
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn, 'Activating...');
         try {
+            const password = $('password').value;
+            const confirm = $('confirmPassword').value;
+            const msg = $('message');
+            msg.classList.add('hidden');
+            if (!password || password.length < 6) {
+                msg.textContent = 'Password must be at least 6 characters.';
+                msg.className = 'error';
+                msg.classList.remove('hidden');
+                return;
+            }
+            if (password !== confirm) {
+                msg.textContent = 'Passwords do not match.';
+                msg.className = 'error';
+                msg.classList.remove('hidden');
+                return;
+            }
             const data = await api('POST', '/auth/onboard/' + encodeURIComponent(token), { password });
             msg.textContent = 'Account activated! Redirecting to dashboard...';
             msg.className = 'success';
@@ -131,11 +146,12 @@
             localStorage.setItem('adoptima_token', data.access_token);
             setTimeout(() => { window.location.href = '/'; }, 1200);
         } catch (e) {
+            const msg = $('message');
             msg.textContent = e.message || 'Failed to activate account.';
             msg.className = 'error';
             msg.classList.remove('hidden');
-            $('saveBtn').disabled = false;
-            $('saveBtn').textContent = 'Activate Account';
+        } finally {
+            _resetSaving(btn);
         }
     }
 

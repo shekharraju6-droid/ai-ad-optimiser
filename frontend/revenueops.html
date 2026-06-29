@@ -471,6 +471,20 @@ let modalMode='',modalEditId=null;
 let invPageSize=10,invPage=1;
 
 function $(id){return document.getElementById(id)}
+function _setSaving(btn,text){
+    if(!btn)return;
+    if(!btn.dataset.originalText)btn.dataset.originalText=btn.textContent;
+    btn.disabled=true;
+    btn.textContent=text||'Saving...';
+}
+function _resetSaving(btn){
+    if(!btn)return;
+    btn.disabled=false;
+    if(btn.dataset.originalText){
+        btn.textContent=btn.dataset.originalText;
+        delete btn.dataset.originalText;
+    }
+}
 function fmt(n){return n!=null?'INR '+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}
 function fmtDate(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}catch(e){return d}}
 function statusBadge(s){const m={paid:'badge-green',partially_paid:'badge-yellow',overdue:'badge-red',unpaid:'badge-gray',invoice_raised:'badge-blue',sent_to_client:'badge-indigo',not_raised:'badge-gray',disputed:'badge-purple',cancelled:'badge-gray',credit_note_issued:'badge-orange',active:'badge-green',paused:'badge-yellow',closed:'badge-red',on_hold:'badge-orange',open:'badge-blue',snoozed:'badge-yellow',done:'badge-green',low:'badge-green',medium:'badge-yellow',high:'badge-orange',critical:'badge-red',bank_transfer:'badge-cyan',upi:'badge-indigo',cheque:'badge-purple',cash:'badge-gray',other:'badge-gray',invoice_pdf:'badge-blue',po:'badge-indigo',sow:'badge-purple',agreement:'badge-orange',payment_proof:'badge-green',credit_note:'badge-red',client_communication:'badge-cyan',other:'badge-gray',admin:'badge-purple',finance:'badge-indigo',business_manager:'badge-cyan',none:'badge-gray'};return `<span class="badge ${m[s]||'badge-gray'}">${s?s.replace(/_/g,' '):''}</span>`}
@@ -590,6 +604,8 @@ async function openClientModal(edit=null){
 }
 
 async function saveModal(){
+    const btn=(typeof event!=='undefined'&&event)?event.target:null;
+    _setSaving(btn);
     try{
         if($('m_clientName')){
             const bm=$('m_businessManager').value;
@@ -597,7 +613,22 @@ async function saveModal(){
             if(modalEditId)await api('PUT',`/clients/${modalEditId}`,data);else await api('POST','/clients',data);
             toast(modalEditId?'Client updated':'Client added');loadClients();closeModal();return;
         }
-    }catch(e){toast(e.message,'error');return}
+        if($('m_invClient')){
+            const from=$('m_invPeriodFrom').value;const to=$('m_invPeriodTo').value;
+            const period=(from||to)?`${from||''} to ${to||''}`:null;
+            const data={client_id:parseInt($('m_invClient').value),invoice_number:$('m_invNumber').value,invoice_date:$('m_invDate').value,due_date:$('m_invDue').value||null,invoice_amount:parseFloat($('m_invAmount').value)||0,billing_type:$('m_invBilling').value||null,invoice_period:period,invoice_status:$('m_invStatus').value,payment_status:$('m_invStatus').value==='paid'?'paid':$('m_invStatus').value==='partially_paid'?'partially_paid':'unpaid',remarks:$('m_invRemarks').value};
+            if(!data.client_id||!data.invoice_number||!data.invoice_amount){toast('Fill required fields','error');return}
+            if(modalEditId)await api('PUT',`/invoices/${modalEditId}`,data);else await api('POST','/invoices',data);
+            toast(modalEditId?'Invoice updated':'Invoice created');loadInvoices();closeModal();return;
+        }
+        if($('m_payClient')){
+            const data={client_id:parseInt($('m_payClient').value),invoice_id:parseInt($('m_payInvoice').value),amount:parseFloat($('m_payAmount').value),payment_date:$('m_payDate').value,payment_mode:$('m_payMode').value,reference_number:$('m_payRef').value||null,remarks:$('m_payRemarks').value||null};
+            if(!data.client_id||!data.invoice_id||!data.amount){toast('Fill required fields','error');return}
+            await api('POST','/payments',data);toast('Payment recorded');loadPayments();closeModal();return;
+        }
+        if($('m_bmName')){await saveBMModal();return;}
+    }catch(e){toast(e.message,'error')}
+    finally{_resetSaving(btn)}
 }
 
 function editClient(id){const c=clients.find(x=>x.id===id);if(c)openClientModal(c)}
@@ -797,9 +828,14 @@ function openReminderModal(){
 }
 
 async function saveReminderModal(){
-    const data={client_id:parseInt($('m_remClient').value),invoice_id:$('m_remInvoice').value?parseInt($('m_remInvoice').value):null,reminder_type:$('m_remType').value,priority:$('m_remPriority').value,due_amount:parseFloat($('m_remAmount').value)||0,due_date:$('m_remDueDate').value||null,notes:$('m_remNotes').value||null};
-    if(!data.client_id){toast('Select a client','error');return}
-    await api('POST','/reminders',data);toast('Reminder added');loadReminders();closeModal();
+    const btn=(typeof event!=='undefined'&&event)?event.target:null;
+    _setSaving(btn);
+    try{
+        const data={client_id:parseInt($('m_remClient').value),invoice_id:$('m_remInvoice').value?parseInt($('m_remInvoice').value):null,reminder_type:$('m_remType').value,priority:$('m_remPriority').value,due_amount:parseFloat($('m_remAmount').value)||0,due_date:$('m_remDueDate').value||null,notes:$('m_remNotes').value||null};
+        if(!data.client_id){toast('Select a client','error');return}
+        await api('POST','/reminders',data);toast('Reminder added');loadReminders();closeModal();
+    }catch(e){toast(e.message,'error')}
+    finally{_resetSaving(btn)}
 }
 
 async function markReminder(id,status){try{await api('PUT',`/reminders/${id}`,{reminder_status:status});toast('Reminder updated');loadReminders()}catch(e){toast(e.message,'error')}}
@@ -837,9 +873,14 @@ function openDocModal(){
 }
 
 async function saveDocModal(){
-    const data={client_id:parseInt($('m_docClient').value),invoice_id:$('m_docInvoice').value?parseInt($('m_docInvoice').value):null,document_type:$('m_docType').value,document_name:$('m_docName').value,file_url:$('m_docUrl').value||null,remarks:$('m_docRemarks').value||null};
-    if(!data.client_id||!data.document_name){toast('Fill required fields','error');return}
-    await api('POST','/documents',data);toast('Document added');loadDocuments();closeModal();
+    const btn=(typeof event!=='undefined'&&event)?event.target:null;
+    _setSaving(btn);
+    try{
+        const data={client_id:parseInt($('m_docClient').value),invoice_id:$('m_docInvoice').value?parseInt($('m_docInvoice').value):null,document_type:$('m_docType').value,document_name:$('m_docName').value,file_url:$('m_docUrl').value||null,remarks:$('m_docRemarks').value||null};
+        if(!data.client_id||!data.document_name){toast('Fill required fields','error');return}
+        await api('POST','/documents',data);toast('Document added');loadDocuments();closeModal();
+    }catch(e){toast(e.message,'error')}
+    finally{_resetSaving(btn)}
 }
 
 async function deleteDoc(id){if(!confirm('Delete document?'))return;try{await api('DELETE',`/documents/${id}`);toast('Document deleted');loadDocuments()}catch(e){toast(e.message,'error')}}
@@ -895,9 +936,14 @@ function openBMModal(){
 }
 
 async function saveBMModal(){
-    const data={full_name:$('m_bmName').value,email:$('m_bmEmail').value,mobile:$('m_bmMobile').value||null,password:$('m_bmPassword').value||null};
-    if(!data.full_name||!data.email){toast('Name and Email are required','error');return}
-    await api('POST','/business-managers',data);toast('Business Manager added');loadBMs();closeModal();
+    const btn=(typeof event!=='undefined'&&event)?event.target:null;
+    _setSaving(btn);
+    try{
+        const data={full_name:$('m_bmName').value,email:$('m_bmEmail').value,mobile:$('m_bmMobile').value||null,password:$('m_bmPassword').value||null};
+        if(!data.full_name||!data.email){toast('Name and Email are required','error');return}
+        await api('POST','/business-managers',data);toast('Business Manager added');loadBMs();closeModal();
+    }catch(e){toast(e.message,'error')}
+    finally{_resetSaving(btn)}
 }
 
 async function deleteBM(id){if(!confirm('Delete this business manager?'))return;try{await api('DELETE',`/business-managers/${id}`);toast('BM deleted');loadBMs()}catch(e){toast(e.message,'error')}}
@@ -1006,20 +1052,22 @@ function getSelectedAccountIds(){
 }
 
 async function saveUserModal(){
-    const full_name=$('usrFullName').value.trim();
-    const email=$('usrEmail').value.trim();
-    const mobile=$('usrMobile').value.trim();
-    const password=$('usrPassword').value;
-    const role=$('usrRole').value;
-    const assigned_account_ids=getSelectedAccountIds();
-    const access_adpulse=$('usrAdpulse').checked;
-    const access_insightdesk=$('usrInsightdesk').checked;
-    const access_revenueops=$('usrRevenueops').checked;
-    if(!full_name||!email){toast('Name and Email are required','error');return}
-    if(!editingUserId&&!password){toast('Password is required','error');return}
-    const payload={full_name,email,mobile,role,assigned_account_ids,access_adpulse,access_insightdesk,access_revenueops};
-    if(password)payload.password=password;
+    const btn=(typeof event!=='undefined'&&event)?event.target:null;
+    _setSaving(btn);
     try{
+        const full_name=$('usrFullName').value.trim();
+        const email=$('usrEmail').value.trim();
+        const mobile=$('usrMobile').value.trim();
+        const password=$('usrPassword').value;
+        const role=$('usrRole').value;
+        const assigned_account_ids=getSelectedAccountIds();
+        const access_adpulse=$('usrAdpulse').checked;
+        const access_insightdesk=$('usrInsightdesk').checked;
+        const access_revenueops=$('usrRevenueops').checked;
+        if(!full_name||!email){toast('Name and Email are required','error');return}
+        if(!editingUserId&&!password){toast('Password is required','error');return}
+        const payload={full_name,email,mobile,role,assigned_account_ids,access_adpulse,access_insightdesk,access_revenueops};
+        if(password)payload.password=password;
         if(editingUserId){
             await fetch(AUTH+`/users/${editingUserId}`,{method:'PUT',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
             toast('User updated');
@@ -1029,6 +1077,7 @@ async function saveUserModal(){
         }
         closeModal();loadUsers();
     }catch(e){toast(e.message,'error')}
+    finally{_resetSaving(btn)}
 }
 
 async function deleteUser(userId,email){
@@ -1044,12 +1093,15 @@ async function loadSettings(){
     try{const s=await api('GET','/settings');$('settDueDays').value=s.default_due_days||30;$('settCompany').value=s.company_name||'Chlear Digital';$('settCurrency').value=s.currency||'INR'}catch(e){}
 }
 async function saveSettings(){
+    const btn=(typeof event!=='undefined'&&event)?event.target:null;
+    _setSaving(btn);
     try{
         await api('PUT','/settings',{key:'default_due_days',value:$('settDueDays').value});
         await api('PUT','/settings',{key:'company_name',value:$('settCompany').value});
         await api('PUT','/settings',{key:'currency',value:$('settCurrency').value});
         toast('Settings saved');
     }catch(e){toast(e.message,'error')}
+    finally{_resetSaving(btn)}
 }
 
 // SEED

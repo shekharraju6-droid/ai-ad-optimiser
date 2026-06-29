@@ -105,6 +105,20 @@ let token=localStorage.getItem('adoptima_token')||'';
 let currentUser=null, accounts=[], globalConfig={}, selectedAccount=null, activeIntegration=null;
 
 function $(id){return document.getElementById(id)}
+function _setSaving(btn,text){
+    if(!btn)return;
+    if(!btn.dataset.originalText)btn.dataset.originalText=btn.textContent;
+    btn.disabled=true;
+    btn.textContent=text||'Saving...';
+}
+function _resetSaving(btn){
+    if(!btn)return;
+    btn.disabled=false;
+    if(btn.dataset.originalText){
+        btn.textContent=btn.dataset.originalText;
+        delete btn.dataset.originalText;
+    }
+}
 function toast(msg,type='success'){const d=document.createElement('div');d.className=`toast toast-${type}`;d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),3500)}
 
 async function api(method,path,body){
@@ -264,21 +278,23 @@ function getFieldValue(f){
 function closeForm(){$('formPanel').classList.add('hidden');activeIntegration=null}
 
 async function saveIntegration(){
-    if(!activeIntegration)return;
-    const accountPayload={};
-    const globalPayload={};
-    activeIntegration.fields.forEach(f=>{
-        const el=$('int_'+f.id);
-        const val=f.type==='checkbox'?el.checked:(el?el.value:'');
-        if(f.account) accountPayload[f.id]=val;
-        else if(f.global) globalPayload[f.id]=val;
-        else{
-            // per-account override by default
-            accountPayload[f.id]=val;
-            // also update global if no account selected, but account is required here
-        }
-    });
+    const btn=(typeof event!=='undefined'&&event)?event.target:null;
+    _setSaving(btn);
     try{
+        if(!activeIntegration)return;
+        const accountPayload={};
+        const globalPayload={};
+        activeIntegration.fields.forEach(f=>{
+            const el=$('int_'+f.id);
+            const val=f.type==='checkbox'?el.checked:(el?el.value:'');
+            if(f.account) accountPayload[f.id]=val;
+            else if(f.global) globalPayload[f.id]=val;
+            else{
+                // per-account override by default
+                accountPayload[f.id]=val;
+                // also update global if no account selected, but account is required here
+            }
+        });
         if(selectedAccount && Object.keys(accountPayload).length){
             await api('PUT',`/accounts/${selectedAccount.id}`,accountPayload);
         }
@@ -293,6 +309,7 @@ async function saveIntegration(){
         renderCards();
         toast(`${activeIntegration.name} credentials saved`);
     }catch(e){toast(e.message,'error')}
+    finally{_resetSaving(btn)}
 }
 
 async function testIntegration(){

@@ -510,6 +510,21 @@
 
     function $(id) { return document.getElementById(id); }
 
+    function _setSaving(btn, text) {
+        if (!btn) return;
+        if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = text || 'Saving...';
+    }
+    function _resetSaving(btn) {
+        if (!btn) return;
+        btn.disabled = false;
+        if (btn.dataset.originalText) {
+            btn.textContent = btn.dataset.originalText;
+            delete btn.dataset.originalText;
+        }
+    }
+
     async function api(method, path, body) {
         const opts = { method, headers: {} };
         if (token) opts.headers['Authorization'] = 'Bearer ' + token;
@@ -1162,77 +1177,79 @@
     }
 
     async function saveAccount() {
-        const name = $('accName').value.trim();
-        if (!name) { toast('Client name is required', true); return; }
-        const hasGoogle = $('accHasGoogle').checked;
-        const hasMeta = $('accHasMeta').checked;
-        if (hasGoogle && !validateGoogleCustomerId()) { toast('Fix Google Customer ID format', true); return; }
-        if (hasMeta && !validateMetaAccountId()) { toast('Fix Meta Ad Account ID format', true); return; }
-        if (hasGoogle && !validateGoogleAccountCreds()) return;
-        if (hasMeta && !validateMetaAccountCreds()) return;
-        const payload = {
-            name,
-            group_id: $('accGroup').value ? parseInt($('accGroup').value) : null,
-            refresh_interval_minutes: parseInt($('accRefreshInterval').value) || 60,
-            audit_interval_minutes: parseInt($('accAuditInterval').value) || 0,
-            has_google: hasGoogle,
-            has_meta: hasMeta,
-            google_external_id: hasGoogle ? $('accGoogleExternalId').value.trim() : null,
-            meta_external_id: hasMeta ? $('accMetaExternalId').value.trim() : null,
-        };
-        if (!payload.has_google && !payload.has_meta) { toast('At least one platform must be enabled', true); return; }
-
-        // Google per-account creds (always required now)
-        payload.google_client_id = $('accGoogleClientId').value.trim() || null;
-        const gSecret = $('accGoogleClientSecret').value;
-        if (gSecret && !gSecret.startsWith('●●●●')) payload.google_client_secret = gSecret;
-        const gDev = $('accGoogleDeveloperToken').value;
-        if (gDev && !gDev.startsWith('●●●●')) payload.google_developer_token = gDev;
-        payload.redirect_base_url = window.location.origin;
-
-        // Meta per-account creds (always required if Meta enabled)
-        if (hasMeta) {
-            payload.meta_app_id = $('accMetaAppId').value.trim() || null;
-            const mSecret = $('accMetaAppSecret').value;
-            if (mSecret && !mSecret.startsWith('●●●●')) payload.meta_app_secret = mSecret;
-        }
-
-        // CRM type + credentials
-        const crmType = $('accCrmType').value;
-        payload.crm_type = crmType;
-        let crmCreds = {};
-        if (crmType === 'leadsquared') {
-            crmCreds.access_key = $('crmLsqAccessKey').value.trim();
-            const ls = $('crmLsqSecretKey').value;
-            crmCreds.secret_key = (ls && !ls.startsWith('●●●●')) ? ls : '';
-            crmCreds.base_url = $('crmLsqBaseUrl').value.trim();
-        } else if (crmType === 'salesforce') {
-            crmCreds.instance_url = $('crmSfUrl').value.trim();
-            crmCreds.client_id = $('crmSfClientId').value.trim();
-            const sfCs = $('crmSfClientSecret').value;
-            crmCreds.client_secret = (sfCs && !sfCs.startsWith('●●●●')) ? sfCs : '';
-            const sfRt = $('crmSfRefreshToken').value;
-            crmCreds.refresh_token = (sfRt && !sfRt.startsWith('●●●●')) ? sfRt : '';
-        } else if (crmType === 'hubspot') {
-            const hsTok = $('crmHsToken').value;
-            crmCreds.private_app_token = (hsTok && !hsTok.startsWith('●●●●')) ? hsTok : '';
-            crmCreds.portal_id = $('crmHsPortalId').value.trim();
-        } else if (crmType === 'zoho') {
-            crmCreds.client_id = $('crmZoClientId').value.trim();
-            const zoCs = $('crmZoClientSecret').value;
-            crmCreds.client_secret = (zoCs && !zoCs.startsWith('●●●●')) ? zoCs : '';
-            const zoRt = $('crmZoRefreshToken').value;
-            crmCreds.refresh_token = (zoRt && !zoRt.startsWith('●●●●')) ? zoRt : '';
-            crmCreds.data_center = $('crmZoDc').value;
-        } else if (crmType === 'custom') {
-            crmCreds.api_url = $('crmCustomUrl').value.trim();
-            crmCreds.api_key = $('crmCustomApiKey').value.trim();
-            const cuSk = $('crmCustomSecretKey').value;
-            crmCreds.secret_key = (cuSk && !cuSk.startsWith('●●●●')) ? cuSk : '';
-        }
-        payload.crm_credentials = (crmType && crmType !== 'none') ? JSON.stringify(crmCreds) : null;
-
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
         try {
+            const name = $('accName').value.trim();
+            if (!name) { toast('Client name is required', true); return; }
+            const hasGoogle = $('accHasGoogle').checked;
+            const hasMeta = $('accHasMeta').checked;
+            if (hasGoogle && !validateGoogleCustomerId()) { toast('Fix Google Customer ID format', true); return; }
+            if (hasMeta && !validateMetaAccountId()) { toast('Fix Meta Ad Account ID format', true); return; }
+            if (hasGoogle && !validateGoogleAccountCreds()) return;
+            if (hasMeta && !validateMetaAccountCreds()) return;
+            const payload = {
+                name,
+                group_id: $('accGroup').value ? parseInt($('accGroup').value) : null,
+                refresh_interval_minutes: parseInt($('accRefreshInterval').value) || 60,
+                audit_interval_minutes: parseInt($('accAuditInterval').value) || 0,
+                has_google: hasGoogle,
+                has_meta: hasMeta,
+                google_external_id: hasGoogle ? $('accGoogleExternalId').value.trim() : null,
+                meta_external_id: hasMeta ? $('accMetaExternalId').value.trim() : null,
+            };
+            if (!payload.has_google && !payload.has_meta) { toast('At least one platform must be enabled', true); return; }
+
+            // Google per-account creds (always required now)
+            payload.google_client_id = $('accGoogleClientId').value.trim() || null;
+            const gSecret = $('accGoogleClientSecret').value;
+            if (gSecret && !gSecret.startsWith('●●●●')) payload.google_client_secret = gSecret;
+            const gDev = $('accGoogleDeveloperToken').value;
+            if (gDev && !gDev.startsWith('●●●●')) payload.google_developer_token = gDev;
+            payload.redirect_base_url = window.location.origin;
+
+            // Meta per-account creds (always required if Meta enabled)
+            if (hasMeta) {
+                payload.meta_app_id = $('accMetaAppId').value.trim() || null;
+                const mSecret = $('accMetaAppSecret').value;
+                if (mSecret && !mSecret.startsWith('●●●●')) payload.meta_app_secret = mSecret;
+            }
+
+            // CRM type + credentials
+            const crmType = $('accCrmType').value;
+            payload.crm_type = crmType;
+            let crmCreds = {};
+            if (crmType === 'leadsquared') {
+                crmCreds.access_key = $('crmLsqAccessKey').value.trim();
+                const ls = $('crmLsqSecretKey').value;
+                crmCreds.secret_key = (ls && !ls.startsWith('●●●●')) ? ls : '';
+                crmCreds.base_url = $('crmLsqBaseUrl').value.trim();
+            } else if (crmType === 'salesforce') {
+                crmCreds.instance_url = $('crmSfUrl').value.trim();
+                crmCreds.client_id = $('crmSfClientId').value.trim();
+                const sfCs = $('crmSfClientSecret').value;
+                crmCreds.client_secret = (sfCs && !sfCs.startsWith('●●●●')) ? sfCs : '';
+                const sfRt = $('crmSfRefreshToken').value;
+                crmCreds.refresh_token = (sfRt && !sfRt.startsWith('●●●●')) ? sfRt : '';
+            } else if (crmType === 'hubspot') {
+                const hsTok = $('crmHsToken').value;
+                crmCreds.private_app_token = (hsTok && !hsTok.startsWith('●●●●')) ? hsTok : '';
+                crmCreds.portal_id = $('crmHsPortalId').value.trim();
+            } else if (crmType === 'zoho') {
+                crmCreds.client_id = $('crmZoClientId').value.trim();
+                const zoCs = $('crmZoClientSecret').value;
+                crmCreds.client_secret = (zoCs && !zoCs.startsWith('●●●●')) ? zoCs : '';
+                const zoRt = $('crmZoRefreshToken').value;
+                crmCreds.refresh_token = (zoRt && !zoRt.startsWith('●●●●')) ? zoRt : '';
+                crmCreds.data_center = $('crmZoDc').value;
+            } else if (crmType === 'custom') {
+                crmCreds.api_url = $('crmCustomUrl').value.trim();
+                crmCreds.api_key = $('crmCustomApiKey').value.trim();
+                const cuSk = $('crmCustomSecretKey').value;
+                crmCreds.secret_key = (cuSk && !cuSk.startsWith('●●●●')) ? cuSk : '';
+            }
+            payload.crm_credentials = (crmType && crmType !== 'none') ? JSON.stringify(crmCreds) : null;
+
             if (editingAccountId) {
                 await api('PUT', '/accounts/' + editingAccountId, payload);
                 toast('Account updated');
@@ -1244,6 +1261,7 @@
             loadAccounts();
             loadSummary();
         } catch (e) { toast(e.message, true); }
+        finally { _resetSaving(btn); }
     }
 
     async function deleteAccount(id) {
@@ -1291,14 +1309,17 @@
         $('addGroupModal').classList.add('hidden');
     }
     async function saveGroup() {
-        const name = $('groupName').value.trim();
-        if (!name) { toast('Category name required', true); return; }
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
         try {
+            const name = $('groupName').value.trim();
+            if (!name) { toast('Category name required', true); return; }
             await api('POST', '/account-groups', { name });
             toast('Category created');
             closeAddGroupModal();
             loadAccounts();
         } catch (e) { toast(e.message, true); }
+        finally { _resetSaving(btn); }
     }
 
     // ---------- Approvals ----------

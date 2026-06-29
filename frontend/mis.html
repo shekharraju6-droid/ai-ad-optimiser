@@ -209,6 +209,21 @@
 
     function $(id) { return document.getElementById(id); }
 
+    function _setSaving(btn, text) {
+        if (!btn) return;
+        if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = text || 'Saving...';
+    }
+    function _resetSaving(btn) {
+        if (!btn) return;
+        btn.disabled = false;
+        if (btn.dataset.originalText) {
+            btn.textContent = btn.dataset.originalText;
+            delete btn.dataset.originalText;
+        }
+    }
+
     async function api(method, path, body) {
         const opts = { method, headers: {} };
         if (token) opts.headers['Authorization'] = 'Bearer ' + token;
@@ -1022,19 +1037,22 @@
     }
 
     async function dsuSaveBudgetEntry() {
-        const payload = {
-            date: $('dsuBudgetDate').value,
-            amount: parseFloat($('dsuBudgetAmount').value) || 0,
-            invoice: $('dsuBudgetInvoice').value,
-            campus: $('dsuBudgetCampus').value,
-        };
-        if (!payload.date) { toast('Date is required', true); return; }
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
         try {
+            const payload = {
+                date: $('dsuBudgetDate').value,
+                amount: parseFloat($('dsuBudgetAmount').value) || 0,
+                invoice: $('dsuBudgetInvoice').value,
+                campus: $('dsuBudgetCampus').value,
+            };
+            if (!payload.date) { toast('Date is required', true); return; }
             await api('POST', '/reports/dsu/budget-entries', payload);
             toast('Budget entry added');
             dsuEditingBudgetId = null;
             await loadDSUReport();
         } catch(e) { toast(e.message, true); }
+        finally { _resetSaving(btn); }
     }
 
     async function dsuEditBudgetEntry(id) {
@@ -1060,20 +1078,23 @@
     }
 
     async function dsuUpdateBudgetEntry() {
-        if (!dsuEditingBudgetId) return;
-        const payload = {
-            date: $('dsuBudgetDate').value,
-            amount: parseFloat($('dsuBudgetAmount').value) || 0,
-            invoice: $('dsuBudgetInvoice').value,
-            campus: $('dsuBudgetCampus').value,
-        };
-        if (!payload.date) { toast('Date is required', true); return; }
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
         try {
+            if (!dsuEditingBudgetId) return;
+            const payload = {
+                date: $('dsuBudgetDate').value,
+                amount: parseFloat($('dsuBudgetAmount').value) || 0,
+                invoice: $('dsuBudgetInvoice').value,
+                campus: $('dsuBudgetCampus').value,
+            };
+            if (!payload.date) { toast('Date is required', true); return; }
             await api('PUT', `/reports/dsu/budget-entries/${dsuEditingBudgetId}`, payload);
             toast('Budget entry updated');
             dsuEditingBudgetId = null;
             await loadDSUReport();
         } catch(e) { toast(e.message, true); }
+        finally { _resetSaving(btn); }
     }
 
     async function dsuDeleteBudgetEntry(id) {
@@ -1598,36 +1619,42 @@
     }
 
     async function dsiSaveBudgetEntry() {
-        const payload = {
-            date: $('dsiBudgetDate').value,
-            amount: parseFloat($('dsiBudgetAmount').value) || 0,
-            invoice: $('dsiBudgetInvoice').value,
-            section: $('dsiBudgetSection').value,
-        };
-        if (!payload.date) { toast('Date is required', true); return; }
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
         try {
+            const payload = {
+                date: $('dsiBudgetDate').value,
+                amount: parseFloat($('dsiBudgetAmount').value) || 0,
+                invoice: $('dsiBudgetInvoice').value,
+                section: $('dsiBudgetSection').value,
+            };
+            if (!payload.date) { toast('Date is required', true); return; }
             await api('POST', '/reports/dsi/budget-entries', payload);
             toast('Budget entry added');
             dsiEditingBudgetId = null;
             await loadDSIReport();
         } catch(e) { toast(e.message, true); }
+        finally { _resetSaving(btn); }
     }
 
     async function dsiUpdateBudgetEntry() {
-        if (!dsiEditingBudgetId) return;
-        const payload = {
-            date: $('dsiBudgetDate').value,
-            amount: parseFloat($('dsiBudgetAmount').value) || 0,
-            invoice: $('dsiBudgetInvoice').value,
-            section: $('dsiBudgetSection').value,
-        };
-        if (!payload.date) { toast('Date is required', true); return; }
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
         try {
+            if (!dsiEditingBudgetId) return;
+            const payload = {
+                date: $('dsiBudgetDate').value,
+                amount: parseFloat($('dsiBudgetAmount').value) || 0,
+                invoice: $('dsiBudgetInvoice').value,
+                section: $('dsiBudgetSection').value,
+            };
+            if (!payload.date) { toast('Date is required', true); return; }
             await api('PUT', '/reports/dsi/budget-entries/' + dsiEditingBudgetId, payload);
             toast('Budget entry updated');
             dsiEditingBudgetId = null;
             await loadDSIReport();
         } catch(e) { toast(e.message, true); }
+        finally { _resetSaving(btn); }
     }
 
     async function dsiDeleteBudgetEntry(id) {
@@ -1933,15 +1960,19 @@
         await renderReport(a);
     }
 
-    function saveRemarks() {
-        const remarks = $('misRemarks').value.trim();
-        const status = $('misStatus').value;
-        if (!remarks) { toast('Enter remarks before saving', true); return; }
-        const box = $('savedRemarks');
-        box.classList.remove('hidden');
-        const ts = new Date().toLocaleString('en-IN');
-        box.innerHTML = `<strong>${status}</strong> — ${escapeHtml(remarks)}<br><span style="font-size:0.75rem; color:var(--text-light);">Saved ${ts}</span>`;
-        toast('Remarks saved');
+    async function saveRemarks() {
+        const btn = (typeof event !== 'undefined' && event) ? event.target : null;
+        _setSaving(btn);
+        try {
+            const remarks = $('misRemarks').value.trim();
+            const status = $('misStatus').value;
+            if (!remarks) { toast('Enter remarks before saving', true); return; }
+            const box = $('savedRemarks');
+            box.classList.remove('hidden');
+            const ts = new Date().toLocaleString('en-IN');
+            box.innerHTML = `<strong>${status}</strong> — ${escapeHtml(remarks)}<br><span style="font-size:0.75rem; color:var(--text-light);">Saved ${ts}</span>`;
+            toast('Remarks saved');
+        } finally { _resetSaving(btn); }
     }
 
     function exportExcel() {
