@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.database import get_db
 from backend.db.models import User, UserAccountAssignment, Account
+from backend.services.onboarding_email import send_onboarding_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -229,7 +230,15 @@ def create_user(req: UserCreateRequest, db: Session = Depends(get_db), current_u
     base_url = os.getenv("ADOPTIMA_PUBLIC_BASE_URL", "")
     setup_path = f"/onboard.html?token={token}"
     setup_link = f"{base_url.rstrip('/')}{setup_path}" if base_url else setup_path
-    return {"user": user.to_dict(), "setup_link": setup_link}
+
+    email_result = send_onboarding_email(req.email, req.full_name, setup_link)
+
+    return {
+        "user": user.to_dict(),
+        "setup_link": setup_link,
+        "email_sent": email_result.get("sent", False),
+        "email_error": email_result.get("error"),
+    }
 
 
 @router.get("/onboard/{token}")

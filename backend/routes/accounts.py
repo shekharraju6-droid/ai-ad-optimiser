@@ -452,12 +452,11 @@ def get_account_leads(account_id: int, start_date: Optional[str] = None, end_dat
         start_date = end_date
 
     try:
-        from backend.services.lsq_mirror import fetch_realtime_lead_counts
-        course_leads = fetch_realtime_lead_counts(account, start_date, end_date)
+        from backend.services.dsu_data import _fetch_lsq_leads
+        course_leads = _fetch_lsq_leads(start_date, end_date, account_id=account_id)
         total = sum(course_leads.values())
         return {"account_id": account_id, "leads": total, "source": "leadsquared", "by_course": course_leads}
     except Exception as e:
-        logger.exception(f"Realtime leads fetch failed for account {account_id}: {e}")
         return {"account_id": account_id, "leads": 0, "source": "leadsquared", "error": str(e)}
 
 

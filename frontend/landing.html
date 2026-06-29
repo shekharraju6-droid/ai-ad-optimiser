@@ -150,7 +150,10 @@
     <!-- User Management Modal -->
     <div id="umOverlay" class="um-overlay hidden" onclick="closeUserManagement(event)">
         <div class="um-modal" onclick="event.stopPropagation()">
-            <h2>User Management</h2>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+                <h2 style="margin:0">User Management</h2>
+                <button class="btn btn-secondary" onclick="closeUserManagement()" style="padding:0.3rem 0.6rem;font-size:1rem;line-height:1;">✕</button>
+            </div>
 
             <div class="um-section">
                 <div class="um-section-title">Add / Edit User</div>
@@ -285,7 +288,7 @@
 
         function updateUI(user) {
             if (user) {
-                $('userInfo').textContent = user.full_name || user.email;
+                $('userInfo').textContent = 'Logged in Profile';
                 $('loginBtn').classList.add('hidden');
                 $('logoutBtn').classList.remove('hidden');
                 $('userBadge').textContent = (user.role === 'user' ? 'BM' : user.role).toUpperCase();
@@ -480,7 +483,11 @@
                 const res = await api('POST', '/auth/users', body);
                 $('umLinkBox').classList.remove('hidden');
                 $('umSetupLink').textContent = res.setup_link;
-                alert('User created. Copy the setup link below to share with the user.');
+                if (res.email_sent) {
+                    alert('User created and invitation email sent.');
+                } else {
+                    alert('User created but email could not be sent: ' + (res.email_error || 'Unknown error') + '. Copy the setup link below to share manually.');
+                }
             }
             loadUsers();
             resetUserForm();

@@ -359,9 +359,8 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group"><label>Developer Token *</label><input type="password" id="accGoogleDeveloperToken" placeholder="From Google Ads API Center"></div>
-                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accGoogleRedirectBaseUrl" value="https://ai-ad-optimiser-production.up.railway.app/" disabled></div>
+                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accGoogleRedirectBaseUrl" value="/" disabled></div>
                         </div>
-                        <p style="font-size:0.72rem; color:var(--text-muted); margin:0.4rem 0 0.2rem;">Make sure this URL is added as an Authorized redirect URI in your Google Cloud OAuth client: <code>https://ai-ad-optimiser-production.up.railway.app/api/oauth/google/callback</code></p>
                     </div>
 
                     <div id="googleOAuthStatus" class="oauth-status disconnected">
@@ -391,13 +390,12 @@
                     <div id="metaAccountCreds" class="platform-fields" style="margin-top:0.5rem;">
                         <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this Meta Ads account:</p>
                         <div class="form-row">
-                            <div class="form-group"><label>App ID *</label><input type="text" id="accMetaAppId" placeholder="996789445380630"></div>
-                            <div class="form-group"><label>App Secret *</label><input type="password" id="accMetaAppSecret" placeholder="from App settings → Basic"></div>
+                            <div class="form-group"><label>App ID *</label><input type="text" id="accMetaAppId" placeholder="1234567890"></div>
+                            <div class="form-group"><label>App Secret *</label><input type="password" id="accMetaAppSecret" placeholder="..."></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accMetaRedirectBaseUrl" value="https://ai-ad-optimiser-production.up.railway.app/" disabled></div>
+                            <div class="form-group"><label>Redirect Base URL</label><input type="text" id="accMetaRedirectBaseUrl" value="/" disabled></div>
                         </div>
-                        <p style="font-size:0.72rem; color:var(--text-muted); margin:0.4rem 0 0.2rem;">Make sure this URL is added as a Valid OAuth Redirect URI in your Meta app: <code>https://ai-ad-optimiser-production.up.railway.app/api/oauth/meta/callback</code></p>
                     </div>
 
                     <div id="metaOAuthStatus" class="oauth-status disconnected">
@@ -798,7 +796,6 @@
     function renderDashboardGroups(groups, ungrouped) {
         const container = $('dashboardGroups');
         container.innerHTML = '';
-        // Sort groups alphabetically by group name, and accounts within each group by account name
         const sortedGroups = [...groups].sort((a, b) => (a.group_name || '').localeCompare(b.group_name || ''));
         sortedGroups.forEach(g => {
             const sortedAccounts = [...(g.accounts || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -981,9 +978,7 @@
     function renderAccountsTable() {
         const tbody = $('accountsTableBody');
         tbody.innerHTML = '';
-        // Sort accounts alphabetically by name
-        const sortedAccounts = [...allAccounts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        sortedAccounts.forEach(a => {
+        allAccounts.forEach(a => {
             const platforms = [];
             if (a.has_google) platforms.push('Google');
             if (a.has_meta) platforms.push('Meta');

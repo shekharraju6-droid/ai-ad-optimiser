@@ -200,7 +200,8 @@ const integrations=[
 ];
 
 function renderCards(){
-    $('cardsGrid').innerHTML=integrations.map(i=>`
+    const sorted=[...integrations].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    $('cardsGrid').innerHTML=sorted.map(i=>`
         <div class="int-card" onclick="openIntegration('${i.id}')">
             <div class="int-icon" style="background:${i.color};color:${i.iconColor}">${i.icon}</div>
             <div class="category">${i.category}</div>
@@ -309,6 +310,7 @@ async function init(){
     $('userInfo').textContent=currentUser.full_name||currentUser.email;
     accounts=await api('GET','/accounts');
     globalConfig=await api('GET','/config');
+    accounts.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
     $('accountSelect').innerHTML='<option value="">— Choose account —</option>'+accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
     renderCards();
 }

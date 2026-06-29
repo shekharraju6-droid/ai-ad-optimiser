@@ -296,8 +296,7 @@
             container.innerHTML = '<div style="padding:1rem 1.25rem; color:var(--text-muted); font-size:0.85rem;">No accounts found.</div>';
             return;
         }
-        const sortedAccounts = [...allAccounts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        sortedAccounts.forEach(a => {
+        allAccounts.forEach(a => {
             const el = document.createElement('div');
             el.className = 'account-item';
             el.onclick = () => selectAccount(a.id);
@@ -1095,15 +1094,16 @@
 
     function computeDSIDateRange(preset, rangeObj) {
         const end = today();
+        end.setDate(end.getDate() - 1);
         let start = new Date(end);
         switch (preset) {
-            case 'yesterday': start.setDate(end.getDate() - 1); end.setDate(end.getDate() - 1); break;
-            case 'today': break;
+            case 'yesterday': break;
+            case 'today': start = today(); break;
             case 'last7': start.setDate(end.getDate() - 6); break;
             case 'last15': start.setDate(end.getDate() - 14); break;
             case 'last30': start.setDate(end.getDate() - 29); break;
             case 'thisMonth': start.setDate(1); break;
-            case 'inception': start = new Date('2026-01-08'); end.setDate(end.getDate() - 1); break;
+            case 'inception': start = new Date('2025-11-28'); break;
             case 'custom': return;
         }
         rangeObj.preset = preset;
@@ -1251,9 +1251,39 @@
         const d = data.daily;
         const c = data.cumulative;
 
+        const dsiT1DateSelector = () => {
+            const label = t1RangeLabel(dsiT1Range);
+            const custom = dsiT1Range.preset === 'custom';
+            return `
+                <div style="display:flex;align-items:center;justify-content:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+                    <span>Table 1:</span>
+                    <label class="dsu-mode-row" style="margin:0 0.35rem">
+                        <input type="radio" name="dsiT1Mode" value="yesterday" ${dsiT1Range.preset==='yesterday'?'checked':''} onchange="dsiT1Preset('yesterday')">
+                        <span>Yesterday</span>
+                    </label>
+                    <label class="dsu-mode-row" style="margin:0 0.35rem">
+                        <input type="radio" name="dsiT1Mode" value="today" ${dsiT1Range.preset==='today'?'checked':''} onchange="dsiT1Preset('today')">
+                        <span>Today</span>
+                    </label>
+                    <label class="dsu-mode-row" style="margin:0 0.35rem">
+                        <input type="radio" name="dsiT1Mode" value="custom" ${custom?'checked':''} onchange="dsiT1Preset('custom')">
+                        <span>Custom</span>
+                    </label>
+                    ${custom?`
+                        <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                            <input type="date" id="dsiT1Start" value="${dsiT1Range.start}" onchange="dsiT1Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                            <span style="font-size:0.7rem">to</span>
+                            <input type="date" id="dsiT1End" value="${dsiT1Range.end}" onchange="dsiT1Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                        </div>
+                    `:''}
+                    <span class="dsu-range-label">${label}</span>
+                </div>
+            `;
+        };
+
         const t1Header = `
             <tr><th colspan="5" class="dsu-banner">${data.gst_note || 'MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026'}</th></tr>
-            <tr><th colspan="5" class="dsu-mis-row">MIS - ${fmtDayMonth(dsiT1Range.end)}</th></tr>
+            <tr><th colspan="5" class="dsu-mis-row">MIS - ${dsiT1Range.preset === 'custom' ? `${fmtDayMonth(dsiT1Range.start)} to ${fmtDayMonth(dsiT1Range.end)}` : fmtDayMonth(dsiT1Range.end)}</th></tr>
         `;
         const t2Header = `
             <tr><th colspan="5" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
@@ -1262,6 +1292,7 @@
 
         $('reportContent').innerHTML = `
             ${dsiTabBar()}
+            ${dsiT1DateSelector()}
             <div class="dsi-t1t2-wrap">
                 <div style="padding:0">
                     ${renderDSITable(d.title, d.rows, d.total, t1Header)}
@@ -1368,7 +1399,7 @@
                 spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${spend}</td>`;
             }
 
-            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-center" style="padding:0.35rem 0.5rem">${submitted}</td>${cpaCell}${spendCell}<td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
+            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${submitted}</td>${cpaCell}${spendCell}<td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
         }).join('');
 
         const gtCpa = gt.submitted > 0 ? fmtMoney(gt.cpa) : '0';
@@ -1382,10 +1413,10 @@
                 </div>
                 <div class="dsi-table4-wrap">
                 <table class="dsu-table" style="font-size:0.78rem">
-                    <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-center" style="padding:0.35rem 0.5rem;white-space:nowrap">Application Submitted</th><th class="text-right" style="padding:0.35rem 0.5rem">CPA</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Target</th></tr></thead>
+                    <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-right" style="padding:0.35rem 0.5rem;white-space:nowrap">Application Submitted</th><th class="text-right" style="padding:0.35rem 0.5rem">CPA</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Target</th></tr></thead>
                     <tbody>
                         ${body}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td colspan="2" style="padding:0.35rem 0.5rem">${gt.course}</td><td class="text-center" style="padding:0.35rem 0.5rem">${gtSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td colspan="2" style="padding:0.35rem 0.5rem">${gt.course}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -1466,13 +1497,13 @@
         const entryRows = (entries || []).map(e => {
             const isEditing = dsiEditingBudgetId === e.id;
             return `<tr style="${isEditing ? 'background:#fef3c7' : ''}">
-                <td style="white-space:nowrap;padding:0.25rem 0.4rem">${escapeHtml(fmtDate(e.date))}</td>
-                <td class="text-center" style="white-space:nowrap;padding:0.25rem 0.4rem">${fmtMoney(e.amount)}</td>
-                <td style="padding:0.25rem 0.4rem">${escapeHtml(e.invoice || '-')}</td>
-                <td style="padding:0.25rem 0.4rem">${escapeHtml(e.section || '-')}</td>
-                <td class="text-center" style="padding:0.25rem 0.4rem;white-space:nowrap">
-                    <button class="action-btn" title="Edit" style="padding:0 0.15rem" onclick="dsiEditBudgetEntry(${e.id})">&#9998;</button>
-                    <button class="action-btn" title="Delete" style="padding:0 0.15rem;color:#dc2626" onclick="dsiDeleteBudgetEntry(${e.id})">&#10005;</button>
+                <td style="white-space:nowrap;padding:0.35rem 0.5rem">${escapeHtml(fmtDate(e.date))}</td>
+                <td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(e.amount)}</td>
+                <td style="padding:0.35rem 0.5rem">${escapeHtml(e.invoice || '-')}</td>
+                <td style="padding:0.35rem 0.5rem">${escapeHtml(e.section || '-')}</td>
+                <td class="text-center" style="padding:0.35rem 0.5rem">
+                    <button class="action-btn" title="Edit" onclick="dsiEditBudgetEntry(${e.id})">&#9998;</button>
+                    <button class="action-btn" title="Delete" onclick="dsiDeleteBudgetEntry(${e.id})" style="color:#dc2626">&#10005;</button>
                 </td>
             </tr>`;
         }).join('');
@@ -1531,12 +1562,12 @@
                 </div>
 
                 <!-- Budget Entries List -->
-                <div class="dsi-table4-wrap">
-                <table class="dsu-table" style="font-size:0.75rem;width:auto">
-                    <thead><tr><th style="padding:0.25rem 0.4rem;white-space:nowrap">Date</th><th class="text-center" style="padding:0.25rem 0.4rem;white-space:nowrap">Amount Received</th><th style="padding:0.25rem 0.4rem">Invoice #</th><th style="padding:0.25rem 0.4rem">Section</th><th class="text-center" style="padding:0.25rem 0.4rem;white-space:nowrap">Actions</th></tr></thead>
+                <div style="overflow-x:auto;">
+                <table class="dsu-table" style="font-size:0.78rem">
+                    <thead><tr><th style="padding:0.35rem 0.5rem">Date</th><th class="text-right" style="padding:0.35rem 0.5rem">Amount Received</th><th style="padding:0.35rem 0.5rem">Invoice #</th><th style="padding:0.35rem 0.5rem">Section</th><th class="text-center" style="padding:0.35rem 0.5rem">Actions</th></tr></thead>
                     <tbody>
                         ${entryRows || '<tr><td colspan="5" style="text-align:center;padding:0.75rem;color:var(--text-muted)">No budget entries yet.</td></tr>'}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td style="padding:0.25rem 0.4rem">TOTAL RECEIVED</td><td class="text-center" style="padding:0.25rem 0.4rem;white-space:nowrap">${fmtMoney(totalReceived)}</td><td colspan="3" style="padding:0.25rem 0.4rem"></td></tr>
+                        <tr class="dsu-total-row" style="background:#c7d2fe"><td style="padding:0.35rem 0.5rem">TOTAL RECEIVED</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(totalReceived)}</td><td colspan="3" style="padding:0.35rem 0.5rem"></td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -1628,6 +1659,19 @@
         dsuT2Range = { preset: 'custom', start: $('dsuT2Start').value, end: $('dsuT2End').value };
         $('dsuT2Preset').value = 'custom';
         loadDSUReport();
+    }
+
+    function dsiT1Preset(val) {
+        if (val === 'custom') {
+            dsiT1Range = { preset: 'custom', start: getYesterdayInputDate(), end: getYesterdayInputDate() };
+        } else {
+            computeDSIDateRange(val, dsiT1Range);
+        }
+        loadDSIReport();
+    }
+    function dsiT1Custom() {
+        dsiT1Range = { preset: 'custom', start: $('dsiT1Start').value, end: $('dsiT1End').value };
+        loadDSIReport();
     }
 
     async function downloadDSUPDF(table) {
