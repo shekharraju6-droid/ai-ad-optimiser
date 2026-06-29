@@ -13,7 +13,7 @@ logger = logging.getLogger("AdOptima")
 
 def send_onboarding_email(recipient_email: str, full_name: str, setup_link: str) -> Dict[str, Any]:
     """Send a setup-link email to a newly created user via SMTP."""
-    smtp_host = os.getenv("SMTP_HOST", "smtp.office365.com")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER", "")
     smtp_pass = os.getenv("SMTP_PASS", "")

@@ -345,9 +345,9 @@
                 </label>
                 <div id="googleFields" class="platform-fields">
                     <div class="form-group">
-                        <label>Google Ads Customer ID *</label>
-                        <input type="text" id="accGoogleExternalId" placeholder="123-456-7890" onblur="validateGoogleCustomerId()">
-                        <div id="googleCustomerIdHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">Find this in the top-right corner of the Google Ads account. Format: 123-456-7890.</div>
+                        <label>Google Ads Customer ID</label>
+                        <input type="text" id="accGoogleExternalId" placeholder="123-456-7890 (optional)" onblur="validateGoogleCustomerId()">
+                        <div id="googleCustomerIdHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">Find this in the top-right corner of the Google Ads account. Format: 123-456-7890. Leave blank if not yet available.</div>
                     </div>
                     <div class="form-group" style="flex:1;"><label>Currency</label><input type="text" id="accGoogleCurrency" value="INR" disabled></div>
 
@@ -978,7 +978,8 @@
     function renderAccountsTable() {
         const tbody = $('accountsTableBody');
         tbody.innerHTML = '';
-        allAccounts.forEach(a => {
+        const sortedAccounts = [...allAccounts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        sortedAccounts.forEach(a => {
             const platforms = [];
             if (a.has_google) platforms.push('Google');
             if (a.has_meta) platforms.push('Meta');
@@ -1007,7 +1008,8 @@
             if (!sel) return;
             const val = sel.value;
             sel.innerHTML = '<option value="">None</option>';
-            allGroups.forEach(g => {
+            const sortedGroups = [...allGroups].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            sortedGroups.forEach(g => {
                 const opt = document.createElement('option');
                 opt.value = g.id; opt.textContent = g.name;
                 sel.appendChild(opt);
@@ -1113,8 +1115,8 @@
     function validateGoogleCustomerId() {
         const val = $('accGoogleExternalId').value.trim();
         const help = $('googleCustomerIdHelp');
+        if (!val) { help.textContent = 'Leave blank if Google Ads Customer ID is not yet available. You can add it later.'; help.style.color = 'var(--text-light)'; return true; }
         const re = /^\d{3}-\d{3}-\d{4}$/;
-        if (!val) { help.textContent = 'Customer ID is required to connect Google Ads.'; help.style.color = 'var(--color-danger)'; return false; }
         if (!re.test(val)) { help.textContent = 'Invalid format. Use 123-456-7890 (with dashes).'; help.style.color = 'var(--color-danger)'; return false; }
         help.textContent = 'Valid Google Ads Customer ID format.'; help.style.color = 'var(--color-success)'; return true;
     }

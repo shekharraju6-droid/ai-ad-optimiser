@@ -560,6 +560,7 @@ async function loadClients(){
     const s=$('clientSearch').value;const st=$('clientStatusFilter').value;
     let url='/clients?';if(s)url+=`search=${encodeURIComponent(s)}&`;if(st)url+=`status=${st}&`;
     try{clients=await api('GET',url)}catch(e){return}
+    clients=[...clients].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
     $('clientsTable').querySelector('tbody').innerHTML=clients.map(c=>`<tr>
         <td style="font-weight:600">${c.client_name}</td><td>${c.brand_name||'—'}</td><td>${c.business_manager_name||'—'}</td>
         <td>${statusBadge(c.client_status)}</td><td>${c.invoice_day||'—'}</td><td>${c.default_due_days||'—'}d</td>
@@ -572,6 +573,7 @@ async function openClientModal(edit=null){
     $('modalTitle').textContent=edit?'Edit Client':'Add Client';
     let bms=[];
     try{bms=await api('GET','/business-managers')}catch(e){bms=[]}
+    bms=[...bms].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
     const bmOptions='<option value="">Unassigned</option>'+bms.map(b=>`<option value="${b.id}" ${edit&&edit.business_manager_id===b.id?'selected':''}>${b.name}</option>`).join('');
     $('modalBody').innerHTML=`
         <div class="form-row"><div class="form-group"><label>Client Name *</label><input id="m_clientName" value="${edit?edit.client_name:''}"></div>
@@ -607,6 +609,7 @@ async function loadInvoices(){
     const s=$('invSearch').value;const st=$('invStatusFilter').value;const df=$('invDateFrom').value;const dt=$('invDateTo').value;
     let url='/invoices?';if(s)url+=`search=${encodeURIComponent(s)}&`;if(st)url+=`status=${st}&`;if(df)url+=`date_from=${df}&`;if(dt)url+=`date_to=${dt}&`;url+=`limit=9999&`;
     try{invoices=await api('GET',url)}catch(e){return}
+    invoices=[...invoices].sort((a,b)=>(a.invoice_number||'').localeCompare(b.invoice_number||''));
     invPage=1;
     renderInvoices();
 }
@@ -630,7 +633,8 @@ function clearInvDates(){$('invDateFrom').value='';$('invDateTo').value='';loadI
 function openInvoiceModal(edit=null){
     modalMode=edit?'edit':'create';modalEditId=edit?edit.id:null;
     $('modalTitle').textContent=edit?'Edit Invoice':'New Invoice';
-    const opts=clients.map(c=>`<option value="${c.id}" ${edit&&edit.client_id===c.id?'selected':''}>${c.client_name}</option>`).join('');
+    const sortedClients=[...clients].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
+    const opts=sortedClients.map(c=>`<option value="${c.id}" ${edit&&edit.client_id===c.id?'selected':''}>${c.client_name}</option>`).join('');
     $('modalBody').innerHTML=`
         <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_invClient"><option value="">Select</option>${opts}</select></div>
         <div class="form-group"><label>Invoice # *</label><input id="m_invNumber" value="${edit?edit.invoice_number:''}"></div></div>
@@ -666,6 +670,7 @@ async function deleteInvoice(id){if(!confirm('Delete invoice and its payments?')
 // PAYMENTS
 async function loadPayments(){
     try{payments=await api('GET','/payments')}catch(e){return}
+    payments=[...payments].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
     $('paymentsTable').querySelector('tbody').innerHTML=payments.map(p=>`<tr>
         <td>${fmtDate(p.payment_date)}</td><td>${p.client_name||'—'}</td><td>${p.invoice_number||'—'}</td>
         <td style="color:var(--success);font-weight:600">${fmt(p.amount)}</td><td>${statusBadge(p.payment_mode)}</td><td>${p.reference_number||'—'}</td>
@@ -676,8 +681,9 @@ async function loadPayments(){
 function openPaymentModal(){
     modalMode='create';modalEditId=null;
     $('modalTitle').textContent='Record Payment';
-    const invOpts=invoices.filter(i=>i.outstanding_amount>0).map(i=>`<option value="${i.id}">${i.invoice_number} (${fmt(i.outstanding_amount)} due)</option>`).join('');
-    const clientOpts=clients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
+    const invOpts=invoices.filter(i=>i.outstanding_amount>0).sort((a,b)=>(a.invoice_number||'').localeCompare(b.invoice_number||'')).map(i=>`<option value="${i.id}">${i.invoice_number} (${fmt(i.outstanding_amount)} due)</option>`).join('');
+    const sortedClients=[...clients].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
+    const clientOpts=sortedClients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
     $('modalBody').innerHTML=`
         <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_payClient"><option value="">Select</option>${clientOpts}</select></div>
         <div class="form-group"><label>Invoice *</label><select id="m_payInvoice"><option value="">Select</option>${invOpts}</select></div></div>
@@ -709,6 +715,7 @@ async function loadOutstanding(){
     const ageing=$('outAgeingFilter').value;
     let url='/outstanding?';if(ageing)url+=`ageing=${ageing}&`;
     try{outstanding=await api('GET',url)}catch(e){return}
+    outstanding=[...outstanding].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
     $('outstandingTable').querySelector('tbody').innerHTML=outstanding.map(i=>`<tr>
         <td>${i.client_name||'—'}</td><td style="font-weight:600">${i.invoice_number}</td><td>${fmt(i.invoice_amount)}</td>
         <td style="color:var(--success)">${fmt(i.amount_received)}</td><td style="color:var(--danger);font-weight:600">${fmt(i.outstanding_amount)}</td>
@@ -719,6 +726,7 @@ async function loadOutstanding(){
 // REMINDERS
 async function loadReminders(){
     try{reminders=await api('GET','/reminders')}catch(e){return}
+    reminders=[...reminders].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
     $('remindersTable').querySelector('tbody').innerHTML=reminders.map(r=>`<tr>
         <td>${r.client_name||'—'}</td><td>${r.invoice_number||'—'}</td><td>${r.reminder_type.replace(/_/g,' ')}</td>
         <td>${statusBadge(r.priority)}</td><td>${fmt(r.due_amount)}</td><td>${fmtDate(r.due_date)}</td><td>${statusBadge(r.reminder_status)}</td>
@@ -773,8 +781,10 @@ function openSnoozeInline(id){showReminderPopup([reminders.find(r=>r.id===id)].f
 function openReminderModal(){
     modalMode='create';modalEditId=null;
     $('modalTitle').textContent='Add Reminder';
-    const clientOpts=clients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
-    const invOpts=invoices.map(i=>`<option value="${i.id}">${i.invoice_number}</option>`).join('');
+    const sortedClients=[...clients].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
+    const clientOpts=sortedClients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
+    const sortedInvoices=[...invoices].sort((a,b)=>(a.invoice_number||'').localeCompare(b.invoice_number||''));
+    const invOpts=sortedInvoices.map(i=>`<option value="${i.id}">${i.invoice_number}</option>`).join('');
     $('modalBody').innerHTML=`
         <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_remClient"><option value="">Select</option>${clientOpts}</select></div>
         <div class="form-group"><label>Invoice</label><select id="m_remInvoice"><option value="">None</option>${invOpts}</select></div></div>
@@ -801,6 +811,7 @@ async function genReminderText(id){
 // DOCUMENTS
 async function loadDocuments(){
     try{documents=await api('GET','/documents')}catch(e){return}
+    documents=[...documents].sort((a,b)=>(a.document_name||'').localeCompare(b.document_name||''));
     $('docsTable').querySelector('tbody').innerHTML=documents.map(d=>`<tr>
         <td>${d.document_name}</td><td>${statusBadge(d.document_type)}</td><td>${d.client_name||'—'}</td><td>${d.invoice_id||'—'}</td>
         <td>${d.uploaded_by_name||'—'}</td><td>${fmtDate(d.created_at)}</td>
@@ -811,8 +822,10 @@ async function loadDocuments(){
 function openDocModal(){
     modalMode='create';modalEditId=null;
     $('modalTitle').textContent='Upload Document';
-    const clientOpts=clients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
-    const invOpts=invoices.map(i=>`<option value="${i.id}">${i.invoice_number}</option>`).join('');
+    const sortedClients=[...clients].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
+    const clientOpts=sortedClients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
+    const sortedInvoices=[...invoices].sort((a,b)=>(a.invoice_number||'').localeCompare(b.invoice_number||''));
+    const invOpts=sortedInvoices.map(i=>`<option value="${i.id}">${i.invoice_number}</option>`).join('');
     $('modalBody').innerHTML=`
         <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_docClient"><option value="">Select</option>${clientOpts}</select></div>
         <div class="form-group"><label>Type</label><select id="m_docType"><option value="invoice_pdf">Invoice PDF</option><option value="po">PO</option><option value="sow">SOW</option><option value="agreement">Agreement</option><option value="payment_proof">Payment Proof</option><option value="credit_note">Credit Note</option><option value="client_communication">Communication</option><option value="other">Other</option></select></div></div>
@@ -863,6 +876,7 @@ function exportCSV(){
 let bmsList=[];
 async function loadBMs(){
     try{bmsList=await api('GET','/business-managers')}catch(e){bmsList=[]}
+    bmsList=[...bmsList].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
     $('bmsTable').querySelector('tbody').innerHTML=bmsList.map(b=>`<tr>
         <td style="font-weight:600">${b.name}</td><td>${b.email}</td><td>${b.mobile||'—'}</td>
         <td><button class="btn btn-danger btn-sm" onclick="deleteBM(${b.id})">Del</button></td>
@@ -892,6 +906,7 @@ async function deleteBM(id){if(!confirm('Delete this business manager?'))return;
 // BM VIEW
 async function loadBMView(){
     try{bmStats=await api('GET','/reports/bm-wise')}catch(e){bmStats=[]}
+    bmStats=[...bmStats].sort((a,b)=>(a.bm_name||'').localeCompare(b.bm_name||''));
     let html='';
     if(bmStats.length===0)html='<div class="empty-state"><h3>No Business Manager Data</h3><p>Assign rev_role as business_manager to users and assign them to clients.</p></div>';
     else bmStats.forEach(bm=>{html+=`<div class="card"><div class="card-header"><span class="card-title">${bm.bm_name}</span><span class="badge badge-blue">${bm.client_count} clients</span></div>
@@ -917,7 +932,8 @@ async function loadUsers(){
         const users=await fetch(AUTH+'/users',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json());
         const accountMap={};
         allUserAccounts.forEach(a=>accountMap[a.id]=a.name);
-        $('usersTable').querySelector('tbody').innerHTML=users.map(u=>{
+        const sortedUsers=[...users].sort((a,b)=>(a.full_name||a.email||'').localeCompare(b.full_name||b.email||''));
+        $('usersTable').querySelector('tbody').innerHTML=sortedUsers.map(u=>{
             const roleLabel=u.role==='superadmin'?'Super Admin':(u.role==='admin'?'Admin':'BM (User)');
             const assigned=u.assigned_account_ids&&u.assigned_account_ids.length?u.assigned_account_ids.map(id=>accountMap[id]||('#'+id)).join(', '):'<span style="color:var(--text-light)">—</span>';
             const canManage=currentUser&&currentUser.role==='superadmin'&&u.role!=='superadmin';
@@ -947,7 +963,8 @@ async function openUserModal(userId=null){
         const users=await fetch(AUTH+'/users',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json());
         u=users.find(x=>x.id===userId)||u;
     }
-    const acctChecks=allUserAccounts.map(a=>`<label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;padding:.25rem 0"><input type="checkbox" value="${a.id}" ${u.assigned_account_ids.includes(a.id)?'checked':''} onchange="updateUserAccountSelection()"> ${a.name}</label>`).join('');
+    const sortedAccounts=[...allUserAccounts].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    const acctChecks=sortedAccounts.map(a=>`<label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;padding:.25rem 0"><input type="checkbox" value="${a.id}" ${u.assigned_account_ids.includes(a.id)?'checked':''} onchange="updateUserAccountSelection()"> ${a.name}</label>`).join('');
     $('modalTitle').textContent=isEdit?'Edit User':'Add User';
     $('modalBody').innerHTML=`
         <div class="form-row">

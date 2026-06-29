@@ -398,7 +398,8 @@
     function renderAssignList(selectedIds) {
         if (!umAccounts.length) { $('umAssignSection').style.display = 'none'; return; }
         $('umAssignSection').style.display = '';
-        $('umAssignAccounts').innerHTML = umAccounts.map(a => {
+        const sortedAccounts = [...umAccounts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        $('umAssignAccounts').innerHTML = sortedAccounts.map(a => {
             const checked = selectedIds.includes(a.id) ? 'checked' : '';
             return `<label><input type="checkbox" value="${a.id}" ${checked}> ${escapeHtml(a.name)}</label>`;
         }).join('');
@@ -416,7 +417,8 @@
     }
 
     function renderUserTable() {
-        $('umTableBody').innerHTML = umUsers.map(u => {
+        const sortedUsers = [...umUsers].sort((a, b) => (a.full_name || a.email || '').localeCompare(b.full_name || b.email || ''));
+        $('umTableBody').innerHTML = sortedUsers.map(u => {
             const access = [];
             if (u.access_adpulse) access.push('AdPulse');
             if (u.access_insightdesk) access.push('InsightDesk');

@@ -296,7 +296,8 @@
             container.innerHTML = '<div style="padding:1rem 1.25rem; color:var(--text-muted); font-size:0.85rem;">No accounts found.</div>';
             return;
         }
-        allAccounts.forEach(a => {
+        const sortedAccounts = [...allAccounts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        sortedAccounts.forEach(a => {
             const el = document.createElement('div');
             el.className = 'account-item';
             el.onclick = () => selectAccount(a.id);
