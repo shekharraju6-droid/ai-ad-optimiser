@@ -1,14 +1,15 @@
 """
 Onboarding invitation email sender.
 
-Priority:
-  1. SendGrid API (HTTPS, works from Railway, no domain verification needed for free tier)
-  2. SMTP fallback (may be blocked on Railway / cloud hosts)
+Uses Google Apps Script web app (HTTPS) to send email through your existing
+Gmail account. Works from Railway (HTTPS port 443, not blocked), no third-party
+email service, no domain verification, no new account.
+
+Fallback: direct SMTP for local development.
 
 Environment variables:
-  SENDGRID_API_KEY       -> SendGrid API key
-  SENDGRID_FROM          -> sender address (any address works on free tier)
-  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS -> legacy SMTP fallback
+  GAS_WEBAPP_URL         -> Google Apps Script web app URL (production)
+  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS -> SMTP fallback (local dev)
 """
 import os
 import json
@@ -96,58 +97,40 @@ Best regards,
     return {"subject": subject, "html": html_body, "text": plain_body}
 
 
-def _http_post(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeout: int = 30) -> Dict[str, Any]:
-    """Minimal dependency-free JSON HTTP POST using only stdlib."""
-    data = json.dumps(payload).encode("utf-8")
+def _send_via_gas(
+    recipient_email: str, full_name: str, setup_link: str, webapp_url: str, sender_name: str
+) -> Dict[str, Any]:
+    """Send email via Google Apps Script web app (uses your Gmail account over HTTPS)."""
+    logger.info(f"Sending onboarding email via Google Apps Script to {recipient_email}")
+    payloads = _build_email_payloads(recipient_email, full_name, setup_link, sender_name)
+    data = json.dumps({
+        "to": recipient_email,
+        "subject": payloads["subject"],
+        "html": payloads["html"],
+        "text": payloads["text"],
+    }).encode("utf-8")
     req = urllib.request.Request(
-        url,
+        webapp_url,
         data=data,
-        headers={"Content-Type": "application/json", **headers},
+        headers={"Content-Type": "application/json"},
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        start = time.time()
+        with urllib.request.urlopen(req, timeout=45) as resp:
             body = resp.read().decode("utf-8")
-            return {"status": resp.status, "body": body}
+            elapsed = round(time.time() - start, 2)
+        logger.info(f"Google Apps Script accepted email for {recipient_email} in {elapsed}s: {body[:200]}")
+        return {"sent": True, "error": None, "provider": "google_apps_script"}
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8")
-        return {"status": e.code, "body": body, "error": f"HTTP {e.code}: {body[:500]}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-def _send_via_sendgrid(
-    recipient_email: str, full_name: str, setup_link: str, api_key: str, sender: str, sender_name: str
-) -> Dict[str, Any]:
-    logger.info(f"Sending onboarding email via SendGrid API to {recipient_email} from {sender}")
-    payloads = _build_email_payloads(recipient_email, full_name, setup_link, sender_name)
-    payload = {
-        "personalizations": [{"to": [{"email": recipient_email, "name": full_name or recipient_email}]}],
-        "from": {"email": sender, "name": sender_name},
-        "subject": payloads["subject"],
-        "content": [
-            {"type": "text/plain", "value": payloads["text"]},
-            {"type": "text/html", "value": payloads["html"]},
-        ],
-    }
-    result = _http_post(
-        "https://api.sendgrid.com/v3/mail/send",
-        payload,
-        {"Authorization": f"Bearer {api_key}"},
-        timeout=30,
-    )
-    if result.get("error"):
-        err = f"SendGrid API error: {result['error']}"
+        err = f"Google Apps Script returned HTTP {e.code}: {body[:500]}"
         logger.error(err)
         return {"sent": False, "error": err}
-    status = result.get("status", 0)
-    if status in (200, 201, 202):
-        logger.info(f"SendGrid accepted email for {recipient_email}")
-        return {"sent": True, "error": None, "provider": "sendgrid"}
-    body = result.get("body", "")
-    err = f"SendGrid API returned {status}: {body[:500]}"
-    logger.error(err)
-    return {"sent": False, "error": err}
+    except Exception as e:
+        err = f"Google Apps Script request failed: {e}"
+        logger.exception(err)
+        return {"sent": False, "error": err}
 
 
 def _send_via_smtp(
@@ -197,9 +180,6 @@ def _send_via_smtp(
                 "sent": False,
                 "error": f"SMTP server rejected recipients: {response}",
                 "provider": "smtp",
-                "smtp_host": cfg["host"],
-                "smtp_from": sender_email,
-                "message_id": message_id,
             }
 
         logger.info(f"Onboarding email ACCEPTED by SMTP for {recipient_email} in {elapsed}s (msgid={message_id})")
@@ -207,9 +187,6 @@ def _send_via_smtp(
             "sent": True,
             "error": None,
             "provider": "smtp",
-            "smtp_host": cfg["host"],
-            "smtp_from": sender_email,
-            "message_id": message_id,
         }
     except smtplib.SMTPAuthenticationError as e:
         err = f"SMTP authentication failed for {cfg['user']}: {e.smtp_error}"
@@ -238,21 +215,19 @@ def send_onboarding_email(
     """
     Send a setup-link email to a newly created user.
 
-    Uses SendGrid HTTPS API first (works from Railway/cloud without domain verification),
-    falls back to SMTP only if no API key is configured.
+    Uses Google Apps Script web app (HTTPS, your existing Gmail) first.
+    Falls back to SMTP for local development.
 
     Returns a dict with keys:
       - sent: bool
       - error: str | None
-      - provider: str (sendgrid|smtp)
-      - message_id, smtp_host, smtp_from for debugging
+      - provider: str (google_apps_script|smtp)
     """
     sender_name = os.getenv("SMTP_SENDER_NAME", "ChlearSakhaaOps AI").strip()
 
-    sendgrid_key = os.getenv("SENDGRID_API_KEY", "").strip()
-    sendgrid_from = os.getenv("SENDGRID_FROM", os.getenv("SMTP_FROM", os.getenv("SMTP_USER", ""))).strip()
-    if sendgrid_key and sendgrid_from:
-        return _send_via_sendgrid(recipient_email, full_name, setup_link, sendgrid_key, sendgrid_from, sender_name)
+    gas_url = os.getenv("GAS_WEBAPP_URL", "").strip()
+    if gas_url:
+        return _send_via_gas(recipient_email, full_name, setup_link, gas_url, sender_name)
 
-    logger.warning("No SendGrid API key found; falling back to SMTP (may fail on Railway)")
+    logger.warning("No GAS_WEBAPP_URL configured; falling back to SMTP (may fail on Railway)")
     return _send_via_smtp(recipient_email, full_name, setup_link, timeout=timeout)
