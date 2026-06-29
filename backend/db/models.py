@@ -574,3 +574,17 @@ class DsiMonthlySpendFixed(Base):
             "month_key": self.month_key,
             "google_spend": self.google_spend,
         }
+
+
+class AppSetting(Base):
+    """Generic key-value application settings stored in PostgreSQL."""
+    __tablename__ = "app_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, nullable=False, unique=True, index=True)
+    value = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {"id": self.id, "key": self.key, "value": self.value}

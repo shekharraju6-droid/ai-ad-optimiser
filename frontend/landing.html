@@ -186,6 +186,7 @@
                 <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
                     <button class="btn btn-secondary" onclick="resetUserForm()">Reset</button>
                     <button class="btn btn-primary" id="umSaveBtn" onclick="saveUser()">Save User</button>
+                    <button class="btn btn-secondary" id="umGmailAuthBtn" onclick="authorizeGmail()" style="display:none;">Authorize Gmail</button>
                 </div>
             </div>
 
@@ -378,9 +379,34 @@
         try {
             currentUser = await api('GET', '/auth/me');
             updateUI(currentUser);
+            checkGmailAuthStatus();
         } catch (e) {
             updateUI(null);
         }
+    }
+
+    async function checkGmailAuthStatus() {
+        // Only show Authorize Gmail button to superadmin when no refresh token is saved
+        if (!currentUser || currentUser.role !== 'superadmin') return;
+        try {
+            const r = await fetch(API + '/auth/gmail-auth-url', { headers: { 'Authorization': 'Bearer ' + token } });
+            if (r.ok) {
+                const d = await r.json();
+                if (d.authorization_url) {
+                    const btn = $('umGmailAuthBtn');
+                    if (btn) btn.style.display = '';
+                }
+            }
+        } catch (e) {}
+    }
+
+    async function authorizeGmail() {
+        try {
+            const r = await fetch(API + '/auth/gmail-auth-url', { headers: { 'Authorization': 'Bearer ' + token } });
+            if (!r.ok) { const d = await r.json(); throw new Error(d.detail || 'Failed to get authorization URL'); }
+            const d = await r.json();
+            if (d.authorization_url) window.open(d.authorization_url, '_blank');
+        } catch (e) { alert(e.message); }
     }
 
     function showOnboarding() {

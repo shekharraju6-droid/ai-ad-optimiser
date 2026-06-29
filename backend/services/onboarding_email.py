@@ -1,12 +1,13 @@
 """
 Onboarding invitation email sender.
 
-Uses your existing Gmail SMTP credentials. Forces IPv4 to avoid
-the [Errno 101] Network is unreachable error on Railway (Railway
-containers lack IPv6, but smtplib tries IPv6 first for smtp.gmail.com).
+Priority:
+  1. Gmail API (HTTPS, works from Railway/cloud, uses your existing Gmail account)
+  2. SMTP fallback (may timeout on Railway)
 
 Environment variables:
-  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_SENDER_NAME
+  GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI -> for Gmail API OAuth
+  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS -> SMTP fallback
 """
 import os
 import socket
@@ -40,7 +41,7 @@ def _smtp_from_env() -> Dict[str, Any]:
         return {"error": "SMTP_HOST/SMTP_PORT not configured"}
     if not smtp_user or not smtp_pass:
         return {
-            "error": "SMTP_USER and SMTP_PASS are required.",
+            "error": "SMTP_USER and SMTP_PASS are required for SMTP fallback.",
         }
 
     return {
@@ -92,11 +93,11 @@ Best regards,
 
 
 def _send_via_smtp(
-    recipient_email: str, full_name: str, setup_link: str, timeout: int = 30
+    recipient_email: str, full_name: str, setup_link: str, timeout: int = 60
 ) -> Dict[str, Any]:
     cfg = _smtp_from_env()
     if cfg.get("error"):
-        logger.error(f"SMTP misconfiguration: {cfg['error']}")
+        logger.error(f"SMTP fallback misconfiguration: {cfg['error']}")
         return {"sent": False, "error": cfg["error"], "provider": "smtp"}
 
     sender_email = cfg["from"]
@@ -119,11 +120,8 @@ def _send_via_smtp(
 
     try:
         # Force IPv4 — Railway (and many cloud hosts) lack IPv6 connectivity.
-        # smtplib/Python tries IPv6 first for smtp.gmail.com, causing
-        # [Errno 101] Network is unreachable. Resolving to an IPv4 address
-        # and connecting directly bypasses this entirely.
         addrs = socket.getaddrinfo(cfg["host"], cfg["port"], socket.AF_INET, socket.SOCK_STREAM)
-        ipv4_addr = addrs[0][4]  # (ip, port) tuple for IPv4
+        ipv4_addr = addrs[0][4]
         ip_str = ipv4_addr[0]
 
         logger.info(
@@ -149,11 +147,7 @@ def _send_via_smtp(
             }
 
         logger.info(f"Onboarding email ACCEPTED by SMTP for {recipient_email} in {elapsed}s (msgid={message_id})")
-        return {
-            "sent": True,
-            "error": None,
-            "provider": "smtp",
-        }
+        return {"sent": True, "error": None, "provider": "smtp"}
     except smtplib.SMTPAuthenticationError as e:
         err = f"SMTP authentication failed for {cfg['user']}: {e.smtp_error}"
         logger.exception(err)
@@ -180,13 +174,30 @@ def send_onboarding_email(
     recipient_email: str,
     full_name: str,
     setup_link: str,
-    timeout: int = 30,
+    refresh_token: str = None,
+    timeout: int = 60,
 ) -> Dict[str, Any]:
     """
-    Send a setup-link email to a newly created user via Gmail SMTP.
+    Send a setup-link email to a newly created user.
 
-    Forces IPv4 to avoid [Errno 101] Network is unreachable on Railway
-    (Railway containers have no IPv6, but Python tries IPv6 first for
-    smtp.gmail.com).
+    Uses Gmail API (HTTPS) if a refresh_token is provided.
+    Falls back to SMTP otherwise.
     """
+    sender_email = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "")).strip()
+    sender_name = os.getenv("SMTP_SENDER_NAME", "ChlearSakhaaOps AI").strip()
+
+    if refresh_token:
+        from backend.services.gmail_api import send_email_via_gmail_api
+        payloads = _build_email_payloads(recipient_email, full_name, setup_link, sender_name)
+        return send_email_via_gmail_api(
+            recipient_email=recipient_email,
+            subject=payloads["subject"],
+            plain_body=payloads["text"],
+            html_body=payloads["html"],
+            sender_email=sender_email,
+            sender_name=sender_name,
+            refresh_token=refresh_token,
+        )
+
+    logger.warning("No Gmail refresh token; falling back to SMTP (may fail on Railway)")
     return _send_via_smtp(recipient_email, full_name, setup_link, timeout=timeout)

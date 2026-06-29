@@ -21,8 +21,9 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from backend.db.database import get_db
-from backend.db.models import User, UserAccountAssignment, Account
+from backend.db.models import User, UserAccountAssignment, Account, AppSetting
 from backend.services.onboarding_email import send_onboarding_email
+from backend.services.gmail_api import build_authorization_url, exchange_code_for_token
 
 logger = logging.getLogger("AdOptima")
 
@@ -236,13 +237,17 @@ def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(
     base_url = os.getenv("ADOPTIMA_PUBLIC_BASE_URL", "") or str(request.base_url).rstrip("/")
     setup_link = f"{base_url}/onboard.html?token={token}"
 
+    # Load Gmail refresh token from DB if available
+    refresh_token_setting = db.query(AppSetting).filter(AppSetting.key == "gmail_refresh_token").first()
+    refresh_token = refresh_token_setting.value if refresh_token_setting else None
+
     def _send_email_background(email, name, link, result_holder):
         try:
-            result = send_onboarding_email(email, name, link)
+            result = send_onboarding_email(email, name, link, refresh_token=refresh_token)
             result_holder.clear()
             result_holder.update(result)
             if result.get("sent"):
-                logger.info(f"Onboarding email thread: ACCEPTED for {email} (msgid={result.get('message_id')}, smtp={result.get('smtp_host')})")
+                logger.info(f"Onboarding email thread: ACCEPTED for {email} (provider={result.get('provider')}, msgid={result.get('message_id')})")
             else:
                 logger.error(f"Onboarding email thread: FAILED for {email}: {result.get('error')}")
         except Exception as e:
@@ -250,16 +255,16 @@ def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(
             result_holder.clear()
             result_holder.update({"sent": False, "error": f"Background send crashed: {e}"})
 
-    email_result = {"sent": False, "error": "Waiting for SMTP response..."}
+    email_result = {"sent": False, "error": "Waiting for email response..."}
     email_thread = threading.Thread(
         target=_send_email_background,
         args=(req.email, req.full_name, setup_link, email_result),
         daemon=True,
     )
     email_thread.start()
-    email_thread.join(timeout=45)
+    email_thread.join(timeout=60)
     if email_thread.is_alive():
-        logger.error(f"Onboarding email thread timed out after 45s for {req.email}")
+        logger.error(f"Onboarding email thread timed out after 60s for {req.email}")
         email_result.clear()
         email_result.update({"sent": False, "error": "Email send timed out; copy the setup link below to share manually."})
 
@@ -344,6 +349,36 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User 
     db.delete(user)
     db.commit()
     return {"status": "success"}
+
+
+@router.get("/gmail-auth-url")
+def gmail_auth_url(request: Request, current_user: User = Depends(require_superadmin)):
+    """Return the Google OAuth URL to authorize Gmail sending."""
+    redirect_uri = os.getenv("GMAIL_REDIRECT_URI", str(request.base_url).rstrip("/") + "/api/auth/gmail/callback")
+    result = build_authorization_url(redirect_uri=redirect_uri)
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    return {"authorization_url": result["url"]}
+
+
+@router.get("/gmail-callback")
+def gmail_callback(code: str, db: Session = Depends(get_db)):
+    """OAuth callback from Google. Saves the refresh token in DB."""
+    result = exchange_code_for_token(code=code)
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    refresh_token = result.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Google did not return a refresh token. Make sure you selected a Gmail account and approved the permission.")
+    setting = db.query(AppSetting).filter(AppSetting.key == "gmail_refresh_token").first()
+    if setting:
+        setting.value = refresh_token
+    else:
+        setting = AppSetting(key="gmail_refresh_token", value=refresh_token)
+        db.add(setting)
+    db.commit()
+    logger.info("Gmail refresh token saved successfully")
+    return {"status": "success", "message": "Gmail authorized successfully. You can now send invite emails."}
 
 
 @router.get("/accounts-for-assignment")
