@@ -1,18 +1,15 @@
 """
 Onboarding invitation email sender.
 
-Uses Google Apps Script web app (HTTPS) to send email through your existing
-Gmail account. Works from Railway (HTTPS port 443, not blocked), no third-party
-email service, no domain verification, no new account.
-
-Fallback: direct SMTP for local development.
+Uses your existing Gmail SMTP credentials. Forces IPv4 to avoid
+the [Errno 101] Network is unreachable error on Railway (Railway
+containers lack IPv6, but smtplib tries IPv6 first for smtp.gmail.com).
 
 Environment variables:
-  GAS_WEBAPP_URL         -> Google Apps Script web app URL (production)
-  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS -> SMTP fallback (local dev)
+  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_SENDER_NAME
 """
 import os
-import json
+import socket
 import logging
 import smtplib
 import time
@@ -21,9 +18,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr, make_msgid
 from typing import Dict, Any
-
-import urllib.request
-import urllib.error
 
 logger = logging.getLogger("AdOptima")
 
@@ -46,7 +40,7 @@ def _smtp_from_env() -> Dict[str, Any]:
         return {"error": "SMTP_HOST/SMTP_PORT not configured"}
     if not smtp_user or not smtp_pass:
         return {
-            "error": "SMTP_USER and SMTP_PASS are required for SMTP fallback.",
+            "error": "SMTP_USER and SMTP_PASS are required.",
         }
 
     return {
@@ -97,48 +91,12 @@ Best regards,
     return {"subject": subject, "html": html_body, "text": plain_body}
 
 
-def _send_via_gas(
-    recipient_email: str, full_name: str, setup_link: str, webapp_url: str, sender_name: str
-) -> Dict[str, Any]:
-    """Send email via Google Apps Script web app (uses your Gmail account over HTTPS)."""
-    logger.info(f"Sending onboarding email via Google Apps Script to {recipient_email}")
-    payloads = _build_email_payloads(recipient_email, full_name, setup_link, sender_name)
-    data = json.dumps({
-        "to": recipient_email,
-        "subject": payloads["subject"],
-        "html": payloads["html"],
-        "text": payloads["text"],
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        webapp_url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        start = time.time()
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            body = resp.read().decode("utf-8")
-            elapsed = round(time.time() - start, 2)
-        logger.info(f"Google Apps Script accepted email for {recipient_email} in {elapsed}s: {body[:200]}")
-        return {"sent": True, "error": None, "provider": "google_apps_script"}
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8")
-        err = f"Google Apps Script returned HTTP {e.code}: {body[:500]}"
-        logger.error(err)
-        return {"sent": False, "error": err}
-    except Exception as e:
-        err = f"Google Apps Script request failed: {e}"
-        logger.exception(err)
-        return {"sent": False, "error": err}
-
-
 def _send_via_smtp(
     recipient_email: str, full_name: str, setup_link: str, timeout: int = 30
 ) -> Dict[str, Any]:
     cfg = _smtp_from_env()
     if cfg.get("error"):
-        logger.error(f"SMTP fallback misconfiguration: {cfg['error']}")
+        logger.error(f"SMTP misconfiguration: {cfg['error']}")
         return {"sent": False, "error": cfg["error"], "provider": "smtp"}
 
     sender_email = cfg["from"]
@@ -160,15 +118,23 @@ def _send_via_smtp(
     msg.attach(MIMEText(payloads["html"], "html", _charset="utf-8"))
 
     try:
+        # Force IPv4 — Railway (and many cloud hosts) lack IPv6 connectivity.
+        # smtplib/Python tries IPv6 first for smtp.gmail.com, causing
+        # [Errno 101] Network is unreachable. Resolving to an IPv4 address
+        # and connecting directly bypasses this entirely.
+        addrs = socket.getaddrinfo(cfg["host"], cfg["port"], socket.AF_INET, socket.SOCK_STREAM)
+        ipv4_addr = addrs[0][4]  # (ip, port) tuple for IPv4
+        ip_str = ipv4_addr[0]
+
         logger.info(
-            f"Connecting to SMTP {cfg['host']}:{cfg['port']} as {cfg['user']} "
+            f"Connecting to SMTP {cfg['host']} ({ip_str}):{cfg['port']} as {cfg['user']} "
             f"to send onboarding email to {recipient_email} (msgid={message_id})"
         )
         start = time.time()
-        server = smtplib.SMTP(cfg["host"], cfg["port"], timeout=timeout)
-        server.ehlo()
+        server = smtplib.SMTP(ip_str, cfg["port"], timeout=timeout)
+        server.ehlo(cfg["host"])
         server.starttls()
-        server.ehlo()
+        server.ehlo(cfg["host"])
         server.login(cfg["user"], cfg["pass"])
         response = server.sendmail(sender_email, [recipient_email], msg.as_string())
         server.quit()
@@ -200,6 +166,10 @@ def _send_via_smtp(
         err = f"SMTP error while sending to {recipient_email}: {e}"
         logger.exception(err)
         return {"sent": False, "error": err, "provider": "smtp"}
+    except socket.gaierror as e:
+        err = f"DNS resolution failed for {cfg['host']}: {e}"
+        logger.exception(err)
+        return {"sent": False, "error": err, "provider": "smtp"}
     except Exception as e:
         err = f"Unexpected error sending onboarding email to {recipient_email}: {e}"
         logger.exception(err)
@@ -213,21 +183,10 @@ def send_onboarding_email(
     timeout: int = 30,
 ) -> Dict[str, Any]:
     """
-    Send a setup-link email to a newly created user.
+    Send a setup-link email to a newly created user via Gmail SMTP.
 
-    Uses Google Apps Script web app (HTTPS, your existing Gmail) first.
-    Falls back to SMTP for local development.
-
-    Returns a dict with keys:
-      - sent: bool
-      - error: str | None
-      - provider: str (google_apps_script|smtp)
+    Forces IPv4 to avoid [Errno 101] Network is unreachable on Railway
+    (Railway containers have no IPv6, but Python tries IPv6 first for
+    smtp.gmail.com).
     """
-    sender_name = os.getenv("SMTP_SENDER_NAME", "ChlearSakhaaOps AI").strip()
-
-    gas_url = os.getenv("GAS_WEBAPP_URL", "").strip()
-    if gas_url:
-        return _send_via_gas(recipient_email, full_name, setup_link, gas_url, sender_name)
-
-    logger.warning("No GAS_WEBAPP_URL configured; falling back to SMTP (may fail on Railway)")
     return _send_via_smtp(recipient_email, full_name, setup_link, timeout=timeout)
