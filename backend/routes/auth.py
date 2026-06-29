@@ -241,38 +241,28 @@ def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(
     refresh_token_setting = db.query(AppSetting).filter(AppSetting.key == "gmail_refresh_token").first()
     refresh_token = refresh_token_setting.value if refresh_token_setting else None
 
-    def _send_email_background(email, name, link, result_holder):
+    def _send_email_background(email, name, link, rt):
         try:
-            result = send_onboarding_email(email, name, link, refresh_token=refresh_token)
-            result_holder.clear()
-            result_holder.update(result)
+            result = send_onboarding_email(email, name, link, refresh_token=rt, timeout=30)
             if result.get("sent"):
-                logger.info(f"Onboarding email thread: ACCEPTED for {email} (provider={result.get('provider')}, msgid={result.get('message_id')})")
+                logger.info(f"Onboarding email sent for {email}: provider={result.get('provider')}, msgid={result.get('message_id')}")
             else:
-                logger.error(f"Onboarding email thread: FAILED for {email}: {result.get('error')}")
+                logger.error(f"Onboarding email failed for {email}: {result.get('error')}")
         except Exception as e:
-            logger.exception(f"Onboarding email thread crashed for {email}: {e}")
-            result_holder.clear()
-            result_holder.update({"sent": False, "error": f"Background send crashed: {e}"})
+            logger.exception(f"Onboarding email background crashed for {email}: {e}")
 
-    email_result = {"sent": False, "error": "Waiting for email response..."}
-    email_thread = threading.Thread(
+    # Fire-and-forget: do not block the HTTP response waiting for email.
+    threading.Thread(
         target=_send_email_background,
-        args=(req.email, req.full_name, setup_link, email_result),
+        args=(req.email, req.full_name, setup_link, refresh_token),
         daemon=True,
-    )
-    email_thread.start()
-    email_thread.join(timeout=60)
-    if email_thread.is_alive():
-        logger.error(f"Onboarding email thread timed out after 60s for {req.email}")
-        email_result.clear()
-        email_result.update({"sent": False, "error": "Email send timed out; copy the setup link below to share manually."})
+    ).start()
 
     return {
         "user": user.to_dict(),
         "setup_link": setup_link,
-        "email_sent": email_result.get("sent", False),
-        "email_error": email_result.get("error") if not email_result.get("sent") else None,
+        "email_sent": True,
+        "email_status": "Email is being sent in background via " + ("Gmail API" if refresh_token else "SMTP fallback"),
     }
 
 

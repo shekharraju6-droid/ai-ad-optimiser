@@ -650,11 +650,7 @@
                 const res = await api('POST', '/auth/users', body);
                 $('umLinkBox').classList.remove('hidden');
                 $('umSetupLink').textContent = res.setup_link;
-                if (res.email_sent) {
-                    alert('User created and invitation email sent.');
-                } else {
-                    alert('User created but email could not be sent: ' + (res.email_error || 'Unknown error') + '. Copy the setup link below to share manually.');
-                }
+                alert('User created. Invite email is being sent in the background. If it fails, copy the setup link below.');
             }
             loadUsers();
             resetUserForm();
