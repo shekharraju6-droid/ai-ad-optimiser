@@ -351,17 +351,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User 
     return {"status": "success"}
 
 
-@router.get("/gmail-auth-url")
-def gmail_auth_url(request: Request, current_user: User = Depends(require_superadmin)):
-    """Return the Google OAuth URL to authorize Gmail sending."""
-    redirect_uri = os.getenv("GMAIL_REDIRECT_URI", str(request.base_url).rstrip("/") + "/api/auth/gmail/callback")
-    result = build_authorization_url(redirect_uri=redirect_uri)
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return {"authorization_url": result["url"]}
-
-
-@router.get("/gmail-callback")
+@router.get("/gmail/callback")
 def gmail_callback(code: str, db: Session = Depends(get_db)):
     """OAuth callback from Google. Saves the refresh token in DB."""
     result = exchange_code_for_token(code=code)
@@ -379,6 +369,16 @@ def gmail_callback(code: str, db: Session = Depends(get_db)):
     db.commit()
     logger.info("Gmail refresh token saved successfully")
     return {"status": "success", "message": "Gmail authorized successfully. You can now send invite emails."}
+
+
+@router.get("/gmail-auth-url")
+def gmail_auth_url(request: Request, current_user: User = Depends(require_superadmin)):
+    """Return the Google OAuth URL to authorize Gmail sending."""
+    redirect_uri = os.getenv("GMAIL_REDIRECT_URI", str(request.base_url).rstrip("/") + "/api/auth/gmail/callback")
+    result = build_authorization_url(redirect_uri=redirect_uri)
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    return {"authorization_url": result["url"]}
 
 
 @router.get("/accounts-for-assignment")
