@@ -133,6 +133,7 @@ def get_integrations_ui(request: Request):
 
 
 @app.get("/onboard", response_class=HTMLResponse)
+@app.get("/onboard.html", response_class=HTMLResponse)
 def get_onboard_ui(request: Request):
     frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
     html_path = os.path.join(frontend_dir, "onboard.html")
