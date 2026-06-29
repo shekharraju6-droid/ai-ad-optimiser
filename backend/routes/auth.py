@@ -13,7 +13,7 @@ import logging
 import threading
 from datetime import datetime, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from passlib.context import CryptContext
@@ -200,7 +200,7 @@ def list_users(db: Session = Depends(get_db), current_user: User = Depends(requi
 
 
 @router.post("/users")
-def create_user(req: UserCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(require_admin_or_superadmin)):
+def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_admin_or_superadmin)):
     existing = db.query(User).filter(User.email == req.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -231,27 +231,37 @@ def create_user(req: UserCreateRequest, db: Session = Depends(get_db), current_u
         _sync_account_assignments(user, req.assigned_account_ids, db)
     db.commit()
     db.refresh(user)
-    base_url = os.getenv("ADOPTIMA_PUBLIC_BASE_URL", "")
-    setup_path = f"/onboard.html?token={token}"
-    setup_link = f"{base_url.rstrip('/')}{setup_path}" if base_url else setup_path
+    # Prefer explicit env var, otherwise derive from the incoming request so
+    # invite links work on Railway/localhost without manual configuration.
+    base_url = os.getenv("ADOPTIMA_PUBLIC_BASE_URL", "") or str(request.base_url).rstrip("/")
+    setup_link = f"{base_url}/onboard.html?token={token}"
 
-    def _send_email_background(email, name, link):
+    def _send_email_background(email, name, link, result_holder):
         try:
             result = send_onboarding_email(email, name, link)
+            result_holder.update(result)
             if result.get("sent"):
                 logger.info(f"Onboarding email sent to {email}")
             else:
                 logger.warning(f"Onboarding email failed for {email}: {result.get('error')}")
         except Exception as e:
             logger.error(f"Onboarding email thread failed for {email}: {e}")
+            result_holder.update({"sent": False, "error": str(e)})
 
-    threading.Thread(target=_send_email_background, args=(req.email, req.full_name, setup_link), daemon=True).start()
+    email_result = {"sent": False, "error": "Email send timed out; copy the setup link below to share manually."}
+    email_thread = threading.Thread(
+        target=_send_email_background,
+        args=(req.email, req.full_name, setup_link, email_result),
+        daemon=True,
+    )
+    email_thread.start()
+    email_thread.join(timeout=10)
 
     return {
         "user": user.to_dict(),
         "setup_link": setup_link,
-        "email_sent": True,
-        "email_error": None,
+        "email_sent": email_result.get("sent", False),
+        "email_error": email_result.get("error") if not email_result.get("sent") else None,
     }
 
 
