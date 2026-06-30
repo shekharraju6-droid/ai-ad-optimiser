@@ -648,7 +648,20 @@ function clearDashDates(){
     loadDashboard();
 }
 
+async function loadDashboardClients(){
+    if(!currentUser || (currentUser.role!=='admin' && currentUser.role!=='superadmin')) return;
+    try{
+        const list=await api('GET','/clients?limit=9999');
+        dashClientsCache=list || [];
+        renderDashAccountFilter();
+    }catch(e){console.error('Failed to load dashboard clients',e);}
+}
+
 async function loadDashboard(){
+    // Ensure client list for dropdown is loaded before dashboard renders
+    if(dashClientsCache.length===0 && currentUser && (currentUser.role==='admin' || currentUser.role==='superadmin')){
+        await loadDashboardClients();
+    }
     const from=$('dashDateFrom').value;const to=$('dashDateTo').value;
     let url='/dashboard?';if(from)url+=`date_from=${from}&`;if(to)url+=`date_to=${to}&`;
     if(dashAccountFilterSelected.length) url+=`client_ids=${dashAccountFilterSelected.join(',')}&`;
