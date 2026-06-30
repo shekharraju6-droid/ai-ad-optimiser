@@ -97,6 +97,7 @@
             <span class="user-info" id="userInfo">Checking session...</span>
             <span class="user-badge hidden" id="userBadge"></span>
             <button class="btn btn-secondary hidden" id="umBtn" onclick="openUserManagement()">👤 User Management</button>
+            <button class="btn btn-secondary hidden" id="maBtn" onclick="openManageAccounts()">🏦 Manage Accounts</button>
             <a class="btn btn-secondary" id="integrationsBtn" href="/integrations" style="display:none">Integrations</a>
             <button class="btn btn-secondary" id="loginBtn" onclick="showAuth()">Login</button>
             <button class="btn btn-secondary hidden" id="logoutBtn" onclick="logout()">Logout</button>
@@ -202,28 +203,30 @@
         </div>
     </div>
 
-    <!-- Manage Accounts Section -->
-    <div id="manageAccountsSection" style="max-width:1200px;margin:0 auto;padding:0 2rem 2rem;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-            <h2 class="font-outfit" style="font-size:1.3rem;font-weight:700;">Manage Accounts</h2>
-            <button class="btn btn-primary" id="addAccountBtn" onclick="openCentralAddAccount()" style="display:none;">+ Add Account</button>
-        </div>
-        <div style="overflow-x:auto;">
-            <table class="um-table" id="centralAccountsTable" style="width:100%;">
-                <thead><tr><th>Client Name</th><th>Brand</th><th>Category</th><th>Contact</th><th>Email</th><th>Mobile</th><th>Platforms</th><th>Actions</th></tr></thead>
-                <tbody id="centralAccountsBody"></tbody>
-            </table>
-        </div>
-    </div>
-
     <!-- Central Account Modal -->
     <div id="centralAccountOverlay" class="um-overlay hidden" onclick="closeCentralAccountModal(event)">
-        <div class="um-modal" onclick="event.stopPropagation()" style="max-width:680px;">
+        <div class="um-modal" onclick="event.stopPropagation()" style="max-width:920px;" id="centralAccountModal">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-                <h2 style="margin:0" id="centralAccountModalTitle">Add Account</h2>
+                <h2 style="margin:0" id="centralAccountModalTitle">Manage Accounts</h2>
                 <button class="btn btn-secondary" onclick="closeCentralAccountModal()" style="padding:0.3rem 0.6rem;font-size:1rem;line-height:1;">✕</button>
             </div>
-            <div id="centralAccountForm">
+
+            <!-- Accounts List View -->
+            <div id="centralAccountListView">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+                    <span class="um-section-title" style="margin:0;">All Accounts</span>
+                    <button class="btn btn-primary" id="centralAddAccountBtn" onclick="openCentralAddAccount()">+ Add Account</button>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="um-table" id="centralAccountsTable" style="width:100%;">
+                        <thead><tr><th>Client Name</th><th>Brand</th><th>Category</th><th>Contact</th><th>Email</th><th>Mobile</th><th>Platforms</th><th>Actions</th></tr></thead>
+                        <tbody id="centralAccountsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add form -->
+            <div id="centralAccountForm" class="hidden">
                 <div class="um-form">
                     <div class="form-group"><label>Client Name *</label><input type="text" id="caName" placeholder="Client name"></div>
                     <div class="form-group"><label>Category *</label>
@@ -240,6 +243,7 @@
                 </div>
                 <p style="font-size:0.78rem;color:var(--text-light);margin:0.5rem 0;">Platform credentials (Google/Meta), CRM, and billing details can be added later via Edit.</p>
                 <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+                    <button class="btn btn-secondary" onclick="showCentralAccountList()">Cancel</button>
                     <button class="btn btn-secondary" onclick="resetCentralAccountForm()">Reset</button>
                     <button class="btn btn-primary" onclick="saveCentralAccount()">Save Account</button>
                 </div>
@@ -300,7 +304,7 @@
                     </div>
                 </div>
                 <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
-                    <button class="btn btn-secondary" onclick="closeCentralAccountModal()">Cancel</button>
+                    <button class="btn btn-secondary" onclick="showCentralAccountList()">Cancel</button>
                     <button class="btn btn-primary" onclick="updateCentralAccount()">Update Account</button>
                 </div>
             </div>
@@ -455,13 +459,12 @@
                 const isAdmin = user.role === 'admin' || user.role === 'superadmin';
                 if (isAdmin) {
                     $('umBtn').classList.remove('hidden');
+                    $('maBtn').classList.remove('hidden');
                     $('integrationsBtn').style.display = 'inline-flex';
-                    $('addAccountBtn').style.display = '';
-                    loadCentralAccounts();
                 } else {
                     $('umBtn').classList.add('hidden');
+                    $('maBtn').classList.add('hidden');
                     $('integrationsBtn').style.display = 'none';
-                    $('addAccountBtn').style.display = 'none';
                 }
                 // Only Super Admin can create another superadmin
                 if (user.role !== 'superadmin') {
@@ -675,6 +678,32 @@
     let centralBMs = [];
     let centralDeleteId = null;
 
+    function openManageAccounts() {
+        $('centralAccountModalTitle').textContent = 'Manage Accounts';
+        showCentralAccountList();
+        $('centralAccountOverlay').classList.remove('hidden');
+        loadCentralAccounts();
+    }
+
+    function showCentralAccountList() {
+        $('centralAccountListView').classList.remove('hidden');
+        $('centralAccountForm').classList.add('hidden');
+        $('centralEditForm').classList.add('hidden');
+        $('centralAccountModalTitle').textContent = 'Manage Accounts';
+    }
+
+    function showCentralAccountAddForm() {
+        $('centralAccountListView').classList.add('hidden');
+        $('centralAccountForm').classList.remove('hidden');
+        $('centralEditForm').classList.add('hidden');
+    }
+
+    function showCentralAccountEditForm() {
+        $('centralAccountListView').classList.add('hidden');
+        $('centralAccountForm').classList.add('hidden');
+        $('centralEditForm').classList.remove('hidden');
+    }
+
     async function loadCentralAccounts() {
         try {
             centralAccounts = await api('GET', '/accounts');
@@ -718,10 +747,8 @@
 
     function openCentralAddAccount() {
         $('centralAccountModalTitle').textContent = 'Add Account';
-        $('centralAccountForm').classList.remove('hidden');
-        $('centralEditForm').classList.add('hidden');
+        showCentralAccountAddForm();
         resetCentralAccountForm();
-        $('centralAccountOverlay').classList.remove('hidden');
     }
 
     function resetCentralAccountForm() {
@@ -749,7 +776,7 @@
             };
             await api('POST', '/accounts', body);
             alert('Account created');
-            closeCentralAccountModal();
+            showCentralAccountList();
             loadCentralAccounts();
         } catch (e) { alert(e.message); }
         finally { _resetSaving(btn); }
@@ -759,8 +786,7 @@
         const a = centralAccounts.find(x => x.id === id);
         if (!a) return;
         $('centralAccountModalTitle').textContent = 'Edit Account: ' + a.name;
-        $('centralAccountForm').classList.add('hidden');
-        $('centralEditForm').classList.remove('hidden');
+        showCentralAccountEditForm();
         $('caEditId').value = a.id;
         $('caEditName').value = a.name || '';
         $('caEditBrand').value = a.brand_name || '';
@@ -783,7 +809,6 @@
         $('caEditLsqBaseUrl').value = a.lsq_base_url || '';
         // Load BMs for dropdown
         loadBMsForCentralEdit(a.business_manager_id);
-        $('centralAccountOverlay').classList.remove('hidden');
     }
 
     async function loadBMsForCentralEdit(selectedBmId) {
@@ -827,7 +852,7 @@
             if ($('caEditLsqBaseUrl').value.trim()) body.lsq_base_url = $('caEditLsqBaseUrl').value.trim();
             await api('PUT', '/accounts/' + id, body);
             alert('Account updated');
-            closeCentralAccountModal();
+            showCentralAccountList();
             loadCentralAccounts();
         } catch (e) { alert(e.message); }
         finally { _resetSaving(btn); }
@@ -836,6 +861,8 @@
     function closeCentralAccountModal(e) {
         if (e && e.target !== $('centralAccountOverlay')) return;
         $('centralAccountOverlay').classList.add('hidden');
+        // Reset to list view for next open
+        showCentralAccountList();
     }
 
     function openDeleteConfirm(id) {
