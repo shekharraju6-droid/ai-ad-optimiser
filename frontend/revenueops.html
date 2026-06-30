@@ -89,13 +89,13 @@
         /* KPI CARDS — gradient tiles */
         .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem;margin-bottom:1.5rem}
         .kpi-card{border-radius:14px;padding:1.15rem 1.25rem;color:#fff;position:relative;overflow:hidden;box-shadow:var(--shadow-md)}
-        .kpi-card.g1{background:var(--grad-1)}
-        .kpi-card.g2{background:var(--grad-3)}
-        .kpi-card.g3{background:var(--grad-4)}
-        .kpi-card.g4{background:var(--grad-5)}
-        .kpi-card.g5{background:var(--grad-2)}
-        .kpi-card.g6{background:var(--grad-6)}
-        .kpi-card.g7{background:var(--grad-7)}
+        .kpi-card.g-blue{background:var(--grad-1)}
+        .kpi-card.g-teal{background:var(--grad-3)}
+        .kpi-card.g-orange{background:var(--grad-4)}
+        .kpi-card.g-red{background:var(--grad-5)}
+        .kpi-card.g-cyan{background:var(--grad-2)}
+        .kpi-card.g-purple{background:var(--grad-6)}
+        .kpi-card.g-sky{background:var(--grad-7)}
         .kpi-card::before{content:'';position:absolute;right:-18px;top:-18px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.14)}
         .kpi-card::after{content:'';position:absolute;right:8px;bottom:-22px;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.08)}
         .kpi-icon{font-size:1.05rem;opacity:.85;margin-bottom:.35rem;display:block}
@@ -603,19 +603,24 @@ async function loadDashboard(){
     try{dashData=await api('GET',url)}catch(e){return}
     const k=dashData;
     $('dashKpis').innerHTML=`
-        <div class="kpi-card g1"><span class="kpi-icon">💰</span><div class="kpi-label">Total Billed</div><div class="kpi-value">${fmt(k.total_billed)}</div></div>
-        <div class="kpi-card g2"><span class="kpi-icon">✅</span><div class="kpi-label">Total Collected</div><div class="kpi-value">${fmt(k.total_collected)}</div></div>
-        <div class="kpi-card g3"><span class="kpi-icon">⏳</span><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmt(k.total_outstanding)}</div></div>
-        <div class="kpi-card g4"><span class="kpi-icon">🔴</span><div class="kpi-label">Overdue</div><div class="kpi-value">${fmt(k.total_overdue)}</div></div>
-        <div class="kpi-card g5"><span class="kpi-icon">🎯</span><div class="kpi-label">Collection %</div><div class="kpi-value">${k.collection_percentage}%</div><div class="stat-bar"><div class="stat-bar-fill" style="width:${k.collection_percentage}%"></div></div></div>
-        <div class="kpi-card g6"><span class="kpi-icon">📅</span><div class="kpi-label">Monthly Billed</div><div class="kpi-value">${fmt(k.monthly_billed)}</div></div>
-        <div class="kpi-card g7"><span class="kpi-icon">💵</span><div class="kpi-label">Monthly Collected</div><div class="kpi-value">${fmt(k.monthly_collected)}</div></div>
-        <div class="kpi-card g1"><span class="kpi-icon">👥</span><div class="kpi-label">Active Clients</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
-        <div class="kpi-card g4"><span class="kpi-icon">⚠️</span><div class="kpi-label">Overdue Invoices</div><div class="kpi-value">${k.overdue_invoices}</div></div>
-        <div class="kpi-card g3"><span class="kpi-icon">🔶</span><div class="kpi-label">Partially Paid</div><div class="kpi-value">${k.partially_paid_count}</div></div>
-        <div class="kpi-card g5"><span class="kpi-icon">⚡</span><div class="kpi-label">Disputed</div><div class="kpi-value">${k.disputed_count}</div></div>
-        <div class="kpi-card g2"><span class="kpi-icon">📆</span><div class="kpi-label">Expected This Week</div><div class="kpi-value">${fmt(k.expected_collection_week)}</div></div>
-        <div class="kpi-card g6"><span class="kpi-icon">🗓️</span><div class="kpi-label">Expected This Month</div><div class="kpi-value">${fmt(k.expected_collection_month)}</div></div>
+        <!-- Row 1: Billed/Collection status + Monthly Billed (Blue/Purple, Teal, Orange, Red, Cyan, Blue/Purple) -->
+        <div class="kpi-card g-blue"><span class="kpi-icon">💰</span><div class="kpi-label">Total Billed</div><div class="kpi-value">${fmt(k.total_billed)}</div></div>
+        <div class="kpi-card g-teal"><span class="kpi-icon">✅</span><div class="kpi-label">Total Collected</div><div class="kpi-value">${fmt(k.total_collected)}</div></div>
+        <div class="kpi-card g-orange"><span class="kpi-icon">⏳</span><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmt(k.total_outstanding)}</div></div>
+        <div class="kpi-card g-red"><span class="kpi-icon">🔴</span><div class="kpi-label">Overdue</div><div class="kpi-value">${fmt(k.total_overdue)}</div></div>
+        <div class="kpi-card g-cyan"><span class="kpi-icon">🎯</span><div class="kpi-label">Collection %</div><div class="kpi-value">${k.collection_percentage}%</div><div class="stat-bar"><div class="stat-bar-fill" style="width:${k.collection_percentage}%"></div></div></div>
+        <div class="kpi-card g-purple"><span class="kpi-icon">📅</span><div class="kpi-label">Monthly Billed</div><div class="kpi-value">${fmt(k.monthly_billed)}</div></div>
+
+        <!-- Row 2: Monthly collected, expected, partial/disputed (Teal, Teal, Teal, Orange, Red, Red) -->
+        <div class="kpi-card g-teal"><span class="kpi-icon">💵</span><div class="kpi-label">Monthly Collected</div><div class="kpi-value">${fmt(k.monthly_collected)}</div></div>
+        <div class="kpi-card g-teal"><span class="kpi-icon">📆</span><div class="kpi-label">Expected This Week</div><div class="kpi-value">${fmt(k.expected_collection_week)}</div></div>
+        <div class="kpi-card g-teal"><span class="kpi-icon">🗓️</span><div class="kpi-label">Expected This Month</div><div class="kpi-value">${fmt(k.expected_collection_month)}</div></div>
+        <div class="kpi-card g-orange"><span class="kpi-icon">🔶</span><div class="kpi-label">Partially Paid</div><div class="kpi-value">${k.partially_paid_count}</div></div>
+        <div class="kpi-card g-red"><span class="kpi-icon">⚠️</span><div class="kpi-label">Overdue Invoices</div><div class="kpi-value">${k.overdue_invoices}</div></div>
+        <div class="kpi-card g-red"><span class="kpi-icon">⚡</span><div class="kpi-label">Disputed</div><div class="kpi-value">${k.disputed_count}</div></div>
+
+        <!-- Row 3: Active clients / without invoice (Blue/Purple, Blue/Purple) -->
+        <div class="kpi-card g-blue"><span class="kpi-icon">👥</span><div class="kpi-label">Active Clients</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
     `;
     $('dashOverdueTable').querySelector('tbody').innerHTML=(k.top_overdue_clients||[]).map(c=>`<tr><td style="font-weight:600">${c.client_name}</td><td style="color:var(--danger);font-weight:600">${fmt(c.outstanding)}</td></tr>`).join('');
     $('dashBillingTable').querySelector('tbody').innerHTML=Object.entries(k.billing_model_dist||{}).map(([t,a])=>`<tr><td>${t.replace(/_/g,' ')}</td><td style="font-weight:600">${fmt(a)}</td></tr>`).join('');
