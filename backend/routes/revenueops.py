@@ -63,6 +63,24 @@ def _bm_client_filter(query, user: User):
     ).filter(Account.id.in_(assigned_ids))
 
 
+def _dashboard_client_filter_for_user(query, user: User):
+    """Return a subquery / filter of RevClient IDs the current user may see.
+
+    Same rules as _bm_client_filter but returns a query object of RevClient.id.
+    """
+    q = db.query(RevClient.id)  # placeholder; caller rebuilds
+    if user.role in ("admin", "superadmin"):
+        return None  # no restriction
+    if user.rev_role == "business_manager":
+        return db.query(RevClient.id).filter(RevClient.business_manager_id == user.id)
+    assigned_ids = user.assigned_account_ids()
+    if not assigned_ids:
+        return db.query(RevClient.id).filter(false())
+    return db.query(RevClient.id).join(
+        Account, Account.rev_client_id == RevClient.id, isouter=False
+    ).filter(Account.id.in_(assigned_ids))
+
+
 def _bm_filter(query, user: User, bm_col):
     if user.role in ("admin", "superadmin"):
         return query
@@ -897,17 +915,50 @@ def list_outstanding(
 def dashboard(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    client_id: Optional[int] = None,
+    client_ids: Optional[str] = None,
     bm: Optional[int] = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user_required),
 ):
+    # Build visible-client subquery based on role/assignments.
+    visible_client_ids = None
+    if user.role not in ("admin", "superadmin"):
+        if user.rev_role == "business_manager":
+            visible_client_ids = db.query(RevClient.id).filter(
+                RevClient.business_manager_id == user.id
+            ).subquery()
+        else:
+            assigned_ids = user.assigned_account_ids()
+            if not assigned_ids:
+                visible_client_ids = db.query(RevClient.id).filter(false()).subquery()
+            else:
+                visible_client_ids = (
+                    db.query(RevClient.id)
+                    .join(Account, Account.rev_client_id == RevClient.id, isouter=False)
+                    .filter(Account.id.in_(assigned_ids))
+                    .subquery()
+                )
+
     q = db.query(RevInvoice)
-    if user.rev_role == "business_manager":
-        bm_clients = db.query(RevClient.id).filter(RevClient.business_manager_id == user.id).subquery()
-        q = q.filter(RevInvoice.client_id.in_(bm_clients))
-    if client_id:
-        q = q.filter(RevInvoice.client_id == client_id)
+    if visible_client_ids is not None:
+        q = q.filter(RevInvoice.client_id.in_(visible_client_ids))
+    if client_ids:
+        # Admin/superadmin only: comma-separated RevClient IDs to scope dashboard.
+        try:
+            ids = [int(x.strip()) for x in client_ids.split(",") if x.strip()]
+            if ids:
+                # Extra safety: if non-admin, intersect with visible clients
+                if user.role in ("admin", "superadmin"):
+                    q = q.filter(RevInvoice.client_id.in_(ids))
+                else:
+                    q = q.filter(
+                        and_(
+                            RevInvoice.client_id.in_(ids),
+                            RevInvoice.client_id.in_(visible_client_ids),
+                        )
+                    )
+        except ValueError:
+            pass
     if bm:
         q = q.filter(RevInvoice.business_manager_id == bm)
     if date_from:
@@ -931,15 +982,12 @@ def dashboard(
     monthly_billed = sum(inv.invoice_amount for inv in this_month_invoices)
     monthly_collected = sum(sum(p.amount for p in inv.payments) for inv in this_month_invoices)
 
-    week_end = (today + __import__("datetime").timedelta(days=7)).isoformat()
-    month_end = today.replace(day=28).isoformat()
-
     overdue_invoices = [inv for inv in invoices if inv.invoice_status in (InvoiceStatus.OVERDUE.value,) or (inv.outstanding_amount and inv.outstanding_amount > 0 and inv.due_date and inv.due_date < today.isoformat())]
     total_overdue = round(sum(inv.outstanding_amount for inv in overdue_invoices), 2)
 
     clients = db.query(RevClient)
-    if user.rev_role == "business_manager":
-        clients = clients.filter(RevClient.business_manager_id == user.id)
+    if visible_client_ids is not None:
+        clients = clients.filter(RevClient.id.in_(visible_client_ids))
     all_clients = clients.all()
     active_clients = [c for c in all_clients if c.client_status == RevClientStatus.ACTIVE.value]
 
