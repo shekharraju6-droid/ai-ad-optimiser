@@ -107,6 +107,7 @@ class RevClient(Base):
     __tablename__ = "rev_clients"
 
     id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, nullable=True, index=True)
     client_name = Column(String, nullable=False)
     brand_name = Column(String, nullable=True)
     company_name = Column(String, nullable=True)
@@ -129,6 +130,7 @@ class RevClient(Base):
         bm = self.business_manager
         return {
             "id": self.id,
+            "account_id": self.account_id,
             "client_name": self.client_name,
             "brand_name": self.brand_name,
             "company_name": self.company_name,

@@ -782,11 +782,21 @@ function setInvPageSize(n){invPageSize=n;invPage=1;renderInvoices();}
 function changeInvPage(dir){const max=Math.ceil(invoices.length/invPageSize)||1;invPage=Math.max(1,Math.min(invPage+dir,max));renderInvoices();}
 function clearInvDates(){$('invDateFrom').value='';$('invDateTo').value='';loadInvoices();}
 
-function openInvoiceModal(edit=null){
+async function openInvoiceModal(edit=null){
     modalMode=edit?'edit':'create';modalEditId=edit?edit.id:null;
     $('modalTitle').textContent=edit?'Edit Invoice':'New Invoice';
-    const sortedClients=[...clients].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
-    const opts=sortedClients.map(c=>`<option value="${c.id}" ${edit&&edit.client_id===c.id?'selected':''}>${c.client_name}</option>`).join('');
+    // Ensure client list is loaded before showing the dropdown
+    if(clients.length===0){
+        try{clients=await api('GET','/clients?limit=9999');}catch(e){clients=[];}
+    }
+    // For BM/User, only show clients linked to assigned accounts
+    let visibleClients=[...clients];
+    if(currentUser && currentUser.role==='user' && currentUser.assigned_account_ids){
+        const assigned=currentUser.assigned_account_ids;
+        visibleClients=visibleClients.filter(c=> assigned.includes(c.account_id));
+    }
+    const sortedClients=visibleClients.sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
+    const opts=sortedClients.map(c=>`<option value="${c.id}" ${edit&&edit.client_id===c.id?'selected':''}>${escapeHtml(c.client_name)}</option>`).join('');
     $('modalBody').innerHTML=`
         <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_invClient"><option value="">Select</option>${opts}</select></div>
         <div class="form-group"><label>Invoice # *</label><input id="m_invNumber" value="${edit?edit.invoice_number:''}"></div></div>

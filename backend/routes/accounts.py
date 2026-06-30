@@ -243,6 +243,7 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
         account.rev_client_id = existing_client.id
     else:
         rev_client = RevClient(
+            account_id=account.id,
             client_name=req.name,
             brand_name=req.brand_name,
             contact_person=req.contact_person,
