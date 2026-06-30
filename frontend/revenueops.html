@@ -278,10 +278,6 @@
                     <div class="card-header"><span class="card-title">Overdue Clients</span></div>
                     <div class="table-wrap"><table id="dashOverdueTable"><thead><tr><th>Client</th><th>Outstanding</th></tr></thead><tbody></tbody></table></div>
                 </div>
-                <div class="card">
-                    <div class="card-header"><span class="card-title">Billing Model Revenue Split</span></div>
-                    <div class="table-wrap"><table id="dashBillingTable"><thead><tr><th>Billing Type</th><th>Revenue</th></tr></thead><tbody></tbody></table></div>
-                </div>
             </div>
 
             <!-- CLIENTS -->
@@ -623,7 +619,6 @@ async function loadDashboard(){
         <div class="kpi-card g-blue"><span class="kpi-icon">👥</span><div class="kpi-label">Active Clients</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
     `;
     $('dashOverdueTable').querySelector('tbody').innerHTML=(k.top_overdue_clients||[]).map(c=>`<tr><td style="font-weight:600">${c.client_name}</td><td style="color:var(--danger);font-weight:600">${fmt(c.outstanding)}</td></tr>`).join('');
-    $('dashBillingTable').querySelector('tbody').innerHTML=Object.entries(k.billing_model_dist||{}).map(([t,a])=>`<tr><td>${t.replace(/_/g,' ')}</td><td style="font-weight:600">${fmt(a)}</td></tr>`).join('');
 }
 
 // CLIENTS
