@@ -1668,80 +1668,87 @@ function closeModal(){$('modalOverlay').style.display='none'; editingUserId=null
 
 <script>
 (function() {
-    let mediaRecorder;
-    let audioChunks = [];
     const micBtn = document.getElementById('voice-mic-btn');
     const statusText = document.getElementById('voice-status-text');
 
     if (!micBtn) return;
 
-    let _recordingActive = false;
-    async function _startRecording() {
-        audioChunks = [];
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
 
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) audioChunks.push(e.data);
+    function ensureRecognition() {
+        if (!recognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-IN';
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                console.log('[Rudra] transcript:', transcript);
+                sendTextCommand(transcript);
             };
-
-            mediaRecorder.onstop = async () => {
-                statusText.innerText = "Processing command...";
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                const formData = new FormData();
-                formData.append("file", audioBlob, "command.wav");
-
-                try {
-                    const response = await fetch('/api/voice/command', {
-                        method: 'POST',
-                        body: formData,
-                        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('adoptima_token') || '') }
-                    });
-                    if (!response.ok) {
-                        let errMsg = 'Rudra could not process the command (server error)';
-                        try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch (e) {}
-                        if (typeof toast === "function") toast(errMsg, "error");
-                        return;
-                    }
-                    const result = await response.json();
-                    if (!result || !result.action) {
-                        if (typeof toast === "function") toast('Rudra did not return an action. Try rephrasing.', "error");
-                        return;
-                    }
-                    handleVoiceAction(result);
-                } catch (err) {
-                    console.error("Voice routing failure:", err);
-                    if (typeof toast === "function") toast("Voice command failed: " + (err.message || 'network error'), "error");
-                } finally {
-                    statusText.style.display = 'none';
-                    micBtn.style.backgroundColor = '#4F46E5';
-                    _recordingActive = false;
+            recognition.onerror = (event) => {
+                console.error('[Rudra] speech recognition error:', event.error);
+                if (event.error !== 'aborted' && event.error !== 'no-speech') {
+                    if (typeof toast === "function") toast('Rudra could not hear you. Please allow microphone and try again.', "error");
                 }
+                statusText.style.display = 'none';
+                micBtn.style.backgroundColor = '#4F46E5';
             };
+            recognition.onend = () => {
+                statusText.style.display = 'none';
+                micBtn.style.backgroundColor = '#4F46E5';
+            };
+        }
+    }
 
-            mediaRecorder.start();
-            statusText.style.display = 'block';
-            statusText.innerText = "Listening... (click again to stop)";
-            micBtn.style.backgroundColor = '#DC2626';
-            _recordingActive = true;
+    async function sendTextCommand(text) {
+        statusText.innerText = "Processing command...";
+        try {
+            const response = await fetch('/api/voice/command', {
+                method: 'POST',
+                body: JSON.stringify({ text }),
+                headers: {
+                    'Authorization': 'Bearer ' + (localStorage.getItem('adoptima_token') || ''),
+                    'Content-Type': 'application/json'
+                }
+            });
+            console.log('[Rudra] backend response status:', response.status);
+            if (!response.ok) {
+                let errMsg = 'Rudra could not process the command (server error ' + response.status + ')';
+                try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch (e) {}
+                console.error('[Rudra] error detail:', errMsg);
+                if (typeof toast === "function") toast(errMsg, "error");
+                return;
+            }
+            const result = await response.json();
+            console.log('[Rudra] parsed action:', JSON.stringify(result));
+            if (!result || !result.action) {
+                if (typeof toast === "function") toast('Rudra did not return an action. Try rephrasing.', "error");
+                return;
+            }
+            handleVoiceAction(result);
         } catch (err) {
-            console.error("Microphone access denied:", err);
-            if (typeof toast === "function") toast("Microphone access denied", "error");
-            _recordingActive = false;
+            console.error('[Rudra] voice routing failure:', err);
+            if (typeof toast === "function") toast("Voice command failed: " + (err.message || 'network error'), "error");
+        } finally {
+            statusText.style.display = 'none';
             micBtn.style.backgroundColor = '#4F46E5';
         }
     }
 
     micBtn.addEventListener('click', async () => {
-        if (_recordingActive) {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-            }
-            _recordingActive = false;
-        } else {
-            await _startRecording();
+        ensureRecognition();
+        try {
+            statusText.style.display = 'block';
+            statusText.innerText = "Listening... (speak, then pause)";
+            micBtn.style.backgroundColor = '#DC2626';
+            recognition.start();
+        } catch (err) {
+            console.error('[Rudra] failed to start recognition:', err);
+            if (typeof toast === "function") toast("Microphone access denied or not supported", "error");
+            statusText.style.display = 'none';
+            micBtn.style.backgroundColor = '#4F46E5';
         }
     });
 

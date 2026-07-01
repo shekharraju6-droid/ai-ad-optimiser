@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import traceback
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
@@ -57,31 +57,29 @@ def _build_voice_schema():
     # any schema that contains this key (True or False).
     return schema
 
-# 2. The API endpoint handling your spoken audio file
+
+class VoiceCommandRequest(BaseModel):
+    text: str
+
+
+# 2. The API endpoint handling the spoken (now transcribed) command
 @router.post("/command")
-async def process_voice_command(file: UploadFile = File(...)):
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No audio file provided")
-        
+async def process_voice_command(request: Request):
     try:
-        raw = await file.read()
-        logger.info(f"[Rudra] received file: {file.filename}, size={len(raw)} bytes, content_type={file.content_type}")
-        # Save temporary file locally on the Railway container
-        temp_file_path = f"/tmp/{file.filename}"
-        with open(temp_file_path, "wb") as buffer:
-            buffer.write(raw)
-            
-        # Upload the audio to Google's temporary staging environment
-        uploaded_audio = client.files.upload(file=temp_file_path)
-        logger.info(f"[Rudra] uploaded audio to Gemini: {uploaded_audio.name}")
-        
-        # Analyze the audio file using Gemini
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Request must be JSON with a 'text' field")
+
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="No command text provided")
+
+    logger.info(f"[Rudra] received text command: {text[:200]}")
+
+    try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[
-                uploaded_audio,
-                "Analyze the user's vocal command and output the structured UI action sequence."
-            ],
+            model='gemini-1.5-flash',
+            contents=text,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=_build_voice_schema(),
@@ -94,22 +92,11 @@ async def process_voice_command(file: UploadFile = File(...)):
             ),
         )
         logger.info(f"[Rudra] Gemini raw response: {response.text[:500] if hasattr(response, 'text') else 'NO TEXT'}")
-        
-        # Clean up temporary storage assets
-        try:
-            client.files.delete(name=uploaded_audio.name)
-        except Exception as ce:
-            logger.warning(f"[Rudra] failed to delete uploaded file: {ce}")
-        try:
-            os.remove(temp_file_path)
-        except Exception:
-            pass
-        
-        # Parse the stringified JSON back into a true dictionary to return to frontend
+
         parsed = json.loads(response.text)
         logger.info(f"[Rudra] parsed action: {parsed.get('action')} module: {parsed.get('target_module')}")
         return parsed
-        
+
     except Exception as e:
         logger.error(f"[Rudra] command failed: {e}", exc_info=True)
         tb = traceback.format_exc()
