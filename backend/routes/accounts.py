@@ -79,6 +79,17 @@ class AccountCreate(BaseModel):
     contact_phone: Optional[str] = None
     business_manager_id: Optional[int] = None
 
+    client_status: Optional[str] = None
+    invoice_day: Optional[int] = None
+    payment_due_days: Optional[int] = None
+    billing_amount: Optional[float] = None
+    gst_number: Optional[str] = None
+    address: Optional[str] = None
+    state: Optional[str] = None
+    state_code: Optional[str] = None
+    adpulse_refresh_interval: Optional[int] = None
+    adpulse_audit_interval: Optional[int] = None
+
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
@@ -113,6 +124,17 @@ class AccountUpdate(BaseModel):
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     business_manager_id: Optional[int] = None
+
+    client_status: Optional[str] = None
+    invoice_day: Optional[int] = None
+    payment_due_days: Optional[int] = None
+    billing_amount: Optional[float] = None
+    gst_number: Optional[str] = None
+    address: Optional[str] = None
+    state: Optional[str] = None
+    state_code: Optional[str] = None
+    adpulse_refresh_interval: Optional[int] = None
+    adpulse_audit_interval: Optional[int] = None
 
 
 class GroupCreate(BaseModel):
@@ -233,6 +255,16 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
         contact_email=req.contact_email,
         contact_phone=req.contact_phone,
         business_manager_id=req.business_manager_id,
+        client_status=req.client_status or "Active",
+        invoice_day=req.invoice_day,
+        payment_due_days=req.payment_due_days if req.payment_due_days is not None else 45,
+        billing_amount=req.billing_amount,
+        gst_number=req.gst_number,
+        address=req.address,
+        state=req.state,
+        state_code=req.state_code,
+        adpulse_refresh_interval=req.adpulse_refresh_interval if req.adpulse_refresh_interval is not None else 5,
+        adpulse_audit_interval=req.adpulse_audit_interval if req.adpulse_audit_interval is not None else 60,
     )
     db.add(account)
     db.flush()
@@ -317,6 +349,29 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
     if req.target_cpa is not None:
         account.target_cpa = req.target_cpa or None
 
+    if req.client_status is not None:
+        account.client_status = req.client_status or "Active"
+    if req.invoice_day is not None:
+        account.invoice_day = req.invoice_day
+    if req.payment_due_days is not None:
+        account.payment_due_days = req.payment_due_days
+    if req.billing_amount is not None:
+        account.billing_amount = req.billing_amount
+    if req.gst_number is not None:
+        account.gst_number = req.gst_number or None
+    if req.address is not None:
+        account.address = req.address or None
+    if req.state is not None:
+        account.state = req.state or None
+    if req.state_code is not None:
+        account.state_code = req.state_code or None
+    if req.adpulse_refresh_interval is not None:
+        account.adpulse_refresh_interval = req.adpulse_refresh_interval
+        account.refresh_interval_minutes = req.adpulse_refresh_interval
+    if req.adpulse_audit_interval is not None:
+        account.adpulse_audit_interval = req.adpulse_audit_interval
+        account.audit_interval_minutes = req.adpulse_audit_interval
+
     if req.brand_name is not None:
         account.brand_name = req.brand_name or None
     if req.contact_person is not None:
@@ -354,6 +409,13 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
                 rev_client.contact_phone = req.contact_phone or None
             if req.business_manager_id is not None:
                 rev_client.business_manager_id = req.business_manager_id or None
+            # Sync new billing fields back to linked RevenueOps client
+            if req.client_status is not None:
+                rev_client.client_status = (req.client_status or "Active").lower().replace(" ", "_")
+            if req.invoice_day is not None:
+                rev_client.invoice_day = req.invoice_day or 1
+            if req.payment_due_days is not None:
+                rev_client.default_due_days = req.payment_due_days or 30
 
     db.commit()
     db.refresh(account)

@@ -103,6 +103,12 @@ def init_db():
     try:
         Base.metadata.create_all(bind=engine)
         logger.info(f"Database initialized ({active_db})")
+        # Run safe additive migrations for Phase 1 single-client master
+        try:
+            from backend.migrations.add_account_billing_columns import run_migration
+            run_migration()
+        except Exception as me:
+            logger.warning(f"Additive account migration skipped/failed: {me}")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise

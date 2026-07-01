@@ -85,8 +85,15 @@
         .modal h2 { margin-bottom: 1rem; font-size: 1.25rem; }
         .form-group { margin-bottom: 1rem; }
         .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.35rem; }
-        .form-group input { width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; }
+        .form-group input, .form-group select { width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; background:#fff; }
+        .form-group select { cursor: pointer; }
         .hidden { display: none !important; }
+        .ca-section { border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 0.75rem; overflow: hidden; }
+        .ca-section .um-section-title { margin: 0; padding: 0.65rem 0.85rem; background: #f9fafb; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .ca-section-body { padding: 0.85rem; }
+        .ca-section.collapsed .ca-section-body { display: none; }
+        .ca-section.collapsed .ca-arrow { transform: rotate(-90deg); }
+        .ca-arrow { display: inline-block; transition: transform 0.2s; }
         .footer { margin-top: auto; text-align: center; padding: 1.5rem; color: var(--text-light); font-size: 0.8rem; border-top: 1px solid var(--border-color); }
         #voice-assistant-widget { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; align-items: center; gap: 10px; }
         #voice-status-text { background: rgba(0,0,0,0.7); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 12px; display: none; font-family: sans-serif; }
@@ -224,7 +231,7 @@
                 </div>
                 <div style="overflow-x:auto;">
                     <table class="um-table" id="centralAccountsTable" style="width:100%;">
-                        <thead><tr><th>Client Name</th><th>Brand</th><th>Category</th><th>Contact</th><th>Email</th><th>Mobile</th><th>Platforms</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Client Name</th><th>Brand</th><th>Category</th><th>Contact</th><th>Email</th><th>Mobile</th><th>Status</th><th>Inv Day</th><th>Due Days</th><th>Platforms</th><th>Actions</th></tr></thead>
                         <tbody id="centralAccountsBody"></tbody>
                     </table>
                 </div>
@@ -232,21 +239,43 @@
 
             <!-- Add form -->
             <div id="centralAccountForm" class="hidden">
-                <div class="um-form">
-                    <div class="form-group"><label>Client Name *</label><input type="text" id="caName" placeholder="Client name"></div>
-                    <div class="form-group"><label>Category *</label>
-                        <select id="caGroup"><option value="">None</option></select>
+                <div id="caAddSections">
+                    <div class="um-section ca-section">
+                        <div class="um-section-title" onclick="toggleCaSection(this)">Basic Information <span class="ca-arrow">▾</span></div>
+                        <div class="um-form ca-section-body">
+                            <div class="form-group"><label>Client Name *</label><input type="text" id="caName" placeholder="Client name"></div>
+                            <div class="form-group"><label>Category</label><select id="caGroup"><option value="">None</option></select></div>
+                            <div class="form-group"><label>Brand/Project Name</label><input type="text" id="caBrand" placeholder="Brand or project"></div>
+                            <div class="form-group"><label>Contact Person</label><input type="text" id="caContactPerson" placeholder="SPOC name"></div>
+                            <div class="form-group"><label>Email</label><input type="email" id="caContactEmail" placeholder="contact@client.com"></div>
+                            <div class="form-group"><label>Mobile</label><input type="text" id="caContactPhone" placeholder="+91 9876543210"></div>
+                            <div class="form-group full"><label>Address</label><input type="text" id="caAddress" placeholder="Client billing address"></div>
+                            <div class="form-group"><label>State</label><input type="text" id="caState" placeholder="e.g. Karnataka"></div>
+                            <div class="form-group"><label>State Code</label><input type="text" id="caStateCode" placeholder="e.g. 29"></div>
+                            <div class="form-group"><label>Business Manager</label><select id="caBM"><option value="">Unassigned</option></select></div>
+                            <div class="form-group"><label>Status</label><select id="caClientStatus"><option value="Active">Active</option><option value="Paused">Paused</option><option value="Closed">Closed</option><option value="On Hold">On Hold</option></select></div>
+                        </div>
                     </div>
-                    <div class="form-group"><label>Brand/Project Name</label><input type="text" id="caBrand" placeholder="Brand or project"></div>
-                    <div class="form-group"><label>Contact Person</label><input type="text" id="caContactPerson" placeholder="SPOC name"></div>
-                    <div class="form-group"><label>Email</label><input type="email" id="caContactEmail" placeholder="contact@client.com"></div>
-                    <div class="form-group"><label>Mobile</label><input type="text" id="caContactPhone" placeholder="+91 9876543210"></div>
+                    <div class="um-section ca-section">
+                        <div class="um-section-title" onclick="toggleCaSection(this)">Ad Platforms <span class="ca-arrow">▾</span></div>
+                        <div class="um-form ca-section-body">
+                            <div class="um-checks">
+                                <label class="um-check"><input type="checkbox" id="caHasGoogle" checked> Google Ads</label>
+                                <label class="um-check"><input type="checkbox" id="caHasMeta"> Meta Ads</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="um-section ca-section">
+                        <div class="um-section-title" onclick="toggleCaSection(this)">Billing &amp; RevenueOps <span class="ca-arrow">▾</span></div>
+                        <div class="um-form ca-section-body">
+                            <div class="form-group"><label>Invoice Day</label><input type="number" id="caInvoiceDay" min="1" max="31" placeholder="1-31"></div>
+                            <div class="form-group"><label>Payment Due Days</label><input type="number" id="caPaymentDueDays" placeholder="45"></div>
+                            <div class="form-group"><label>Billing Amount / Monthly Retainer</label><input type="number" id="caBillingAmount" placeholder="0.00" step="0.01"></div>
+                            <div class="form-group"><label>GST Number</label><input type="text" id="caGstNumber" placeholder="GSTIN"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="um-checks" style="margin:0.75rem 0;">
-                    <label class="um-check"><input type="checkbox" id="caHasGoogle" checked> Google Ads</label>
-                    <label class="um-check"><input type="checkbox" id="caHasMeta"> Meta Ads</label>
-                </div>
-                <p style="font-size:0.78rem;color:var(--text-light);margin:0.5rem 0;">Platform credentials (Google/Meta), CRM, and billing details can be added later via Edit.</p>
+                <p style="font-size:0.78rem;color:var(--text-light);margin:0.5rem 0;">Platform credentials (Google/Meta) and CRM details can be added later via Edit.</p>
                 <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
                     <button class="btn btn-secondary" onclick="showCentralAccountList()">Cancel</button>
                     <button class="btn btn-secondary" onclick="resetCentralAccountForm()">Reset</button>
@@ -258,53 +287,80 @@
             <div id="centralEditForm" class="hidden">
                 <input type="hidden" id="caEditId">
                 <div id="caEditSections" style="margin-bottom:1rem;">
-                    <div class="um-section">
-                        <div class="um-section-title">Basic Info</div>
-                        <div class="um-form">
+                    <div class="um-section ca-section">
+                        <div class="um-section-title" onclick="toggleCaSection(this)">Basic Info <span class="ca-arrow">▾</span></div>
+                        <div class="um-form ca-section-body">
                             <div class="form-group"><label>Client Name *</label><input type="text" id="caEditName"></div>
                             <div class="form-group"><label>Category</label><select id="caEditGroup"><option value="">None</option></select></div>
                             <div class="form-group"><label>Brand/Project</label><input type="text" id="caEditBrand"></div>
                             <div class="form-group"><label>Contact Person</label><input type="text" id="caEditContactPerson"></div>
                             <div class="form-group"><label>Email</label><input type="email" id="caEditContactEmail"></div>
                             <div class="form-group"><label>Mobile</label><input type="text" id="caEditContactPhone"></div>
+                            <div class="form-group full"><label>Address</label><input type="text" id="caEditAddress"></div>
+                            <div class="form-group"><label>State</label><input type="text" id="caEditState"></div>
+                            <div class="form-group"><label>State Code</label><input type="text" id="caEditStateCode"></div>
                             <div class="form-group"><label>Business Manager</label><select id="caEditBM"><option value="">Unassigned</option></select></div>
+                            <div class="form-group"><label>Status</label><select id="caEditClientStatus"><option value="Active">Active</option><option value="Paused">Paused</option><option value="Closed">Closed</option><option value="On Hold">On Hold</option></select></div>
                         </div>
                     </div>
-                    <div class="um-section">
-                        <div class="um-section-title">Google Ads</div>
-                        <label class="um-check"><input type="checkbox" id="caEditHasGoogle"> Google Ads enabled</label>
-                        <div class="um-form" style="margin-top:0.5rem;">
-                            <div class="form-group"><label>Customer ID</label><input type="text" id="caEditGoogleCustId" placeholder="123-456-7890"></div>
-                            <div class="form-group"><label>Client ID</label><input type="text" id="caEditGoogleClientId"></div>
-                            <div class="form-group"><label>Client Secret</label><input type="password" id="caEditGoogleClientSecret"></div>
-                            <div class="form-group"><label>Developer Token</label><input type="text" id="caEditGoogleDevToken"></div>
+                    <div class="um-section ca-section">
+                        <div class="um-section-title" onclick="toggleCaSection(this)">Ad Platforms <span class="ca-arrow">▾</span></div>
+                        <div class="ca-section-body">
+                            <div class="um-section">
+                                <div class="um-section-title" style="font-size:0.75rem;text-transform:none;letter-spacing:0;color:var(--text-muted);">Google Ads</div>
+                                <label class="um-check"><input type="checkbox" id="caEditHasGoogle"> Google Ads enabled</label>
+                                <div class="um-form" style="margin-top:0.5rem;">
+                                    <div class="form-group"><label>Customer ID</label><input type="text" id="caEditGoogleCustId" placeholder="123-456-7890"></div>
+                                    <div class="form-group"><label>Client ID</label><input type="text" id="caEditGoogleClientId"></div>
+                                    <div class="form-group"><label>Client Secret</label><input type="password" id="caEditGoogleClientSecret"></div>
+                                    <div class="form-group"><label>Developer Token</label><input type="text" id="caEditGoogleDevToken"></div>
+                                </div>
+                            </div>
+                            <div class="um-section" style="margin-top:0.75rem;">
+                                <div class="um-section-title" style="font-size:0.75rem;text-transform:none;letter-spacing:0;color:var(--text-muted);">Meta Ads</div>
+                                <label class="um-check"><input type="checkbox" id="caEditHasMeta"> Meta Ads enabled</label>
+                                <div class="um-form" style="margin-top:0.5rem;">
+                                    <div class="form-group"><label>Ad Account ID</label><input type="text" id="caEditMetaAdId" placeholder="act_123456789"></div>
+                                    <div class="form-group"><label>App ID</label><input type="text" id="caEditMetaAppId"></div>
+                                    <div class="form-group"><label>App Secret</label><input type="password" id="caEditMetaAppSecret"></div>
+                                </div>
+                            </div>
+                            <div class="um-section" style="margin-top:0.75rem;">
+                                <div class="um-section-title" style="font-size:0.75rem;text-transform:none;letter-spacing:0;color:var(--text-muted);">AdPulse Sync Intervals</div>
+                                <div class="um-form">
+                                    <div class="form-group"><label>Refresh Interval (min)</label><input type="number" id="caEditAdpulseRefresh" min="1" placeholder="5"></div>
+                                    <div class="form-group"><label>Audit Interval (min)</label><input type="number" id="caEditAdpulseAudit" min="1" placeholder="60"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="um-section">
-                        <div class="um-section-title">Meta Ads</div>
-                        <label class="um-check"><input type="checkbox" id="caEditHasMeta"> Meta Ads enabled</label>
-                        <div class="um-form" style="margin-top:0.5rem;">
-                            <div class="form-group"><label>Ad Account ID</label><input type="text" id="caEditMetaAdId" placeholder="act_123456789"></div>
-                            <div class="form-group"><label>App ID</label><input type="text" id="caEditMetaAppId"></div>
-                            <div class="form-group"><label>App Secret</label><input type="password" id="caEditMetaAppSecret"></div>
+                    <div class="um-section ca-section">
+                        <div class="um-section-title" onclick="toggleCaSection(this)">CRM Integration <span class="ca-arrow">▾</span></div>
+                        <div class="ca-section-body">
+                            <div class="form-group"><label>CRM Type</label>
+                                <select id="caEditCrmType">
+                                    <option value="none">None</option>
+                                    <option value="leadsquared">LeadSquared</option>
+                                    <option value="salesforce">Salesforce</option>
+                                    <option value="hubspot">HubSpot</option>
+                                    <option value="zoho">Zoho</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <div class="um-form">
+                                <div class="form-group"><label>LSQ Access Key</label><input type="text" id="caEditLsqAccessKey"></div>
+                                <div class="form-group"><label>LSQ Secret Key</label><input type="password" id="caEditLsqSecretKey"></div>
+                                <div class="form-group"><label>LSQ Base URL</label><input type="text" id="caEditLsqBaseUrl" placeholder="https://api-in21.leadsquared.com/v2/"></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="um-section">
-                        <div class="um-section-title">CRM</div>
-                        <div class="form-group"><label>CRM Type</label>
-                            <select id="caEditCrmType">
-                                <option value="none">None</option>
-                                <option value="leadsquared">LeadSquared</option>
-                                <option value="salesforce">Salesforce</option>
-                                <option value="hubspot">HubSpot</option>
-                                <option value="zoho">Zoho</option>
-                                <option value="custom">Custom</option>
-                            </select>
-                        </div>
-                        <div class="um-form">
-                            <div class="form-group"><label>LSQ Access Key</label><input type="text" id="caEditLsqAccessKey"></div>
-                            <div class="form-group"><label>LSQ Secret Key</label><input type="password" id="caEditLsqSecretKey"></div>
-                            <div class="form-group"><label>LSQ Base URL</label><input type="text" id="caEditLsqBaseUrl" placeholder="https://api-in21.leadsquared.com/v2/"></div>
+                    <div class="um-section ca-section">
+                        <div class="um-section-title" onclick="toggleCaSection(this)">Billing &amp; RevenueOps <span class="ca-arrow">▾</span></div>
+                        <div class="um-form ca-section-body">
+                            <div class="form-group"><label>Invoice Day</label><input type="number" id="caEditInvoiceDay" min="1" max="31" placeholder="1-31"></div>
+                            <div class="form-group"><label>Payment Due Days</label><input type="number" id="caEditPaymentDueDays" placeholder="45"></div>
+                            <div class="form-group"><label>Billing Amount / Monthly Retainer</label><input type="number" id="caEditBillingAmount" placeholder="0.00" step="0.01"></div>
+                            <div class="form-group"><label>GST Number</label><input type="text" id="caEditGstNumber" placeholder="GSTIN"></div>
                         </div>
                     </div>
                 </div>
@@ -727,6 +783,12 @@
             if (a.has_google) platforms.push('Google');
             if (a.has_meta) platforms.push('Meta');
             const group = centralGroups.find(g => g.id === a.group_id);
+            const status = a.client_status || 'Active';
+            let statusClass = 'badge-gray';
+            if (status === 'Active') statusClass = 'badge-green';
+            else if (status === 'Paused') statusClass = 'badge-orange';
+            else if (status === 'On Hold') statusClass = 'badge-orange';
+            else if (status === 'Closed') statusClass = 'badge-gray';
             return `<tr>
                 <td style="font-weight:600">${escapeHtml(a.name || '-')}</td>
                 <td>${escapeHtml(a.brand_name || '-')}</td>
@@ -734,6 +796,9 @@
                 <td>${escapeHtml(a.contact_person || '-')}</td>
                 <td>${escapeHtml(a.contact_email || '-')}</td>
                 <td>${escapeHtml(a.contact_phone || '-')}</td>
+                <td><span class="badge ${statusClass}">${escapeHtml(status)}</span></td>
+                <td>${escapeHtml(a.invoice_day || '-')}</td>
+                <td>${escapeHtml(a.payment_due_days || '-')}</td>
                 <td>${platforms.join(', ') || '-'}</td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="openCentralEditAccount(${a.id})">Edit</button>
@@ -750,17 +815,46 @@
         const sel2 = $('caEditGroup'); if (sel2) sel2.innerHTML = opts;
     }
 
+    function toggleCaSection(titleEl) {
+        const section = titleEl.closest('.ca-section');
+        if (!section) return;
+        section.classList.toggle('collapsed');
+    }
+
+    function expandAllCaSections() {
+        document.querySelectorAll('.ca-section').forEach(s => s.classList.remove('collapsed'));
+    }
+
+    async function populateCentralBMs(selectId, selectedId) {
+        try {
+            const users = await api('GET', '/auth/users');
+            const bms = users.filter(u => u.role === 'user' || u.role === 'admin' || u.role === 'superadmin');
+            const sortedBms = [...bms].sort((a, b) => (a.full_name || a.email || '').localeCompare(b.full_name || b.email || ''));
+            const opts = '<option value="">Unassigned</option>' + sortedBms.map(u => `<option value="${u.id}" ${selectedId === u.id ? 'selected' : ''}>${escapeHtml(u.full_name || u.email)}</option>`).join('');
+            const sel = $(selectId); if (sel) sel.innerHTML = opts;
+        } catch (e) {
+            const sel = $(selectId); if (sel) sel.innerHTML = '<option value="">Unassigned</option>';
+        }
+    }
+
     function openCentralAddAccount() {
         $('centralAccountModalTitle').textContent = 'Add Account';
         showCentralAccountAddForm();
         resetCentralAccountForm();
+        expandAllCaSections();
     }
 
     function resetCentralAccountForm() {
         $('caName').value = ''; $('caBrand').value = '';
         $('caContactPerson').value = ''; $('caContactEmail').value = ''; $('caContactPhone').value = '';
+        $('caAddress').value = ''; $('caState').value = ''; $('caStateCode').value = '';
+        $('caInvoiceDay').value = ''; $('caPaymentDueDays').value = ''; $('caBillingAmount').value = ''; $('caGstNumber').value = '';
+        $('caClientStatus').value = 'Active';
         $('caHasGoogle').checked = true; $('caHasMeta').checked = false;
         if ($('caGroup')) $('caGroup').value = '';
+        if ($('caBM')) $('caBM').value = '';
+        populateCentralBMs('caBM', null);
+        expandAllCaSections();
     }
 
     async function saveCentralAccount() {
@@ -769,6 +863,11 @@
         try {
             const name = $('caName').value.trim();
             if (!name) { alert('Client name is required'); return; }
+            const invoiceDay = $('caInvoiceDay').value.trim();
+            const dueDays = $('caPaymentDueDays').value.trim();
+            const billing = $('caBillingAmount').value.trim();
+            const refresh = $('caAdpulseRefresh')?.value.trim();
+            const audit = $('caAdpulseAudit')?.value.trim();
             const body = {
                 name,
                 group_id: $('caGroup').value ? parseInt($('caGroup').value) : null,
@@ -776,9 +875,20 @@
                 contact_person: $('caContactPerson').value.trim() || null,
                 contact_email: $('caContactEmail').value.trim() || null,
                 contact_phone: $('caContactPhone').value.trim() || null,
+                business_manager_id: $('caBM').value ? parseInt($('caBM').value) : null,
+                address: $('caAddress').value.trim() || null,
+                state: $('caState').value.trim() || null,
+                state_code: $('caStateCode').value.trim() || null,
+                client_status: $('caClientStatus').value,
+                invoice_day: invoiceDay ? parseInt(invoiceDay) : null,
+                payment_due_days: dueDays ? parseInt(dueDays) : null,
+                billing_amount: billing ? parseFloat(billing) : null,
+                gst_number: $('caGstNumber').value.trim() || null,
                 has_google: $('caHasGoogle').checked,
                 has_meta: $('caHasMeta').checked,
             };
+            if (refresh) body.adpulse_refresh_interval = parseInt(refresh);
+            if (audit) body.adpulse_audit_interval = parseInt(audit);
             await api('POST', '/accounts', body);
             alert('Account created');
             showCentralAccountList();
@@ -798,6 +908,16 @@
         $('caEditContactPerson').value = a.contact_person || '';
         $('caEditContactEmail').value = a.contact_email || '';
         $('caEditContactPhone').value = a.contact_phone || '';
+        $('caEditAddress').value = a.address || '';
+        $('caEditState').value = a.state || '';
+        $('caEditStateCode').value = a.state_code || '';
+        $('caEditClientStatus').value = a.client_status || 'Active';
+        $('caEditInvoiceDay').value = a.invoice_day || '';
+        $('caEditPaymentDueDays').value = a.payment_due_days || '';
+        $('caEditBillingAmount').value = a.billing_amount || '';
+        $('caEditGstNumber').value = a.gst_number || '';
+        $('caEditAdpulseRefresh').value = a.adpulse_refresh_interval || '';
+        $('caEditAdpulseAudit').value = a.adpulse_audit_interval || '';
         if ($('caEditGroup')) $('caEditGroup').value = a.group_id || '';
         $('caEditHasGoogle').checked = a.has_google;
         $('caEditHasMeta').checked = a.has_meta;
@@ -813,7 +933,8 @@
         $('caEditLsqSecretKey').value = '';
         $('caEditLsqBaseUrl').value = a.lsq_base_url || '';
         // Load BMs for dropdown
-        loadBMsForCentralEdit(a.business_manager_id);
+        populateCentralBMs('caEditBM', a.business_manager_id);
+        expandAllCaSections();
     }
 
     async function loadBMsForCentralEdit(selectedBmId) {
@@ -845,6 +966,16 @@
                 has_meta: $('caEditHasMeta').checked,
                 google_external_id: $('caEditGoogleCustId').value.trim() || null,
                 meta_external_id: $('caEditMetaAdId').value.trim() || null,
+                address: $('caEditAddress').value.trim() || null,
+                state: $('caEditState').value.trim() || null,
+                state_code: $('caEditStateCode').value.trim() || null,
+                client_status: $('caEditClientStatus').value,
+                invoice_day: $('caEditInvoiceDay').value ? parseInt($('caEditInvoiceDay').value) : null,
+                payment_due_days: $('caEditPaymentDueDays').value ? parseInt($('caEditPaymentDueDays').value) : null,
+                billing_amount: $('caEditBillingAmount').value ? parseFloat($('caEditBillingAmount').value) : null,
+                gst_number: $('caEditGstNumber').value.trim() || null,
+                adpulse_refresh_interval: $('caEditAdpulseRefresh').value ? parseInt($('caEditAdpulseRefresh').value) : null,
+                adpulse_audit_interval: $('caEditAdpulseAudit').value ? parseInt($('caEditAdpulseAudit').value) : null,
             };
             const googleSecret = $('caEditGoogleClientSecret').value.trim();
             if (googleSecret) { body.google_client_id = $('caEditGoogleClientId').value.trim() || null; body.google_client_secret = googleSecret; body.google_developer_token = $('caEditGoogleDevToken').value.trim() || null; }

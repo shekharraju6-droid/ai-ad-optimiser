@@ -94,6 +94,8 @@ class Account(Base):
     # Sync settings
     refresh_interval_minutes = Column(Integer, default=60)
     audit_interval_minutes = Column(Integer, default=60)  # auto audit frequency
+    adpulse_refresh_interval = Column(Integer, default=5)
+    adpulse_audit_interval = Column(Integer, default=60)
     is_active = Column(Boolean, default=True)
     is_live = Column(Boolean, default=False)
     last_sync_at = Column(DateTime, nullable=True)
@@ -111,6 +113,18 @@ class Account(Base):
     budget_used_pct = Column(Float, default=0.0)
     target_cpa = Column(Float, nullable=True)
     billing_cache = Column(Text, nullable=True)
+
+    # Client business lifecycle status (additive; separate from technical status enum)
+    client_status = Column(String, default="Active")
+
+    # Billing / RevenueOps fields
+    invoice_day = Column(Integer, nullable=True)
+    payment_due_days = Column(Integer, default=45)
+    billing_amount = Column(Float, nullable=True)
+    gst_number = Column(String, nullable=True)
+    address = Column(Text, nullable=True)
+    state = Column(String, nullable=True)
+    state_code = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -148,6 +162,16 @@ class Account(Base):
             "crm_credentials_masked": bool(self.crm_credentials),
             "refresh_interval_minutes": self.refresh_interval_minutes,
             "audit_interval_minutes": self.audit_interval_minutes,
+            "adpulse_refresh_interval": self.adpulse_refresh_interval,
+            "adpulse_audit_interval": self.adpulse_audit_interval,
+            "client_status": self.client_status,
+            "invoice_day": self.invoice_day,
+            "payment_due_days": self.payment_due_days,
+            "billing_amount": self.billing_amount,
+            "gst_number": self.gst_number,
+            "address": self.address,
+            "state": self.state,
+            "state_code": self.state_code,
             "is_active": self.is_active,
             "is_live": self.is_live,
             "last_sync_at": self.last_sync_at.isoformat() + "Z" if self.last_sync_at else None,
