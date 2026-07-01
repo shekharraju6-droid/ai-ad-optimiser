@@ -1070,11 +1070,21 @@
                             body: formData,
                             headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('adoptima_token') || '') }
                         });
+                        if (!response.ok) {
+                            let errMsg = 'Rudra could not process the command (server error)';
+                            try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch (e) {}
+                            toast(errMsg, 'error');
+                            return;
+                        }
                         const result = await response.json();
+                        if (!result || !result.action) {
+                            toast('Rudra did not return an action. Try rephrasing the command.', 'error');
+                            return;
+                        }
                         handleVoiceAction(result);
                     } catch (err) {
                         console.error("Voice routing failure:", err);
-                        toast("Voice command failed", "error");
+                        toast("Voice command failed: " + (err.message || 'network error'), "error");
                     } finally {
                         statusText.style.display = 'none';
                         micBtn.style.backgroundColor = '#4F46E5';
@@ -1113,6 +1123,15 @@
                     else if (dest === 'revenueops') window.location.href = '/revenueops';
                     else if (dest === 'home' || dest === 'landing') window.location.href = '/';
                     break;
+                case 'OPEN_ACCOUNT':
+                case 'OPEN_DASHBOARD':
+                    const mod = (params.module || 'adpulse').toLowerCase();
+                    const acct = params.account_name;
+                    if (mod === 'adpulse') window.location.href = '/adpulse' + (acct ? '?open_account=' + encodeURIComponent(acct) : '');
+                    else if (mod === 'insightdesk' || mod === 'mis') window.location.href = '/mis' + (acct ? '?open_account=' + encodeURIComponent(acct) : '');
+                    else if (mod === 'revenueops') window.location.href = '/revenueops';
+                    else window.location.href = '/adpulse' + (acct ? '?open_account=' + encodeURIComponent(acct) : '');
+                    break;
                 case 'OPEN_MODAL':
                     if (params.modal_type === 'user') openUserManagement();
                     else if (params.modal_type === 'account') openManageAccounts();
@@ -1129,6 +1148,8 @@
                 case 'SHOW_OVERDUE':
                     window.location.href = '/revenueops';
                     break;
+                default:
+                    toast('Rudra did not recognise that action: ' + data.action, 'error');
             }
         }
     })();

@@ -684,6 +684,29 @@
         loadPendingActionsCount();
         switchPanel('dashboard');
         handleOAuthParams();
+        handleOpenAccountParam();
+    }
+
+    function handleOpenAccountParam() {
+        // Support ?open_account=DSU to auto-open a specific account dashboard (from Rudra voice)
+        const params = new URLSearchParams(window.location.search);
+        const openName = params.get('open_account');
+        if (!openName) return;
+        // accounts may not be loaded yet; load then open
+        api('GET', '/accounts').then(accs => {
+            allAccounts = accs;
+            const target = openName.toLowerCase().trim();
+            const matched = allAccounts.find(a => (a.name||'').toLowerCase() === target || (a.brand_name||'').toLowerCase() === target || (a.name||'').toLowerCase().includes(target) || target.includes((a.name||'').toLowerCase()));
+            if (matched) {
+                const platform = matched.has_google ? 'google' : 'meta';
+                openAccountDetail(matched.id, platform);
+                // clean the URL
+                window.history.replaceState({}, '', '/adpulse');
+            } else {
+                toast('Account "' + openName + '" not found', true);
+                switchPanel('accounts');
+            }
+        }).catch(() => {});
     }
 
     // ---------- Date range ----------
@@ -1491,11 +1514,21 @@
                             body: formData,
                             headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('adoptima_token') || '') }
                         });
+                        if (!response.ok) {
+                            let errMsg = 'Rudra could not process the command (server error)';
+                            try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch (e) {}
+                            toast(errMsg, true);
+                            return;
+                        }
                         const result = await response.json();
+                        if (!result || !result.action) {
+                            toast('Rudra did not return an action. Try rephrasing the command.', true);
+                            return;
+                        }
                         handleVoiceAction(result);
                     } catch (err) {
                         console.error("Voice routing failure:", err);
-                        toast("Voice command failed", true);
+                        toast("Voice command failed: " + (err.message || 'network error'), true);
                     } finally {
                         statusText.style.display = 'none';
                         micBtn.style.backgroundColor = '#4F46E5';
@@ -1524,7 +1557,7 @@
             const params = data.parameters || {};
             switch (data.action) {
                 case 'REFRESH_METRICS':
-                    if (typeof loadDashboard === "function") loadDashboard();
+                    if (typeof loadSummary === "function") loadSummary();
                     else window.location.reload();
                     break;
                 case 'SWITCH_TAB':
@@ -1534,6 +1567,23 @@
                     else if (tabId === 'revenueops') window.location.href = '/revenueops';
                     else if (tabId === 'mis' || tabId === 'insightdesk') window.location.href = '/mis';
                     else if (tabId === 'home' || tabId === 'landing') window.location.href = '/';
+                    break;
+                case 'OPEN_ACCOUNT':
+                case 'OPEN_DASHBOARD':
+                    const acctName = (params.account_name || '').toLowerCase().trim();
+                    if (acctName) {
+                        const matched = allAccounts.find(a => (a.name||'').toLowerCase() === acctName || (a.brand_name||'').toLowerCase() === acctName || (a.name||'').toLowerCase().includes(acctName) || acctName.includes((a.name||'').toLowerCase()));
+                        if (matched) {
+                            const platform = matched.has_google ? 'google' : 'meta';
+                            if (typeof openAccountDetail === 'function') openAccountDetail(matched.id, platform);
+                            else window.location.href = '/adpulse?open_account=' + encodeURIComponent(params.account_name);
+                        } else {
+                            toast('Account "' + params.account_name + '" not found in AdPulse', true);
+                            switchPanel('accounts');
+                        }
+                    } else {
+                        switchPanel('dashboard');
+                    }
                     break;
                 case 'OPEN_MODAL':
                     if (params.modal_type === 'account' && typeof openAddAccountModal === "function") openAddAccountModal();
@@ -1553,6 +1603,8 @@
                 case 'SHOW_OVERDUE':
                     window.location.href = '/revenueops';
                     break;
+                default:
+                    toast('Rudra did not recognise that action: ' + data.action, true);
             }
         }
     })();

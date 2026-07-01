@@ -19,6 +19,7 @@ class VoiceActionResponse(BaseModel):
             "'REFRESH_METRICS' (parameters: timeframe), "
             "'SWITCH_TAB' or 'NAVIGATE' (parameters: tab_id or module_name), "
             "'OPEN_MODAL' (parameters: modal_type), "
+            "'OPEN_ACCOUNT' or 'OPEN_DASHBOARD' (parameters: account_name, module), "
             "'SYNC_LEADS', "
             "'TOGGLE_LIVE_MODE' (parameters: platform), "
             "'CREATE_INVOICE' (parameters: client_name), "
