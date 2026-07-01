@@ -205,6 +205,19 @@ class RevInvoice(Base):
     remarks = Column(Text, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # AI invoice upload fields (additive, nullable)
+    base_amount = Column(Float, nullable=True)
+    gst_amount = Column(Float, nullable=True)
+    cgst_amount = Column(Float, nullable=True)
+    sgst_amount = Column(Float, nullable=True)
+    igst_amount = Column(Float, nullable=True)
+    description = Column(Text, nullable=True)
+    jobcard_number = Column(String, nullable=True)
+    po_reference = Column(String, nullable=True)
+    document_file_path = Column(String, nullable=True)
+    source = Column(String, default="manual")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -247,6 +260,16 @@ class RevInvoice(Base):
             "remarks": self.remarks,
             "created_by": self.created_by,
             "updated_by": self.updated_by,
+            "base_amount": self.base_amount,
+            "gst_amount": self.gst_amount,
+            "cgst_amount": self.cgst_amount,
+            "sgst_amount": self.sgst_amount,
+            "igst_amount": self.igst_amount,
+            "description": self.description,
+            "jobcard_number": self.jobcard_number,
+            "po_reference": self.po_reference,
+            "document_file_path": self.document_file_path,
+            "source": self.source,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

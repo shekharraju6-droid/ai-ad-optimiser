@@ -3,7 +3,8 @@ RevenueOps API routes: clients, billing models, invoices, payments,
 documents, reminders, followup notes, audit logs, dashboard, reports, settings, RBAC.
 """
 import json
-from datetime import datetime, date
+import os
+from datetime import datetime, date, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from pydantic import BaseModel
@@ -501,6 +502,17 @@ class InvoiceCreate(BaseModel):
     invoice_status: str = InvoiceStatus.NOT_RAISED.value
     payment_status: str = PaymentStatus.UNPAID.value
     remarks: Optional[str] = None
+    # AI invoice upload fields (all optional, additive)
+    base_amount: Optional[float] = None
+    gst_amount: Optional[float] = None
+    cgst_amount: Optional[float] = None
+    sgst_amount: Optional[float] = None
+    igst_amount: Optional[float] = None
+    description: Optional[str] = None
+    jobcard_number: Optional[str] = None
+    po_reference: Optional[str] = None
+    document_file_path: Optional[str] = None
+    source: str = "manual"
 
 
 class InvoiceUpdate(BaseModel):
@@ -623,6 +635,16 @@ def create_invoice(req: InvoiceCreate, db: Session = Depends(get_db), user: User
         outstanding_amount=req.invoice_amount,
         remarks=req.remarks,
         created_by=user.id,
+        base_amount=req.base_amount,
+        gst_amount=req.gst_amount,
+        cgst_amount=req.cgst_amount,
+        sgst_amount=req.sgst_amount,
+        igst_amount=req.igst_amount,
+        description=req.description,
+        jobcard_number=req.jobcard_number,
+        po_reference=req.po_reference,
+        document_file_path=req.document_file_path,
+        source=req.source or "manual",
     )
     db.add(inv)
     db.commit()
@@ -630,7 +652,246 @@ def create_invoice(req: InvoiceCreate, db: Session = Depends(get_db), user: User
     _recalc_invoice(inv, db)
     _generate_invoice_reminders(inv, db)
     _audit(db, user.id, "create_invoice", "invoice", inv.id, new_val=json.dumps(inv.to_dict()))
+    # Step 6: auto-link uploaded file to Documents section
+    if req.source == "ai_upload" and req.document_file_path:
+        try:
+            import logging
+            logging.getLogger("AdOptima").info(f"Auto-linking document for invoice {inv.id}")
+            doc = RevDocument(
+                client_id=req.client_id,
+                invoice_id=inv.id,
+                document_type=DocType.INVOICE_PDF.value,
+                document_name=req.document_file_path,
+                file_url=req.document_file_path,
+                uploaded_by=user.id,
+                remarks="Auto-linked from AI invoice upload",
+            )
+            db.add(doc)
+            db.commit()
+            _audit(db, user.id, "create_document", "document", doc.id, new_val=json.dumps(doc.to_dict()))
+        except Exception as de:
+            import logging
+            logging.getLogger("AdOptima").warning(f"Auto-link document failed: {de}")
     return inv.to_dict()
+
+
+# ============================================================
+# AI INVOICE UPLOAD (Gemini 2.5 Flash extraction)
+# ============================================================
+INVOICE_UPLOAD_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "uploads", "invoices",
+)
+
+INVOICE_EXTRACT_PROMPT = (
+    "You are an invoice data extraction assistant. "
+    "Analyze this invoice and extract the following fields. "
+    "Return ONLY a valid JSON object with these exact keys, no additional text:\n\n"
+    "{\n"
+    "  \"invoice_number\": \"the invoice/bill number\",\n"
+    "  \"client_name\": \"the buyer/client company name\",\n"
+    "  \"contact_person\": \"the Kind Attn / attention person name\",\n"
+    "  \"invoice_date\": \"date in YYYY-MM-DD format\",\n"
+    "  \"base_amount\": numeric value of taxable amount before tax,\n"
+    "  \"cgst_amount\": numeric value of CGST,\n"
+    "  \"sgst_amount\": numeric value of SGST,\n"
+    "  \"igst_amount\": numeric value of IGST,\n"
+    "  \"total_tax\": numeric value of total tax amount,\n"
+    "  \"total_amount\": numeric value of total amount after tax,\n"
+    "  \"description\": \"description of services from the line items\",\n"
+    "  \"jobcard_number\": \"job card number if present, else null\",\n"
+    "  \"po_reference\": \"PO reference if present, else null\",\n"
+    "  \"client_gstin\": \"client GSTIN number if present, else null\",\n"
+    "  \"state\": \"client state if present, else null\",\n"
+    "  \"state_code\": \"client state code if present, else null\"\n"
+    "}\n\n"
+    "Rules:\n"
+    "- All amount fields must be numbers, not strings\n"
+    "- Date must be in YYYY-MM-DD format\n"
+    "- If a field is not found on the invoice, set it to null\n"
+    "- Do not guess or infer — only extract what is visible"
+)
+
+ALLOWED_INVOICE_CONTENT_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+}
+ALLOWED_INVOICE_EXTS = {".pdf", ".jpg", ".jpeg", ".png"}
+
+
+def _clean_gemini_json(text_resp):
+    """Strip markdown fences and leading/trailing whitespace from a model response."""
+    if not text_resp:
+        return ""
+    s = text_resp.strip()
+    if s.startswith("```"):
+        # remove opening fence (optionally with language tag)
+        s = s.split("\n", 1)[1] if "\n" in s else s
+        # remove closing fence
+        if s.endswith("```"):
+            s = s[:-3]
+        s = s.strip()
+    return s
+
+
+def _match_client_account(db, extracted_name):
+    """Try to match the extracted client name to a central Account row.
+
+    Strategy:
+      1. Exact match on Account.name or Account.brand_name (case-insensitive)
+      2. Partial match: extracted name CONTAINS account name, or account name
+         CONTAINS extracted name (case-insensitive)
+    Returns (account, account_rev_client_id) or (None, None).
+    """
+    if not extracted_name:
+        return None, None
+    name_norm = extracted_name.strip().lower()
+    accounts = db.query(Account).all()
+    # 1. Exact
+    for a in accounts:
+        if a.name and a.name.strip().lower() == name_norm:
+            return a, a.rev_client_id
+        if a.brand_name and a.brand_name.strip().lower() == name_norm:
+            return a, a.rev_client_id
+    # 2. Partial / fuzzy (containment both ways)
+    for a in accounts:
+        an = (a.name or "").strip().lower()
+        bn = (a.brand_name or "").strip().lower()
+        if not an and not bn:
+            continue
+        if (an and (an in name_norm or name_norm in an)) or \
+           (bn and (bn in name_norm or name_norm in bn)):
+            return a, a.rev_client_id
+    return None, None
+
+
+def _compute_suggested_due_date(invoice_date, due_days):
+    """Return YYYY-MM-DD = invoice_date + due_days. Falls back to +45."""
+    if not invoice_date:
+        return None
+    days = due_days if due_days and due_days > 0 else 45
+    try:
+        d = datetime.strptime(invoice_date, "%Y-%m-%d").date()
+    except Exception:
+        return None
+    from datetime import timedelta
+    return (d + timedelta(days=days)).isoformat()
+
+
+@router.post("/invoices/upload")
+async def upload_invoice_extract(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
+):
+    """Upload an invoice PDF/image and extract fields with Gemini 2.5 Flash.
+    Does NOT save any invoice — returns extracted data for user review.
+    """
+    # Validate file type
+    original_name = file.filename or "upload"
+    ext = os.path.splitext(original_name)[1].lower()
+    if ext not in ALLOWED_INVOICE_EXTS:
+        raise HTTPException(status_code=400, detail="Unsupported file type. Allowed: PDF, JPEG, PNG.")
+
+    # Ensure upload dir exists
+    os.makedirs(INVOICE_UPLOAD_DIR, exist_ok=True)
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    saved_name = f"{timestamp}_{original_name}"
+    saved_path = os.path.join(INVOICE_UPLOAD_DIR, saved_name)
+
+    # Save uploaded file
+    try:
+        contents = await file.read()
+        with open(saved_path, "wb") as f:
+            f.write(contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {e}")
+
+    # Send to Gemini 2.5 Flash
+    try:
+        from google import genai
+        from google.genai import types
+        client = genai.Client()
+
+        # Build the file part based on content type
+        if ext == ".pdf":
+            mime = "application/pdf"
+            inline_part = types.Part.from_bytes(data=contents, mime_type=mime)
+        elif ext in (".jpg", ".jpeg"):
+            mime = "image/jpeg"
+            inline_part = types.Part.from_bytes(data=contents, mime_type=mime)
+        else:
+            mime = "image/png"
+            inline_part = types.Part.from_bytes(data=contents, mime_type=mime)
+
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[inline_part, INVOICE_EXTRACT_PROMPT],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                system_instruction="You are an invoice data extraction assistant. Return only JSON.",
+            ),
+        )
+        raw_text = response.text if hasattr(response, "text") else ""
+    except Exception as e:
+        # Clean up file on extraction failure? Keep it so user can retry, but report error.
+        raise HTTPException(status_code=500, detail=f"Gemini extraction failed: {e}")
+
+    # Parse the JSON response (clean fences if present)
+    extracted = None
+    parse_error = None
+    try:
+        cleaned = _clean_gemini_json(raw_text)
+        extracted = json.loads(cleaned)
+    except Exception as e1:
+        parse_error = str(e1)
+        # Retry once more after aggressive cleaning
+        try:
+            import re
+            cleaned = re.sub(r"^```(?:json)?|```$", "", raw_text or "", flags=re.MULTILINE).strip()
+            extracted = json.loads(cleaned)
+        except Exception as e2:
+            parse_error = f"{e1} | retry: {e2}"
+
+    if extracted is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not parse Gemini response as JSON. {parse_error or ''} Raw: {(raw_text or '')[:300]}",
+        )
+
+    # Match client account
+    client_name = extracted.get("client_name")
+    matched_account, matched_rev_client_id = _match_client_account(db, client_name)
+
+    # Compute suggested due date
+    invoice_date = extracted.get("invoice_date")
+    due_days = None
+    if matched_account:
+        due_days = matched_account.payment_due_days
+    suggested_due = _compute_suggested_due_date(invoice_date, due_days)
+
+    # Suggested BM
+    suggested_bm_name = None
+    if matched_account and matched_account.business_manager_id:
+        bm_user = db.query(User).filter(User.id == matched_account.business_manager_id).first()
+        if bm_user:
+            suggested_bm_name = bm_user.full_name or bm_user.email
+
+    return {
+        "success": True,
+        "extracted_data": extracted,
+        "matched_account": {
+            "id": matched_account.id if matched_account else None,
+            "name": matched_account.name if matched_account else None,
+            "rev_client_id": matched_rev_client_id if matched_account else None,
+        },
+        "suggested_due_date": suggested_due,
+        "suggested_bm": suggested_bm_name,
+        "suggested_bm_id": matched_account.business_manager_id if matched_account else None,
+        "file_path": saved_name,
+    }
 
 
 @router.put("/invoices/{invoice_id}")

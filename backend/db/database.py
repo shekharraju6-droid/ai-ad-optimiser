@@ -109,6 +109,11 @@ def init_db():
             run_migration()
         except Exception as me:
             logger.warning(f"Additive account migration skipped/failed: {me}")
+        try:
+            from backend.migrations.add_invoice_upload_columns import run_invoice_migration
+            run_invoice_migration()
+        except Exception as me:
+            logger.warning(f"Additive invoice migration skipped/failed: {me}")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise
