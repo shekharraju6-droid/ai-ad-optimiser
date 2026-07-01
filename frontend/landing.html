@@ -1146,15 +1146,16 @@
                     break;
                 case 'SWITCH_TAB':
                 case 'NAVIGATE':
-                    const dest = params.tab_id || params.module_name;
+                    const dest = params.tab_id || params.module_name || data.target_module;
                     if (dest === 'adpulse') window.location.href = '/adpulse';
                     else if (dest === 'insightdesk' || dest === 'mis') window.location.href = '/mis';
                     else if (dest === 'revenueops') window.location.href = '/revenueops';
                     else if (dest === 'home' || dest === 'landing') window.location.href = '/';
+                    else toast('Rudra did not understand where to navigate. Try again.', 'error');
                     break;
                 case 'OPEN_ACCOUNT':
                 case 'OPEN_DASHBOARD':
-                    const mod = (params.module || 'adpulse').toLowerCase();
+                    const mod = (params.module || data.target_module || 'adpulse').toLowerCase();
                     const acct = params.account_name;
                     if (mod === 'adpulse') window.location.href = '/adpulse' + (acct ? '?open_account=' + encodeURIComponent(acct) : '');
                     else if (mod === 'insightdesk' || mod === 'mis') window.location.href = '/mis' + (acct ? '?open_account=' + encodeURIComponent(acct) : '');

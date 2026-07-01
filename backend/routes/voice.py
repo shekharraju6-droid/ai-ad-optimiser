@@ -114,4 +114,7 @@ async def process_voice_command(file: UploadFile = File(...)):
         logger.error(f"[Rudra] command failed: {e}", exc_info=True)
         tb = traceback.format_exc()
         print(f"[Rudra] Voice command error traceback:\n{tb}")
-        raise HTTPException(status_code=500, detail=str(e))
+        msg = str(e)
+        if "503" in msg or "UNAVAILABLE" in msg or "high demand" in msg:
+            raise HTTPException(status_code=503, detail="Gemini is temporarily overloaded. Please wait a few seconds and try again.")
+        raise HTTPException(status_code=500, detail=msg)

@@ -1572,25 +1572,40 @@
                     break;
                 case 'SWITCH_TAB':
                 case 'NAVIGATE':
-                    const tabId = params.tab_id || params.module_name;
+                    const tabId = params.tab_id || params.module_name || data.target_module;
                     if (['dashboard','accounts','approvals'].includes(tabId) && typeof switchPanel === "function") switchPanel(tabId);
+                    else if (tabId === 'adpulse') window.location.href = '/adpulse';
                     else if (tabId === 'revenueops') window.location.href = '/revenueops';
                     else if (tabId === 'mis' || tabId === 'insightdesk') window.location.href = '/mis';
                     else if (tabId === 'home' || tabId === 'landing') window.location.href = '/';
+                    else toast('Rudra did not understand where to navigate. Try again.', true);
                     break;
                 case 'OPEN_ACCOUNT':
                 case 'OPEN_DASHBOARD':
+                    const targetMod = (params.module || data.target_module || 'adpulse').toLowerCase();
                     const acctName = (params.account_name || '').toLowerCase().trim();
                     if (acctName) {
-                        const matched = allAccounts.find(a => (a.name||'').toLowerCase() === acctName || (a.brand_name||'').toLowerCase() === acctName || (a.name||'').toLowerCase().includes(acctName) || acctName.includes((a.name||'').toLowerCase()));
-                        if (matched) {
-                            const platform = matched.has_google ? 'google' : 'meta';
-                            if (typeof openAccountDetail === 'function') openAccountDetail(matched.id, platform);
-                            else window.location.href = '/adpulse?open_account=' + encodeURIComponent(params.account_name);
+                        if (targetMod === 'adpulse') {
+                            const matched = allAccounts.find(a => (a.name||'').toLowerCase() === acctName || (a.brand_name||'').toLowerCase() === acctName || (a.name||'').toLowerCase().includes(acctName) || acctName.includes((a.name||'').toLowerCase()));
+                            if (matched) {
+                                const platform = matched.has_google ? 'google' : 'meta';
+                                if (typeof openAccountDetail === 'function') openAccountDetail(matched.id, platform);
+                                else window.location.href = '/adpulse?open_account=' + encodeURIComponent(params.account_name);
+                            } else {
+                                toast('Account "' + params.account_name + '" not found in AdPulse', true);
+                                switchPanel('accounts');
+                            }
+                        } else if (targetMod === 'mis' || targetMod === 'insightdesk') {
+                            window.location.href = '/mis?open_account=' + encodeURIComponent(params.account_name);
+                        } else if (targetMod === 'revenueops') {
+                            window.location.href = '/revenueops';
                         } else {
-                            toast('Account "' + params.account_name + '" not found in AdPulse', true);
-                            switchPanel('accounts');
+                            switchPanel('dashboard');
                         }
+                    } else if (targetMod === 'revenueops') {
+                        window.location.href = '/revenueops';
+                    } else if (targetMod === 'mis' || targetMod === 'insightdesk') {
+                        window.location.href = '/mis';
                     } else {
                         switchPanel('dashboard');
                     }

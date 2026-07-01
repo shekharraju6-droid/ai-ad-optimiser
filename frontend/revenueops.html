@@ -1762,9 +1762,18 @@ function closeModal(){$('modalOverlay').style.display='none'; editingUserId=null
 
             case 'SWITCH_TAB':
             case 'NAVIGATE':
-                const tabId = params.tab_id || params.module_name;
-                if (tabId && typeof showPanel === "function") showPanel(tabId);
-                else if (tabId === 'revenueops') window.location.href = '/revenueops';
+                const tabId = params.tab_id || params.module_name || data.target_module;
+                const panelMap = {
+                    'dashboard':'dashboard','clients':'clients','invoices':'invoices',
+                    'payments':'payments','outstanding':'outstanding','reminders':'reminders',
+                    'documents':'documents','reports':'reports','bms':'bms','bm-view':'bm-view',
+                    'settings':'settings','users':'users'
+                };
+                if (tabId === 'adpulse') window.location.href = '/adpulse';
+                else if (tabId === 'mis' || tabId === 'insightdesk') window.location.href = '/mis';
+                else if (tabId && panelMap[tabId] && typeof showPanel === "function") showPanel(tabId);
+                else if (tabId === 'home' || tabId === 'landing') window.location.href = '/';
+                else toast('Rudra did not understand where to navigate. Try again.', 'error');
                 break;
 
             case 'OPEN_MODAL':

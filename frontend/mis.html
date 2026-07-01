@@ -2233,12 +2233,16 @@
                     break;
                 case 'SWITCH_TAB':
                 case 'NAVIGATE':
-                    const tabId = params.tab_id || params.module_name;
+                    const tabId = params.tab_id || params.module_name || data.target_module;
                     const report = params.report || 'dsu';
                     if (tabId === 'revenueops') window.location.href = '/revenueops';
                     else if (tabId === 'adpulse') window.location.href = '/adpulse';
+                    else if (tabId === 'mis' || tabId === 'insightdesk') {
+                        if (currentAccountId && typeof loadReport === "function") loadReport(currentAccountId, report);
+                    }
                     else if (tabId === 'home' || tabId === 'landing') window.location.href = '/';
                     else if (currentAccountId && typeof loadReport === "function") loadReport(currentAccountId, report);
+                    else toast('Rudra did not understand where to navigate. Try again.', true);
                     break;
                 case 'OPEN_MODAL':
                     if (params.modal_type === 'date') {
