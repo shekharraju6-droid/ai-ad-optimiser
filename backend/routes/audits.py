@@ -1,6 +1,7 @@
 """
 Audit and approval queue API routes.
 """
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -12,6 +13,7 @@ from backend.services.scheduler import run_manual_smart_audit
 from backend.services.audit_settings import get_audit_settings, set_audit_setting
 from backend.services.notifications import dispatch
 
+logger = logging.getLogger("AdOptima")
 router = APIRouter(prefix="/api", tags=["audits"])
 
 
@@ -83,6 +85,15 @@ def run_all_audits(start_date: Optional[str] = None, end_date: Optional[str] = N
             db,
         )
     return result
+
+
+@router.post("/pending-actions/clear-pending")
+def clear_pending_actions(req: ReviewRequest, db: Session = Depends(get_db)):
+    """Delete all pending actions (auto-generated recommendations only)."""
+    count = db.query(PendingAction).filter(PendingAction.status == "pending").delete(synchronize_session=False)
+    db.commit()
+    logger.info(f"Cleared {count} pending actions by {req.reviewer}")
+    return {"cleared": count}
 
 
 @router.get("/pending-actions")
