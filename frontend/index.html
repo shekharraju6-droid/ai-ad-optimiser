@@ -247,11 +247,11 @@
                     <div class="card">
                         <div class="card-header">
                             <h2 class="card-title">Manage Accounts</h2>
-                            <div style="font-size:0.8rem;color:var(--text-light);">Manage accounts from the main page →</div>
+                            <div style="font-size:0.8rem;color:var(--text-light);">Showing accounts with Google Ads or Meta Ads. Full management on main page →</div>
                         </div>
                         <div class="table-wrapper">
                             <table>
-                                <thead><tr><th>Name</th><th>Platforms</th><th>Category</th><th>External ID</th><th>Mode</th><th>Status</th><th class="text-right">Spend</th><th class="text-right">Refresh</th></tr></thead>
+                                <thead><tr><th>Name</th><th>Platforms</th><th>Category</th><th>External ID</th><th>Mode</th><th>Status</th><th class="text-right">Spend</th><th class="text-right">Refresh</th><th class="text-right">Audit</th><th>Actions</th></tr></thead>
                                 <tbody id="accountsTableBody"></tbody>
                             </table>
                         </div>
@@ -992,7 +992,9 @@
     function renderAccountsTable() {
         const tbody = $('accountsTableBody');
         tbody.innerHTML = '';
-        const sortedAccounts = [...allAccounts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        // Step 6: show only accounts with Google or Meta credentials configured
+        const visibleAccounts = allAccounts.filter(a => a.has_google || a.has_meta);
+        const sortedAccounts = [...visibleAccounts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         sortedAccounts.forEach(a => {
             const platforms = [];
             if (a.has_google) platforms.push('Google');
@@ -1006,11 +1008,17 @@
                 <td>${a.is_live ? '<span class="flag-tag flag-success">Live</span>' : '<span class="flag-tag flag-warning">Not Connected</span>'}</td>
                 <td>${a.status}</td>
                 <td class="text-right">${formatMoney(a.spend)}</td>
-                <td class="text-right">${a.refresh_interval_minutes}m</td>
-            </tr>`;
+                <td class="text-right">${a.adpulse_refresh_interval || a.refresh_interval_minutes || 60}m</td>
+                <td class="text-right">${a.adpulse_audit_interval || a.audit_interval_minutes || 60}m</td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick="openAccountDetail(${a.id}, '${a.has_google ? 'google' : 'meta'}')">View</button>
+                    <button class="btn btn-secondary btn-sm" onclick="window.location.href='/'">Edit</button>
+                </td>
+            `;
             tbody.appendChild(tr);
         });
     }
+
 
     function populateGroupSelects() {
         const selects = ['accGroup'];
@@ -1030,12 +1038,19 @@
     }
 
     function openAddAccountModal() {
+        // Step 6 Phase 1: redirect to main page Manage Accounts for account creation
+        window.location.href = '/';
+        localStorage.setItem('open_manage_accounts','1');
+        return;
+    }
+
+    function _legacyOpenAddAccountModal() {
         editingAccountId = null;
         $('addAccountModal').querySelector('h2').textContent = 'Add Account';
         $('accName').value = '';
         $('accGroup').value = '';
-        $('accRefreshInterval').value = 60;
-        $('accAuditInterval').value = 0;
+        $('accRefreshInterval').value = 5;
+        $('accAuditInterval').value = 60;
         $('accHasGoogle').checked = true;
         $('accHasMeta').checked = false;
         $('accGoogleExternalId').value = '';
@@ -1050,14 +1065,21 @@
     }
 
     async function openEditAccountModal(id) {
+        // Step 6 Phase 1: redirect to main page Manage Accounts for full editing
+        window.location.href = '/';
+        localStorage.setItem('open_manage_accounts','1');
+        return;
+    }
+
+    async function _legacyOpenEditAccountModal(id) {
         const a = allAccounts.find(x => x.id === id);
         if (!a) return;
         editingAccountId = id;
         $('addAccountModal').querySelector('h2').textContent = 'Edit Account';
         $('accName').value = a.name;
         $('accGroup').value = a.group_id || '';
-        $('accRefreshInterval').value = a.refresh_interval_minutes;
-        $('accAuditInterval').value = a.audit_interval_minutes || 0;
+        $('accRefreshInterval').value = a.adpulse_refresh_interval || a.refresh_interval_minutes;
+        $('accAuditInterval').value = a.adpulse_audit_interval || a.audit_interval_minutes || 0;
         $('accHasGoogle').checked = a.has_google;
         $('accHasMeta').checked = a.has_meta;
         $('accGoogleExternalId').value = a.google_external_id || '';
@@ -1197,8 +1219,8 @@
             const payload = {
                 name,
                 group_id: $('accGroup').value ? parseInt($('accGroup').value) : null,
-                refresh_interval_minutes: parseInt($('accRefreshInterval').value) || 60,
-                audit_interval_minutes: parseInt($('accAuditInterval').value) || 0,
+                adpulse_refresh_interval: parseInt($('accRefreshInterval').value) || 5,
+                adpulse_audit_interval: parseInt($('accAuditInterval').value) || 60,
                 has_google: hasGoogle,
                 has_meta: hasMeta,
                 google_external_id: hasGoogle ? $('accGoogleExternalId').value.trim() : null,
