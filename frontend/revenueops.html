@@ -307,10 +307,10 @@
                             <select class="filter-select" id="clientStatusFilter" onchange="loadClients()">
                                 <option value="">All Status</option><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option><option value="on_hold">On Hold</option>
                             </select>
-                            <span style="font-size:0.78rem;color:var(--text-light);">Manage clients from the main page →</span>
+                            <a class="btn btn-secondary btn-sm" href="/" onclick="localStorage.setItem('open_manage_accounts','1')">Manage Accounts</a>
                         </div>
                     </div>
-                    <div class="table-wrap"><table id="clientsTable"><thead><tr><th>Name</th><th>Brand</th><th>BM</th><th>Status</th><th>Invoice Day</th><th>Due Days</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="clientsTable"><thead><tr><th>Account Name</th><th>Brand</th><th>BM</th><th>Status</th><th>Invoice Day</th><th>Due Days</th><th>Contact Person</th><th>Email</th><th>Mobile</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
 
@@ -700,43 +700,81 @@ async function loadClients(){
     clients=[...clients].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
     dashClientsCache=clients; // keep in sync for dashboard filter
     if(currentUser && (currentUser.role==='admin' || currentUser.role==='superadmin')){renderDashAccountFilter();}
-    $('clientsTable').querySelector('tbody').innerHTML=clients.map(c=>`<tr>
-        <td style="font-weight:600">${c.client_name}</td><td>${c.brand_name||'—'}</td><td>${c.business_manager_name||'—'}</td>
-        <td>${statusBadge(c.client_status)}</td><td>${c.invoice_day||'—'}</td><td>${c.default_due_days||'—'}d</td>
-    </tr>`).join('');
+    const canEdit = currentUser && (currentUser.role==='admin' || currentUser.role==='superadmin' || currentUser.rev_role==='finance' || currentUser.rev_role==='business_manager');
+    $('clientsTable').querySelector('tbody').innerHTML=clients.map(c=>{
+        const statusOpts = [['active','Active'],['paused','Paused'],['on_hold','On Hold'],['closed','Closed']];
+        const statusSelect = canEdit
+            ? `<select class="filter-input client-status-select" data-id="${c.id}" onchange="quickEditClientStatus(${c.id}, this.value)" style="min-width:100px">${statusOpts.map(([v,l]) => `<option value="${v}" ${(c.client_status||'active')===v?'selected':''}>${l}</option>`).join('')}</select>`
+            : statusBadge(c.client_status);
+        const invDayInput = canEdit
+            ? `<input type="number" class="filter-input client-day-input" data-id="${c.id}" value="${c.invoice_day||''}" min="1" max="31" onchange="quickEditClientInvoiceDay(${c.id}, this.value)" style="width:70px">`
+            : (c.invoice_day||'—');
+        const dueDaysInput = canEdit
+            ? `<input type="number" class="filter-input client-due-input" data-id="${c.id}" value="${c.default_due_days||''}" min="0" onchange="quickEditClientDueDays(${c.id}, this.value)" style="width:70px">`
+            : (c.default_due_days||'—') + 'd';
+        const actions = canEdit ? `<button class="btn btn-secondary btn-sm" onclick="openClientQuickEdit(${c.id})">Quick Edit</button>` : '—';
+        return `<tr>
+            <td style="font-weight:600">${c.client_name}</td><td>${c.brand_name||'—'}</td><td>${c.business_manager_name||'—'}</td>
+            <td>${statusSelect}</td><td>${invDayInput}</td><td>${dueDaysInput}d</td>
+            <td>${c.contact_person||'—'}</td><td>${c.contact_email||'—'}</td><td>${c.contact_phone||'—'}</td>
+            <td>${actions}</td>
+        </tr>`;
+    }).join('');
 }
 
-async function openClientModal(edit=null){
-    modalMode=edit?'edit':'create';modalEditId=edit?edit.id:null;
-    $('modalTitle').textContent=edit?'Edit Client':'Add Client';
-    let bms=[];
-    try{bms=await api('GET','/business-managers')}catch(e){bms=[]}
-    bms=[...bms].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-    const bmOptions='<option value="">Unassigned</option>'+bms.map(b=>`<option value="${b.id}" ${edit&&edit.business_manager_id===b.id?'selected':''}>${b.name}</option>`).join('');
+async function quickEditClientStatus(id, value) {
+    await quickUpdateClientBilling(id, { client_status: value });
+}
+async function quickEditClientInvoiceDay(id, value) {
+    const day = value ? parseInt(value) : null;
+    await quickUpdateClientBilling(id, { invoice_day: day });
+}
+async function quickEditClientDueDays(id, value) {
+    const days = value ? parseInt(value) : null;
+    await quickUpdateClientBilling(id, { default_due_days: days });
+}
+async function quickUpdateClientBilling(id, data) {
+    try {
+        await api('PUT', `/clients/${id}/billing`, data);
+        toast('Client billing updated');
+        loadClients();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+function openClientQuickEdit(id) {
+    const c = clients.find(x => x.id === id);
+    if (!c) return;
+    modalMode='edit'; modalEditId=id;
+    $('modalTitle').textContent='Quick Edit: ' + c.client_name;
     $('modalBody').innerHTML=`
-        <div class="form-row"><div class="form-group"><label>Client Name *</label><input id="m_clientName" value="${edit?edit.client_name:''}"></div>
-        <div class="form-group"><label>Brand/Project</label><input id="m_brandName" value="${edit?edit.brand_name||'':''}"></div></div>
-        <div class="form-row"><div class="form-group"><label>Client SPOC</label><input id="m_contactPerson" value="${edit?edit.contact_person||'':''}"></div>
-        <div class="form-group"><label>Mobile Number</label><input id="m_contactPhone" value="${edit?edit.contact_phone||'':''}"></div></div>
-        <div class="form-row full"><div class="form-group"><label>Email</label><input id="m_contactEmail" value="${edit?edit.contact_email||'':''}"></div></div>
-        <div class="form-row"><div class="form-group"><label>Business Manager</label><select id="m_businessManager">${bmOptions}</select></div>
-        <div class="form-group"><label>Status</label><select id="m_clientStatus"><option value="active" ${edit&&edit.client_status==='active'?'selected':''}>Active</option><option value="paused" ${edit&&edit.client_status==='paused'?'selected':''}>Paused</option><option value="closed" ${edit&&edit.client_status==='closed'?'selected':''}>Closed</option><option value="on_hold" ${edit&&edit.client_status==='on_hold'?'selected':''}>On Hold</option></select></div></div>
-        <div class="form-row"><div class="form-group"><label>Invoice Day <span style="font-size:.7rem;color:var(--text-light)">(Day of month to raise invoice)</span></label><input type="number" id="m_invoiceDay" value="${edit?edit.invoice_day:1}" min="1" max="28"></div>
-        <div class="form-group"><label>Default Due Days <span style="font-size:.7rem;color:var(--text-light)">(Payment credit period)</span></label><input type="number" id="m_dueDays" value="${edit?edit.default_due_days:30}"></div></div>
-        <div class="form-group"><label>Remarks</label><textarea id="m_remarks">${edit?edit.remarks||'':''}</textarea></div>
+        <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Full account details are managed from the main page → Manage Accounts.</p>
+        <div class="form-row"><div class="form-group"><label>Status</label><select id="m_clientStatus"><option value="active" ${(c.client_status||'active')==='active'?'selected':''}>Active</option><option value="paused" ${c.client_status==='paused'?'selected':''}>Paused</option><option value="closed" ${c.client_status==='closed'?'selected':''}>Closed</option><option value="on_hold" ${c.client_status==='on_hold'?'selected':''}>On Hold</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label>Invoice Day</label><input type="number" id="m_invoiceDay" value="${c.invoice_day||1}" min="1" max="31"></div>
+        <div class="form-group"><label>Default Due Days</label><input type="number" id="m_dueDays" value="${c.default_due_days||30}" min="0"></div></div>
     `;
     $('modalOverlay').style.display='flex';
 }
+
+async function openClientModal(edit=null){
+    // In Phase 1, openClientModal becomes a quick-edit for billing fields only.
+    if (!edit) {
+        window.location.href = '/';
+        localStorage.setItem('open_manage_accounts','1');
+        return;
+    }
+    openClientQuickEdit(edit.id);
+}
+
 
 async function saveModal(){
     const btn=(typeof event!=='undefined'&&event)?event.target:null;
     _setSaving(btn);
     try{
-        if($('m_clientName')){
-            const bm=$('m_businessManager').value;
-            const data={client_name:$('m_clientName').value,brand_name:$('m_brandName').value,contact_person:$('m_contactPerson').value,contact_email:$('m_contactEmail').value,contact_phone:$('m_contactPhone').value,business_manager_id:bm?parseInt(bm):null,client_status:$('m_clientStatus').value,invoice_day:parseInt($('m_invoiceDay').value)||1,default_due_days:parseInt($('m_dueDays').value)||30,remarks:$('m_remarks').value};
-            if(modalEditId)await api('PUT',`/clients/${modalEditId}`,data);else await api('POST','/clients',data);
-            toast(modalEditId?'Client updated':'Client added');loadClients();closeModal();return;
+        if($('m_clientStatus')){
+            // Phase 1 quick-edit only: status, invoice day, due days
+            const data={client_status:$('m_clientStatus').value,invoice_day:parseInt($('m_invoiceDay').value)||1,default_due_days:parseInt($('m_dueDays').value)||30};
+            await api('PUT',`/clients/${modalEditId}/billing`,data);
+            toast('Client billing updated');loadClients();closeModal();return;
         }
         if($('m_invClient')){
             const from=$('m_invPeriodFrom').value;const to=$('m_invPeriodTo').value;

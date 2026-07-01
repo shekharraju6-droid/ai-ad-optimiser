@@ -21,6 +21,7 @@ from backend.db.revenueops_models import (
     FollowupNote, AuditLog, RevSetting, RevRole,
 )
 from backend.routes.auth import get_current_user_required
+from backend.routes.accounts import _filter_accounts_for_user as _filter_accounts_for_user_helper
 
 router = APIRouter(prefix="/api/revenueops", tags=["revenueops"])
 
@@ -40,7 +41,7 @@ def _check_rev_role(user: User, allowed_roles: list):
 
 
 def _bm_client_filter(query, user: User):
-    """Filter RevClient visibility by role.
+    """Filter RevClient visibility by role using central Account linkage.
 
     - superadmin/admin: see all clients.
     - business_manager: see only clients where business_manager_id == user.id.
@@ -51,16 +52,71 @@ def _bm_client_filter(query, user: User):
         return query
     if user.rev_role == "business_manager":
         return query.filter(RevClient.business_manager_id == user.id)
-    # Regular user: restrict to assigned accounts. RevClient is linked to Account
-    # via Account.rev_client_id.
+    # Regular user: restrict to assigned accounts.
     assigned_ids = user.assigned_account_ids()
     if not assigned_ids:
         return query.filter(false())
     return query.join(
         Account,
-        Account.rev_client_id == RevClient.id,
+        or_(
+            Account.rev_client_id == RevClient.id,
+            RevClient.account_id == Account.id,
+        ),
         isouter=False,
     ).filter(Account.id.in_(assigned_ids))
+
+
+def _client_view_query(db: Session, user: User):
+    """Return a query that joins RevClient with central Account so RevenueOps lists
+    show the single client master fields while keeping RevClient.id as the client_id
+    anchor for invoices/payments.
+    """
+    q = db.query(RevClient, Account).join(
+        Account,
+        or_(
+            Account.rev_client_id == RevClient.id,
+            RevClient.account_id == Account.id,
+        ),
+        isouter=True,
+    )
+    q = _bm_client_filter(q.with_entities(RevClient, Account), user)
+    # _bm_client_filter operates on a RevClient query; restoring projection
+    q = db.query(RevClient, Account).select_from(q.subquery())
+    return q
+
+
+def _client_view_dict(rev_client: RevClient, account: Account = None):
+    """Build a unified client dict preferring central Account fields but keeping
+    RevClient.id as the canonical client_id.
+    """
+    bm = rev_client.business_manager
+    bm_name = bm.full_name or bm.email if bm else None
+    if account:
+        # Prefer central account fields, fallback to RevClient fields
+        return {
+            "id": rev_client.id,
+            "account_id": account.id,
+            "client_name": account.name or rev_client.client_name,
+            "brand_name": account.brand_name or rev_client.brand_name,
+            "company_name": rev_client.company_name,
+            "contact_person": account.contact_person or rev_client.contact_person,
+            "contact_email": account.contact_email or rev_client.contact_email,
+            "contact_phone": account.contact_phone or rev_client.contact_phone,
+            "business_manager_id": account.business_manager_id or rev_client.business_manager_id,
+            "business_manager_name": bm_name,
+            "client_status": (account.client_status or "Active").lower().replace(" ", "_"),
+            "invoice_day": account.invoice_day if account.invoice_day is not None else rev_client.invoice_day,
+            "default_due_days": account.payment_due_days if account.payment_due_days is not None else rev_client.default_due_days,
+            "billing_amount": account.billing_amount,
+            "gst_number": account.gst_number,
+            "address": account.address,
+            "state": account.state,
+            "state_code": account.state_code,
+            "remarks": rev_client.remarks,
+            "created_at": rev_client.created_at.isoformat() if rev_client.created_at else None,
+            "updated_at": rev_client.updated_at.isoformat() if rev_client.updated_at else None,
+        }
+    return rev_client.to_dict()
 
 
 def _dashboard_client_filter_for_user(query, user: User):
@@ -77,7 +133,12 @@ def _dashboard_client_filter_for_user(query, user: User):
     if not assigned_ids:
         return db.query(RevClient.id).filter(false())
     return db.query(RevClient.id).join(
-        Account, Account.rev_client_id == RevClient.id, isouter=False
+        Account,
+        or_(
+            Account.rev_client_id == RevClient.id,
+            RevClient.account_id == Account.id,
+        ),
+        isouter=False,
     ).filter(Account.id.in_(assigned_ids))
 
 
@@ -183,7 +244,71 @@ def list_clients(search: Optional[str] = None, status: Optional[str] = None, bm:
         q = q.filter(RevClient.client_status == status)
     if bm:
         q = q.filter(RevClient.business_manager_id == bm)
-    return [c.to_dict() for c in q.order_by(RevClient.client_name).all()]
+    rows = q.order_by(RevClient.client_name).all()
+    # Build unified view by joining central accounts
+    result = []
+    for rc in rows:
+        account = db.query(Account).filter(
+            or_(
+                Account.rev_client_id == rc.id,
+                Account.id == rc.account_id,
+            )
+        ).first()
+        result.append(_client_view_dict(rc, account))
+    return result
+
+
+class ClientBillingQuickUpdate(BaseModel):
+    client_status: Optional[str] = None
+    invoice_day: Optional[int] = None
+    default_due_days: Optional[int] = None
+
+
+@router.put("/clients/{client_id}/billing")
+def update_client_billing(
+    client_id: int,
+    req: ClientBillingQuickUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
+):
+    """Quick edit of billing-only fields from RevenueOps. Updates the linked central
+    Account and keeps RevClient in sync for legacy invoice/payment lookups.
+    """
+    _check_rev_role(user, ["admin", "finance", "business_manager"])
+    c = db.query(RevClient).filter(RevClient.id == client_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if user.rev_role == "business_manager" and c.business_manager_id != user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    account = db.query(Account).filter(
+        or_(
+            Account.rev_client_id == c.id,
+            Account.id == c.account_id,
+        )
+    ).first()
+
+    old = json.dumps(c.to_dict())
+    if req.client_status is not None:
+        normalized = (req.client_status or "Active").lower().replace(" ", "_")
+        c.client_status = normalized
+        if account:
+            account.client_status = req.client_status or "Active"
+    if req.invoice_day is not None:
+        c.invoice_day = req.invoice_day
+        if account:
+            account.invoice_day = req.invoice_day
+    if req.default_due_days is not None:
+        c.default_due_days = req.default_due_days
+        if account:
+            account.payment_due_days = req.default_due_days
+
+    db.commit()
+    db.refresh(c)
+    if account:
+        db.refresh(account)
+    _audit(db, user.id, "update_client_billing", "client", c.id, old_val=old, new_val=json.dumps(c.to_dict()))
+    return _client_view_dict(c, account)
 
 
 @router.get("/clients/{client_id}")
@@ -193,7 +318,13 @@ def get_client(client_id: int, db: Session = Depends(get_db), user: User = Depen
         raise HTTPException(status_code=404, detail="Client not found")
     if user.rev_role == "business_manager" and c.business_manager_id != user.id:
         raise HTTPException(status_code=403, detail="Access denied")
-    return c.to_dict()
+    account = db.query(Account).filter(
+        or_(
+            Account.rev_client_id == c.id,
+            Account.id == c.account_id,
+        )
+    ).first()
+    return _client_view_dict(c, account)
 
 
 @router.post("/clients")
@@ -934,7 +1065,14 @@ def dashboard(
             else:
                 visible_client_ids = (
                     db.query(RevClient.id)
-                    .join(Account, Account.rev_client_id == RevClient.id, isouter=False)
+                    .join(
+                        Account,
+                        or_(
+                            Account.rev_client_id == RevClient.id,
+                            RevClient.account_id == Account.id,
+                        ),
+                        isouter=False,
+                    )
                     .filter(Account.id.in_(assigned_ids))
                     .subquery()
                 )
