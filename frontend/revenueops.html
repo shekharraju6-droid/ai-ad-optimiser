@@ -604,7 +604,7 @@ async function sendVoiceCommand() {
     if (!voiceChunks.length) return;
     const blob = new Blob(voiceChunks, { type: 'audio/mp3' });
     const form = new FormData();
-    form.append('audio', blob, 'voice_command.mp3');
+    form.append('file', blob, 'voice_command.mp3');
     toast('Processing voice command...', 'info');
     try {
         const res = await fetch('/api/voice/command', { method: 'POST', body: form, headers: { 'Authorization': 'Bearer ' + token } });
@@ -619,29 +619,39 @@ async function sendVoiceCommand() {
 }
 
 function handleVoicePayload(payload) {
-    const cmd = payload.command || {};
-    if (cmd.action === 'REFRESH_ADS') {
-        toast(`Refresh ads: ${cmd.target_platform}`);
-        const container = $('live-ad-container');
-        if (container) container.innerHTML = renderVoiceAdHTML(payload.data);
-    } else if (cmd.action === 'GENERATE_REPORT') {
-        toast(`Generate report: ${cmd.target_platform} (${cmd.timeframe})`);
-        runReport(cmd.timeframe || 'outstanding');
-    } else if (cmd.action === 'SWITCH_DASHBOARD') {
-        const target = (cmd.target_platform || 'dashboard').toLowerCase();
-        const map = { adpulse: 'dashboard', insightdesk: 'dashboard', revenueops: 'dashboard', dashboard: 'dashboard' };
-        showPanel(map[target] || 'dashboard');
-        toast(`Switched to ${target}`);
+    const action = (payload.action || '').toUpperCase();
+    const module = (payload.target_module || '').toLowerCase();
+    const params = payload.parameters || {};
+    
+    if (action === 'REFRESH_METRICS') {
+        toast(`Refreshing metrics for ${module}...`);
+        if (module === 'revenueops') { loadDashboard(); }
+        else if (module === 'adpulse') { /* trigger AdPulse refresh here */ }
+        else if (module === 'insightdesk') { /* trigger InsightDesk refresh here */ }
+    } else if (action === 'SWITCH_TAB') {
+        const tabId = params.tab_id || 'dashboard';
+        const panelMap = {
+            dashboard: 'dashboard',
+            clients: 'clients',
+            invoices: 'invoices',
+            payments: 'payments',
+            outstanding: 'outstanding',
+            reminders: 'reminders',
+            documents: 'documents',
+            reports: 'reports',
+            settings: 'settings',
+            users: 'users'
+        };
+        if (panelMap[tabId]) showPanel(panelMap[tabId]);
+        toast(`Switched to ${tabId}`);
+    } else if (action === 'OPEN_MODAL') {
+        const modalType = params.modal_type || 'invoice';
+        if (modalType === 'invoice') openInvoiceModal();
+        else if (modalType === 'client') openClientModal();
+        toast(`Opened ${modalType} modal`);
     } else {
-        toast('Unknown voice command: ' + cmd.action, 'error');
+        toast('Unknown voice command: ' + action, 'error');
     }
-}
-
-function renderVoiceAdHTML(data) {
-    if (!data || !data.ads || !data.ads.length) {
-        return `<div class="card"><div class="card-header"><span class="card-title">Voice Refresh Result</span></div><p>${data.note || 'No data'}</p></div>`;
-    }
-    return `<div class="card"><div class="card-header"><span class="card-title">Voice Refresh: ${data.platform}</span></div><p>${data.ads.length} ads loaded</p></div>`;
 }
 
 // DASHBOARD
