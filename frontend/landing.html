@@ -1053,9 +1053,10 @@
             setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(10px)'; setTimeout(() => el.remove(), 300); }, 3000);
         }
 
-        micBtn.addEventListener('mousedown', async () => {
+        let _recordingActive = false;
+        async function _startRecording() {
             audioChunks = [];
-            console.log('[Rudra] mic pressed — requesting mic access');
+            console.log('[Rudra] starting recording (click-to-start)');
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
@@ -1065,9 +1066,10 @@
                     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                     console.log('[Rudra] recording stopped. Blob size:', audioBlob.size, 'chunks:', audioChunks.length);
                     if (audioBlob.size === 0) {
-                        toast('No audio captured. Press and hold the mic while speaking.', 'error');
+                        toast('No audio captured. Click the mic, speak, then click again to stop.', 'error');
                         statusText.style.display = 'none';
                         micBtn.style.backgroundColor = '#4F46E5';
+                        _recordingActive = false;
                         return;
                     }
                     const formData = new FormData();
@@ -1100,23 +1102,37 @@
                     } finally {
                         statusText.style.display = 'none';
                         micBtn.style.backgroundColor = '#4F46E5';
+                        _recordingActive = false;
                     }
                 };
                 mediaRecorder.start();
                 statusText.style.display = 'block';
-                statusText.innerText = "Listening...";
+                statusText.innerText = "Listening... (click again to stop)";
                 micBtn.style.backgroundColor = '#DC2626';
-                console.log('[Rudra] recording started');
+                _recordingActive = true;
+                console.log('[Rudra] recording started — click again to stop');
             } catch (err) {
                 console.error('[Rudra] microphone access denied:', err);
                 toast("Microphone access denied: " + (err.message || ''), "error");
+                _recordingActive = false;
+                micBtn.style.backgroundColor = '#4F46E5';
             }
-        });
+        }
 
-        micBtn.addEventListener('mouseup', () => {
+        function _stopRecording() {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+            _recordingActive = false;
+        }
+
+        micBtn.addEventListener('click', async () => {
+            if (_recordingActive) {
+                console.log('[Rudra] stopping recording (click-to-stop)');
+                _stopRecording();
+            } else {
+                await _startRecording();
             }
         });
 

@@ -1675,7 +1675,8 @@ function closeModal(){$('modalOverlay').style.display='none'; editingUserId=null
 
     if (!micBtn) return;
 
-    micBtn.addEventListener('mousedown', async () => {
+    let _recordingActive = false;
+    async function _startRecording() {
         audioChunks = [];
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1697,31 +1698,50 @@ function closeModal(){$('modalOverlay').style.display='none'; editingUserId=null
                         body: formData,
                         headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('adoptima_token') || '') }
                     });
+                    if (!response.ok) {
+                        let errMsg = 'Rudra could not process the command (server error)';
+                        try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch (e) {}
+                        if (typeof toast === "function") toast(errMsg, "error");
+                        return;
+                    }
                     const result = await response.json();
+                    if (!result || !result.action) {
+                        if (typeof toast === "function") toast('Rudra did not return an action. Try rephrasing.', "error");
+                        return;
+                    }
                     handleVoiceAction(result);
                 } catch (err) {
                     console.error("Voice routing failure:", err);
-                    if (typeof toast === "function") toast("Voice command failed", "error");
+                    if (typeof toast === "function") toast("Voice command failed: " + (err.message || 'network error'), "error");
                 } finally {
                     statusText.style.display = 'none';
                     micBtn.style.backgroundColor = '#4F46E5';
+                    _recordingActive = false;
                 }
             };
 
             mediaRecorder.start();
             statusText.style.display = 'block';
-            statusText.innerText = "Listening...";
+            statusText.innerText = "Listening... (click again to stop)";
             micBtn.style.backgroundColor = '#DC2626';
+            _recordingActive = true;
         } catch (err) {
             console.error("Microphone access denied:", err);
             if (typeof toast === "function") toast("Microphone access denied", "error");
+            _recordingActive = false;
+            micBtn.style.backgroundColor = '#4F46E5';
         }
-    });
+    }
 
-    micBtn.addEventListener('mouseup', () => {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            mediaRecorder.stop();
-            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    micBtn.addEventListener('click', async () => {
+        if (_recordingActive) {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+            _recordingActive = false;
+        } else {
+            await _startRecording();
         }
     });
 

@@ -2158,7 +2158,8 @@
         const statusText = document.getElementById('voice-status-text');
         if (!micBtn) return;
 
-        micBtn.addEventListener('mousedown', async () => {
+        let _recordingActive = false;
+        async function _startRecording() {
             audioChunks = [];
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -2175,30 +2176,49 @@
                             body: formData,
                             headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('adoptima_token') || '') }
                         });
+                        if (!response.ok) {
+                            let errMsg = 'Rudra could not process the command (server error)';
+                            try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch (e) {}
+                            toast(errMsg, true);
+                            return;
+                        }
                         const result = await response.json();
+                        if (!result || !result.action) {
+                            toast('Rudra did not return an action. Try rephrasing.', true);
+                            return;
+                        }
                         handleVoiceAction(result);
                     } catch (err) {
                         console.error("Voice routing failure:", err);
-                        toast("Voice command failed", true);
+                        toast("Voice command failed: " + (err.message || 'network error'), true);
                     } finally {
                         statusText.style.display = 'none';
                         micBtn.style.backgroundColor = '#4F46E5';
+                        _recordingActive = false;
                     }
                 };
                 mediaRecorder.start();
                 statusText.style.display = 'block';
-                statusText.innerText = "Listening...";
+                statusText.innerText = "Listening... (click again to stop)";
                 micBtn.style.backgroundColor = '#DC2626';
+                _recordingActive = true;
             } catch (err) {
                 console.error("Microphone access denied:", err);
                 toast("Microphone access denied", true);
+                _recordingActive = false;
+                micBtn.style.backgroundColor = '#4F46E5';
             }
-        });
+        }
 
-        micBtn.addEventListener('mouseup', () => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        micBtn.addEventListener('click', async () => {
+            if (_recordingActive) {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+                _recordingActive = false;
+            } else {
+                await _startRecording();
             }
         });
 
