@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import traceback
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from google import genai
 from google.genai import types
@@ -111,4 +112,6 @@ async def process_voice_command(file: UploadFile = File(...)):
         
     except Exception as e:
         logger.error(f"[Rudra] command failed: {e}", exc_info=True)
+        tb = traceback.format_exc()
+        print(f"[Rudra] Voice command error traceback:\n{tb}")
         raise HTTPException(status_code=500, detail=str(e))
