@@ -52,7 +52,8 @@ def _build_voice_schema():
                 _strip_additional_properties(item)
 
     _strip_additional_properties(schema)
-    schema["additionalProperties"] = True
+    # Do NOT re-add 'additionalProperties'. Gemini Developer API rejects
+    # any schema that contains this key (True or False).
     return schema
 
 # 2. The API endpoint handling your spoken audio file
