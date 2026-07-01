@@ -210,7 +210,7 @@
                     <span class="nav-section-arrow">▶</span><span>Management</span>
                 </div>
                 <div class="nav-section-items">
-                    <div class="nav-item" onclick="showPanel('clients')">👥 Clients</div>
+                    <div class="nav-item" onclick="showPanel('clients')">👥 Client/Brand</div>
                     <div class="nav-item" onclick="showPanel('invoices')">🧾 Invoices</div>
                     <div class="nav-item" onclick="showPanel('payments')">💳 Payments</div>
                     <div class="nav-item" onclick="showPanel('outstanding')">⏳ Outstanding</div>
@@ -302,7 +302,7 @@
             <div class="panel" id="panel-clients">
                 <div class="card">
                     <div class="card-header">
-                        <span class="card-title">Clients</span>
+                        <span class="card-title">Client/Brand</span>
                         <div class="filters">
                             <input class="filter-input" placeholder="Search..." id="clientSearch" oninput="loadClients()">
                             <select class="filter-select" id="clientStatusFilter" onchange="loadClients()">
@@ -311,7 +311,7 @@
                             <a class="btn btn-secondary btn-sm" href="/" onclick="localStorage.setItem('open_manage_accounts','1')">Manage Accounts</a>
                         </div>
                     </div>
-                    <div class="table-wrap"><table id="clientsTable"><thead><tr><th>Account Name</th><th>Legal/Billing Entity</th><th>BM</th><th>Status</th><th>Invoice Day</th><th>Due Days</th><th>Contact Person</th><th>Email</th><th>Mobile</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="clientsTable"><thead><tr><th>Client/Brand</th><th>Legal/Billing Entity</th><th>BM</th><th>Status</th><th>Invoice Day</th><th>Due Days</th><th>Contact Person</th><th>Email</th><th>Mobile</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
 
