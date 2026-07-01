@@ -3,11 +3,15 @@ Background scheduler for running automatic audits and metric refreshes.
 Reads global and per-account audit intervals.
 """
 import logging
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timedelta, date
+from typing import Dict, Any
 from apscheduler.schedulers.background import BackgroundScheduler
 from backend.services.auditor import audit_account, audit_all_accounts
+from backend.services.keyword_auditor import run_keyword_audit
+from backend.services.search_term_auditor import run_search_term_audit
 from backend.db.database import SessionLocal
-from backend.db.models import Account, AccountStatus
+from backend.db.models import Account, AccountStatus, AuditRun
 from backend.services.config import load_config
 
 logger = logging.getLogger("AdOptima")
@@ -25,8 +29,125 @@ def start_scheduler():
     _scheduler.add_job(_auto_refresh_live_metrics, 'interval', minutes=15, id='auto_metrics_refresh', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(seconds=30))
     # Incremental LeadSquared lead mirror sync every 3 hours (and once at startup)
     _scheduler.add_job(_sync_lsq_leads, 'interval', hours=3, id='lsq_lead_mirror_sync', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(minutes=2))
+    # Daily smart keyword + search term audit at 8:00 AM IST = 2:30 AM UTC
+    _scheduler.add_job(_run_daily_smart_audit, 'cron', hour=2, minute=30, id='daily_smart_audit', replace_existing=True)
     _scheduler.start()
     logger.info("Background scheduler started")
+
+
+def _run_daily_smart_audit():
+    """Run keyword audit + search term audit for all active Google Ads accounts."""
+    from datetime import date
+    logger.info("Daily smart keyword + search term audit started")
+    db = SessionLocal()
+    run = None
+    try:
+        run = AuditRun(
+            run_date=date.today(),
+            run_type="daily_scheduled",
+            start_time=datetime.utcnow(),
+            status="pending",
+        )
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+
+        accounts = db.query(Account).filter(Account.is_active == True, Account.has_google == True, Account.google_is_live == True).all()
+        total_kw = 0
+        total_st = 0
+        errors = []
+        accounts_audited = 0
+
+        for account in accounts:
+            try:
+                logger.info(f"Smart auditing account: {account.name} (id={account.id})")
+                kw_result = run_keyword_audit(account.id, db=db)
+                time.sleep(5)
+                st_result = run_search_term_audit(account.id, db=db)
+                time.sleep(5)
+
+                kw_count = kw_result.get("actions_generated", 0)
+                st_count = st_result.get("actions_generated", 0)
+                total_kw += kw_count
+                total_st += st_count
+                accounts_audited += 1
+                logger.info(f"Smart audit {account.name}: keyword_flags={kw_count}, search_term_flags={st_count}")
+                if kw_result.get("error"):
+                    errors.append(f"{account.name} keyword: {kw_result['error']}")
+                if st_result.get("error"):
+                    errors.append(f"{account.name} search_term: {st_result['error']}")
+            except Exception as e:
+                logger.error(f"Smart audit failed for account {account.id}: {e}", exc_info=True)
+                errors.append(f"{account.name}: {str(e)}")
+
+        run.end_time = datetime.utcnow()
+        run.accounts_audited = accounts_audited
+        run.total_keyword_flags = total_kw
+        run.total_search_term_flags = total_st
+        run.status = "completed" if not errors else "partial"
+        if errors:
+            run.error_log = "\n".join(errors)
+        db.commit()
+        logger.info(f"Daily smart audit completed: accounts={accounts_audited}, keyword_flags={total_kw}, search_term_flags={total_st}")
+    except Exception as e:
+        logger.error(f"Daily smart audit orchestration failed: {e}", exc_info=True)
+        if run:
+            try:
+                run.end_time = datetime.utcnow()
+                run.status = "failed"
+                run.error_log = str(e)
+                db.commit()
+            except Exception:
+                pass
+    finally:
+        db.close()
+
+
+def run_manual_smart_audit(account_id: int) -> Dict[str, Any]:
+    """Manual on-demand smart audit for a single account."""
+    from datetime import date
+    db = SessionLocal()
+    try:
+        run = AuditRun(
+            run_date=date.today(),
+            run_type="manual",
+            start_time=datetime.utcnow(),
+            status="pending",
+        )
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+
+        kw_result = run_keyword_audit(account_id, db=db)
+        st_result = run_search_term_audit(account_id, db=db)
+
+        run.end_time = datetime.utcnow()
+        run.accounts_audited = 1
+        run.total_keyword_flags = kw_result.get("actions_generated", 0)
+        run.total_search_term_flags = st_result.get("actions_generated", 0)
+        run.status = "completed" if not (kw_result.get("error") or st_result.get("error")) else "partial"
+        if kw_result.get("error") or st_result.get("error"):
+            run.error_log = "\n".join([kw_result.get("error", ""), st_result.get("error", "")]).strip()
+        db.commit()
+
+        return {
+            "audit_run_id": run.id,
+            "keyword_audit": kw_result,
+            "search_term_audit": st_result,
+        }
+    except Exception as e:
+        logger.error(f"Manual smart audit failed for account {account_id}: {e}", exc_info=True)
+        if run:
+            try:
+                run.end_time = datetime.utcnow()
+                run.status = "failed"
+                run.error_log = str(e)
+                db.commit()
+            except Exception:
+                pass
+        return {"error": str(e)}
+    finally:
+        db.close()
 
 
 def stop_scheduler():

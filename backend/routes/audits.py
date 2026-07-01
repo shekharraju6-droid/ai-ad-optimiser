@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from backend.db.database import get_db
 from backend.db.models import PendingAction
 from backend.services.auditor import audit_account, audit_all_accounts, review_action, list_pending_actions
+from backend.services.scheduler import run_manual_smart_audit
+from backend.services.audit_settings import get_audit_settings, set_audit_setting
 from backend.services.notifications import dispatch
 
 router = APIRouter(prefix="/api", tags=["audits"])
@@ -16,6 +18,43 @@ router = APIRouter(prefix="/api", tags=["audits"])
 class ReviewRequest(BaseModel):
     decision: str  # "approve" or "reject"
     reviewer: str = "admin"
+
+
+class AuditSettingUpdate(BaseModel):
+    value: str
+
+
+@router.get("/audit-settings")
+def list_audit_settings():
+    return get_audit_settings()
+
+
+@router.put("/audit-settings/{key}")
+def update_audit_setting(key: str, req: AuditSettingUpdate):
+    try:
+        return set_audit_setting(key, req.value)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/accounts/{account_id}/smart-audit")
+def run_smart_audit_for_account(account_id: int, db: Session = Depends(get_db)):
+    """Run keyword + search term audit for a single account on demand."""
+    result = run_manual_smart_audit(account_id)
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    total_actions = (
+        result.get("keyword_audit", {}).get("actions_generated", 0)
+        + result.get("search_term_audit", {}).get("actions_generated", 0)
+    )
+    if total_actions > 0:
+        dispatch(
+            "audit_complete",
+            f"Smart audit complete for account {account_id}",
+            f"{total_actions} keyword/search-term actions generated.",
+            db,
+        )
+    return result
 
 
 @router.post("/accounts/{account_id}/audit")
@@ -93,4 +132,10 @@ def get_account_campaigns(account_id: int, platform: Optional[str] = None, db: S
             return connector.fetch_campaigns()
     return []
 
-    return []
+
+@router.get("/audit-runs")
+def list_audit_runs(limit: int = 30, db: Session = Depends(get_db)):
+    """Return recent smart audit runs (keyword + search term audits)."""
+    from backend.db.models import AuditRun
+    runs = db.query(AuditRun).order_by(AuditRun.start_time.desc()).limit(limit).all()
+    return [r.to_dict() for r in runs]

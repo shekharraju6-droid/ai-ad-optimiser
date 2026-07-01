@@ -3,17 +3,16 @@ import json
 import logging
 import traceback
 from fastapi import APIRouter, HTTPException, Request
-from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+from backend.services.ai_client import get_gemini_client
 
 logger = logging.getLogger("AdOptima")
 
 router = APIRouter(prefix="/api/voice", tags=["voice-control"])
 
 # Initialize the Gemini Client
-# (Picks up GEMINI_API_KEY from your Railway environment variables)
-client = genai.Client()
+client = get_gemini_client()
 
 # 1. Define the JSON schema Gemini MUST respond with
 class VoiceActionResponse(BaseModel):

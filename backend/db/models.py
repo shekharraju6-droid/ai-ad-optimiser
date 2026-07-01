@@ -126,10 +126,14 @@ class Account(Base):
     state = Column(String, nullable=True)
     state_code = Column(String, nullable=True)
 
+    # Keyword / search term audit brand settings
+    brand_keywords = Column(Text, nullable=True)  # comma-separated brand terms
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     group = relationship("AccountGroup", back_populates="accounts")
+    campaign_type_tags = relationship("CampaignTypeTag", back_populates="account", cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
@@ -189,12 +193,93 @@ class Account(Base):
             "billing_cache": self.billing_cache,
             "rev_client_id": self.rev_client_id,
             "brand_name": self.brand_name,
+            "brand_keywords": self.brand_keywords,
             "contact_person": self.contact_person,
             "contact_email": self.contact_email,
             "contact_phone": self.contact_phone,
             "business_manager_id": self.business_manager_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class CampaignTypeTag(Base):
+    """Manual/auto campaign type tags for brand vs non-brand detection."""
+    __tablename__ = "campaign_type_tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    campaign_id = Column(String, nullable=False)
+    campaign_name = Column(String, nullable=True)
+    campaign_type = Column(String, default="auto")  # brand, non_brand, auto
+    updated_by = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    account = relationship("Account", back_populates="campaign_type_tags")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "account_id": self.account_id,
+            "campaign_id": self.campaign_id,
+            "campaign_name": self.campaign_name,
+            "campaign_type": self.campaign_type,
+            "updated_by": self.updated_by,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class AuditRun(Base):
+    __tablename__ = "audit_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_date = Column(Date, nullable=False)
+    run_type = Column(String, nullable=False)  # daily_scheduled or manual
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=True)
+    accounts_audited = Column(Integer, default=0)
+    total_keyword_flags = Column(Integer, default=0)
+    total_search_term_flags = Column(Integer, default=0)
+    status = Column(String, default="pending")  # pending, completed, failed, partial
+    error_log = Column(Text, nullable=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "run_date": str(self.run_date) if self.run_date else None,
+            "run_type": self.run_type,
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "end_time": self.end_time.isoformat() if self.end_time else None,
+            "accounts_audited": self.accounts_audited,
+            "total_keyword_flags": self.total_keyword_flags,
+            "total_search_term_flags": self.total_search_term_flags,
+            "status": self.status,
+            "error_log": self.error_log,
+        }
+
+
+class SuppressedSearchTerm(Base):
+    __tablename__ = "suppressed_search_terms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    campaign_id = Column(String, nullable=False)
+    search_term = Column(String, nullable=False)
+    suppressed_until = Column(Date, nullable=False)
+    rejected_by = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    account = relationship("Account")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "account_id": self.account_id,
+            "campaign_id": self.campaign_id,
+            "search_term": self.search_term,
+            "suppressed_until": str(self.suppressed_until) if self.suppressed_until else None,
+            "rejected_by": self.rejected_by,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 

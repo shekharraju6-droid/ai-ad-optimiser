@@ -223,7 +223,7 @@ class GoogleAdsConnector(AdsConnector):
             budget_start = active_budget.approved_start_date_time or ""
 
             # Step 2: Fetch spend since budget start date
-            # Parse start date: "2026-04-02 09:36:11" → "2026-04-02"
+            # Parse start date: "2026-04-02 09:36:11" -> "2026-04-02"
             spend_start = budget_start[:10] if budget_start else "2026-01-01"
             query_spend = f"""
                 SELECT
@@ -253,6 +253,224 @@ class GoogleAdsConnector(AdsConnector):
         except Exception as e:
             logger.warning(f"Google fetch billing failed for account {self.account.id}: {e}")
             return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+
+    def fetch_keywords(self) -> List[Dict[str, Any]]:
+        """Fetch active keywords with 30-day performance metrics."""
+        if not self.is_valid:
+            return []
+        customer_id = (self.account.google_external_id or self.account.external_id or "").replace("-", "")
+        if not customer_id:
+            return []
+        date_clause = self._date_clause()
+        query = f"""
+            SELECT
+              campaign.id,
+              campaign.name,
+              ad_group.id,
+              ad_group.name,
+              ad_group_criterion.criterion_id,
+              ad_group_criterion.keyword.text,
+              ad_group_criterion.keyword.match_type,
+              ad_group_criterion.status,
+              metrics.cost_micros,
+              metrics.conversions,
+              metrics.clicks,
+              metrics.impressions,
+              metrics.ctr,
+              metrics.average_cpc
+            FROM keyword_view
+            WHERE {date_clause}
+              AND campaign.status = 'ENABLED'
+              AND ad_group.status = 'ENABLED'
+              AND ad_group_criterion.status = 'ENABLED'
+        """
+        try:
+            service = self.client.get_service("GoogleAdsService")
+            response = service.search(customer_id=customer_id, query=query)
+            results = []
+            for row in response:
+                cost = (row.metrics.cost_micros or 0) / 1_000_000.0
+                clicks = row.metrics.clicks or 0
+                impressions = row.metrics.impressions or 0
+                conversions = row.metrics.conversions or 0
+                ctr = round((row.metrics.ctr or 0) * 100, 2)
+                results.append({
+                    "campaign_id": str(row.campaign.id),
+                    "campaign_name": row.campaign.name,
+                    "ad_group_id": str(row.ad_group.id),
+                    "ad_group_name": row.ad_group.name,
+                    "criterion_id": str(row.ad_group_criterion.criterion_id),
+                    "text": row.ad_group_criterion.keyword.text,
+                    "match_type": str(row.ad_group_criterion.keyword.match_type).replace("KeywordMatchType.", ""),
+                    "status": str(row.ad_group_criterion.status),
+                    "spend": cost,
+                    "conversions": conversions,
+                    "clicks": clicks,
+                    "impressions": impressions,
+                    "ctr": ctr,
+                    "average_cpc": (row.metrics.average_cpc or 0) / 1_000_000.0,
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Google fetch keywords failed for account {self.account.id}: {e}")
+            return []
+
+    def fetch_search_terms(self, campaign_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Fetch search term report for last 30 days with metrics."""
+        if not self.is_valid:
+            return []
+        customer_id = (self.account.google_external_id or self.account.external_id or "").replace("-", "")
+        if not customer_id:
+            return []
+        date_clause = self._date_clause()
+        campaign_filter = f" AND campaign.id = '{campaign_id}'" if campaign_id else ""
+        query = f"""
+            SELECT
+              campaign.id,
+              campaign.name,
+              ad_group.id,
+              ad_group.name,
+              search_term_view.search_term,
+              search_term_view.status,
+              metrics.cost_micros,
+              metrics.conversions,
+              metrics.clicks,
+              metrics.impressions,
+              metrics.ctr
+            FROM search_term_view
+            WHERE {date_clause}
+              AND campaign.status = 'ENABLED'
+              AND metrics.impressions > 0
+              {campaign_filter}
+        """
+        try:
+            service = self.client.get_service("GoogleAdsService")
+            response = service.search(customer_id=customer_id, query=query)
+            results = []
+            for row in response:
+                cost = (row.metrics.cost_micros or 0) / 1_000_000.0
+                clicks = row.metrics.clicks or 0
+                impressions = row.metrics.impressions or 0
+                conversions = row.metrics.conversions or 0
+                ctr = round((row.metrics.ctr or 0) * 100, 2)
+                results.append({
+                    "campaign_id": str(row.campaign.id),
+                    "campaign_name": row.campaign.name,
+                    "ad_group_id": str(row.ad_group.id),
+                    "ad_group_name": row.ad_group.name,
+                    "term": row.search_term_view.search_term,
+                    "status": str(row.search_term_view.status),
+                    "spend": cost,
+                    "conversions": conversions,
+                    "clicks": clicks,
+                    "impressions": impressions,
+                    "ctr": ctr,
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Google fetch search terms failed for account {self.account.id}: {e}")
+            return []
+
+    def fetch_campaign_negative_keywords(self, campaign_id: str) -> List[Dict[str, Any]]:
+        """Fetch existing negative keywords at campaign level for a specific campaign."""
+        if not self.is_valid:
+            return []
+        customer_id = (self.account.google_external_id or self.account.external_id or "").replace("-", "")
+        if not customer_id:
+            return []
+        query = f"""
+            SELECT
+              campaign_criterion.criterion_id,
+              campaign_criterion.keyword.text,
+              campaign_criterion.keyword.match_type,
+              campaign_criterion.negative
+            FROM campaign_criterion
+            WHERE campaign.id = '{campaign_id}'
+              AND campaign_criterion.type = 'KEYWORD'
+              AND campaign_criterion.negative = TRUE
+        """
+        try:
+            service = self.client.get_service("GoogleAdsService")
+            response = service.search(customer_id=customer_id, query=query)
+            results = []
+            for row in response:
+                results.append({
+                    "criterion_id": str(row.campaign_criterion.criterion_id),
+                    "text": row.campaign_criterion.keyword.text,
+                    "match_type": str(row.campaign_criterion.keyword.match_type).replace("KeywordMatchType.", ""),
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Google fetch campaign negatives failed for account {self.account.id}: {e}")
+            return []
+
+    def apply_negative_keyword(self, campaign_id: str, keyword: str, match_type: str) -> Dict[str, Any]:
+        """Add a campaign-level negative keyword."""
+        if not self.is_valid:
+            return {"success": False, "error": "Google Ads client not valid"}
+        customer_id = (self.account.google_external_id or self.account.external_id or "").replace("-", "")
+        if not customer_id:
+            return {"success": False, "error": "No Google customer ID configured"}
+        try:
+            client = self.client
+            campaign_service = client.get_service("CampaignCriterionService")
+            campaign_resource_name = client.get_service("GoogleAdsService").campaign_path(customer_id, campaign_id)
+
+            criterion = client.get_type("CampaignCriterion")
+            criterion.campaign = campaign_resource_name
+            criterion.negative = True
+            criterion.keyword.text = keyword
+            # Match type mapping
+            mt = (match_type or "EXACT").upper()
+            if mt == "EXACT":
+                criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.EXACT
+            elif mt == "PHRASE":
+                criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.PHRASE
+            else:
+                criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.BROAD
+
+            operation = client.get_type("CampaignCriterionOperation")
+            operation.create.CopyFrom(criterion)
+
+            response = campaign_service.mutate_campaign_criteria(
+                customer_id=customer_id,
+                operations=[operation],
+            )
+            created = response.results[0].resource_name if response.results else None
+            return {"success": True, "resource_name": created, "campaign_id": campaign_id, "keyword": keyword, "match_type": match_type}
+        except Exception as e:
+            logger.error(f"Google apply negative keyword failed: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    def pause_keyword(self, ad_group_id: str, criterion_id: str) -> Dict[str, Any]:
+        """Pause an ad group criterion (keyword) by setting status to PAUSED."""
+        if not self.is_valid:
+            return {"success": False, "error": "Google Ads client not valid"}
+        customer_id = (self.account.google_external_id or self.account.external_id or "").replace("-", "")
+        if not customer_id:
+            return {"success": False, "error": "No Google customer ID configured"}
+        try:
+            client = self.client
+            agc_service = client.get_service("AdGroupCriterionService")
+            resource_name = agc_service.ad_group_criterion_path(customer_id, ad_group_id, criterion_id)
+
+            operation = client.get_type("AdGroupCriterionOperation")
+            operation.update.resource_name = resource_name
+            operation.update.status = client.enums.AdGroupCriterionStatusEnum.PAUSED
+            operation.update_mask.paths.append("resource_name")
+            operation.update_mask.paths.append("status")
+
+            response = agc_service.mutate_ad_group_criteria(
+                customer_id=customer_id,
+                operations=[operation],
+            )
+            return {"success": True, "resource_name": resource_name, "ad_group_id": ad_group_id, "criterion_id": criterion_id}
+        except Exception as e:
+            logger.error(f"Google pause keyword failed: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    def update_campaign_budget(self, campaign_id: str, new_budget: float) -> Dict[str, Any]:
+        raise NotImplementedError
 
 
 class MetaAdsConnector(AdsConnector):

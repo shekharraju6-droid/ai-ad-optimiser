@@ -114,6 +114,12 @@ def init_db():
             run_invoice_migration()
         except Exception as me:
             logger.warning(f"Additive invoice migration skipped/failed: {me}")
+        # Run safe additive migrations for Phase 2 smart keyword auditor
+        try:
+            from backend.migrations.add_brand_keyword_audit_tables import run_migration as run_brand_migration
+            run_brand_migration()
+        except Exception as me:
+            logger.warning(f"Additive brand keyword audit migration skipped/failed: {me}")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise

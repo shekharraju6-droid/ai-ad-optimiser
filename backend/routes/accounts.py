@@ -1,18 +1,31 @@
 """
 Account management and dashboard summary APIs.
 """
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
-from backend.db.models import Account, AccountGroup, AccountType, AccountStatus, User, UserAccountAssignment
+from backend.db.models import Account, AccountGroup, AccountType, AccountStatus, User, UserAccountAssignment, CampaignTypeTag
 from backend.db.revenueops_models import RevClient, RevClientStatus
 from backend.services.crypto import encrypt, decrypt
 from backend.services.connectors import get_connector
 from backend.routes.auth import get_current_user_required
 
+logger = logging.getLogger("AdOptima")
 router = APIRouter(prefix="/api", tags=["accounts"])
+
+
+class CampaignTypeTagUpdate(BaseModel):
+    campaign_type: str
+
+
+def _detect_campaign_type(campaign_name: str) -> str:
+    name_lower = (campaign_name or "").lower()
+    if "brand" in name_lower or "branded" in name_lower:
+        return "brand"
+    return "non_brand"
 
 
 def _filter_accounts_for_user(query, user: User):
@@ -89,6 +102,7 @@ class AccountCreate(BaseModel):
     state_code: Optional[str] = None
     adpulse_refresh_interval: Optional[int] = None
     adpulse_audit_interval: Optional[int] = None
+    brand_keywords: Optional[str] = None
 
 
 class AccountUpdate(BaseModel):
@@ -120,6 +134,7 @@ class AccountUpdate(BaseModel):
     target_cpa: Optional[float] = None
 
     brand_name: Optional[str] = None
+    brand_keywords: Optional[str] = None
     contact_person: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -251,6 +266,7 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
         crm_credentials=req.crm_credentials,
         target_cpa=req.target_cpa,
         brand_name=req.brand_name,
+        brand_keywords=req.brand_keywords,
         contact_person=req.contact_person,
         contact_email=req.contact_email,
         contact_phone=req.contact_phone,
@@ -374,6 +390,8 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
 
     if req.brand_name is not None:
         account.brand_name = req.brand_name or None
+    if req.brand_keywords is not None:
+        account.brand_keywords = req.brand_keywords or None
     if req.contact_person is not None:
         account.contact_person = req.contact_person or None
     if req.contact_email is not None:
@@ -562,6 +580,81 @@ def get_account(account_id: int, start_date: Optional[str] = None, end_date: Opt
     data["end_date"] = end_date
     data["platform"] = platform
     return data
+
+
+@router.get("/accounts/{account_id}/campaigns-with-tags")
+def get_campaigns_with_tags(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Fetch live Google Ads campaigns with their manual/auto campaign type tags."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if user.role == "user" and account_id not in user.assigned_account_ids():
+        raise HTTPException(status_code=403, detail="Access denied to this account")
+
+    campaigns = []
+    if account.has_google and account.google_is_live:
+        try:
+            connector = get_connector(account, platform="google")
+            if connector and connector.is_valid:
+                campaigns = connector.fetch_campaigns()
+        except Exception as e:
+            logger.warning(f"Failed to fetch campaigns for account {account_id}: {e}")
+
+    tags = db.query(CampaignTypeTag).filter(CampaignTypeTag.account_id == account_id).all()
+    tag_map = {t.campaign_id: t for t in tags}
+
+    results = []
+    for camp in campaigns:
+        cid = camp.get("id")
+        tag = tag_map.get(cid)
+        manual_type = tag.campaign_type if tag else "auto"
+        auto_type = _detect_campaign_type(camp.get("name", ""))
+        final_type = auto_type if manual_type == "auto" else manual_type
+        results.append({
+            "campaign_id": cid,
+            "campaign_name": camp.get("name"),
+            "campaign_status": camp.get("status"),
+            "auto_type": auto_type,
+            "manual_type": manual_type,
+            "final_type": final_type,
+            "updated_by": tag.updated_by if tag else None,
+            "updated_at": tag.updated_at.isoformat() if tag and tag.updated_at else None,
+        })
+    return {"account_id": account_id, "campaigns": results}
+
+
+@router.put("/accounts/{account_id}/campaign-type-tags/{campaign_id}")
+def update_campaign_type_tag(account_id: int, campaign_id: str, req: CampaignTypeTagUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Set manual campaign type override for a campaign."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if user.role == "user" and account_id not in user.assigned_account_ids():
+        raise HTTPException(status_code=403, detail="Access denied to this account")
+    if req.campaign_type not in ("brand", "non_brand", "auto"):
+        raise HTTPException(status_code=400, detail="campaign_type must be brand, non_brand, or auto")
+
+    tag = db.query(CampaignTypeTag).filter(
+        CampaignTypeTag.account_id == account_id,
+        CampaignTypeTag.campaign_id == campaign_id,
+    ).first()
+    from datetime import datetime
+    if tag:
+        tag.campaign_type = req.campaign_type
+        tag.updated_by = user.email or user.role
+        tag.updated_at = datetime.utcnow()
+    else:
+        tag = CampaignTypeTag(
+            account_id=account_id,
+            campaign_id=campaign_id,
+            campaign_type=req.campaign_type,
+            updated_by=user.email or user.role,
+            updated_at=datetime.utcnow(),
+        )
+        db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    return tag.to_dict()
 
 
 @router.get("/account-groups")

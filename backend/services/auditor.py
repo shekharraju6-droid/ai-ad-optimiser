@@ -12,8 +12,9 @@ from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 from backend.db.database import SessionLocal
-from backend.db.models import Account, AccountType, PendingAction
+from backend.db.models import Account, AccountType, PendingAction, SuppressedSearchTerm
 from backend.services.connectors import get_connector
+from backend.services.audit_settings import get_int_setting
 
 NEGATIVE_INTENT_WORDS = [
     "free", "job", "jobs", "salary", "download", "tutorial", "tutorials",
@@ -500,7 +501,7 @@ def review_action(action_id: int, decision: str, reviewer: str = "admin") -> Dic
         if action.status != "pending":
             return {"error": f"Action already {action.status}"}
 
-        from datetime import datetime
+        from datetime import datetime, timedelta, date
         action.status = "approved" if decision == "approve" else "rejected"
         action.reviewed_by = reviewer
         action.reviewed_at = datetime.utcnow()
@@ -513,6 +514,27 @@ def review_action(action_id: int, decision: str, reviewer: str = "admin") -> Dic
             else:
                 action.status = "failed"
                 action.error_message = result.get("error")
+
+        if action.status == "rejected" and action.action_type == "SMART_ADD_NEGATIVE_KEYWORD":
+            # Suppress rejected search term for configured days so it is not re-flagged
+            suppression_days = get_int_setting("smart_audit_rejection_suppression_days", db)
+            suppressed_until = date.today() + timedelta(days=suppression_days)
+            existing = db.query(SuppressedSearchTerm).filter(
+                SuppressedSearchTerm.account_id == action.account_id,
+                SuppressedSearchTerm.campaign_id == action.campaign_id,
+                SuppressedSearchTerm.search_term == action.keyword,
+            ).first()
+            if existing:
+                existing.suppressed_until = suppressed_until
+                existing.rejected_by = reviewer
+            else:
+                db.add(SuppressedSearchTerm(
+                    account_id=action.account_id,
+                    campaign_id=action.campaign_id or "",
+                    search_term=action.keyword or "",
+                    suppressed_until=suppressed_until,
+                    rejected_by=reviewer,
+                ))
 
         db.commit()
         db.refresh(action)
@@ -536,6 +558,30 @@ def _apply_action(action: PendingAction, db: Session) -> Dict[str, Any]:
                         action.campaign_id or "",
                         action.keyword or "",
                         action.match_type or "EXACT",
+                    )
+                return {"success": False, "error": "Live Google connector not valid"}
+            return {"success": False, "error": "Account is not live; cannot apply action"}
+
+        if action.action_type == "SMART_ADD_NEGATIVE_KEYWORD" and action.platform == "google":
+            if account.google_is_live:
+                connector = get_connector(account, platform="google")
+                if connector and connector.is_valid:
+                    return connector.apply_negative_keyword(
+                        action.campaign_id or "",
+                        action.keyword or "",
+                        action.match_type or "EXACT",
+                    )
+                return {"success": False, "error": "Live Google connector not valid"}
+            return {"success": False, "error": "Account is not live; cannot apply action"}
+
+        if action.action_type == "SMART_PAUSE_KEYWORD" and action.platform == "google":
+            if account.google_is_live:
+                connector = get_connector(account, platform="google")
+                if connector and connector.is_valid:
+                    new_value = action.new_value or {}
+                    return connector.pause_keyword(
+                        new_value.get("ad_group_id") or action.adset_id or "",
+                        new_value.get("criterion_id") or "",
                     )
                 return {"success": False, "error": "Live Google connector not valid"}
             return {"success": False, "error": "Account is not live; cannot apply action"}

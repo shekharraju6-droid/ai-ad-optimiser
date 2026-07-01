@@ -289,12 +289,38 @@
                             <div class="kpi-card"><div class="kpi-title">CTR</div><div class="kpi-value" id="detail-ctr">0%</div></div>
                             <div class="kpi-card"><div class="kpi-title">CPA</div><div class="kpi-value" id="detail-cpa">Rs 0</div></div>
                         </div>
+                        <div class="card" style="margin-top:1rem;">
+                            <div class="card-header">
+                                <h3 class="card-title">Campaign Type Tags</h3>
+                                <div style="font-size:0.78rem;color:var(--text-light);">Auto = detected from name. Manual override controls brand vs non-brand classification.</div>
+                            </div>
+                            <div id="campaignTypeTagsContainer"><p style="color:var(--text-muted);padding:1rem;">Loading campaigns...</p></div>
+                        </div>
                     </div>
                 </div>
 
                 <div id="panel-approvals" class="panel">
                     <div class="card">
-                        <div class="card-header"><h2 class="card-title">Approval Queue</h2><button class="btn btn-secondary btn-sm" onclick="loadPendingActions()"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh</button></div>
+                        <div class="card-header">
+                            <h2 class="card-title">Approval Queue</h2>
+                            <div style="display:flex;gap:0.5rem;align-items:center;">
+                                <button class="btn btn-sm btn-secondary" onclick="openAuditSettings()" title="Audit thresholds">⚙️ Audit Settings</button>
+                                <span id="lastAuditRun" style="font-size:0.75rem;color:var(--text-light);"></span>
+                                <button class="btn btn-secondary btn-sm" onclick="loadPendingActions()"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh</button>
+                            </div>
+                        </div>
+                        <div id="approvalQueueControls" style="padding:0.75rem 1rem; border-bottom:1px solid var(--border-color);">
+                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+                                <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('all')">All</button>
+                                <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('keywords')">Keywords</button>
+                                <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('search_terms')">Search Terms</button>
+                                <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('pending')">Pending</button>
+                                <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('approved')">Approved</button>
+                                <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('rejected')">Rejected</button>
+                            </div>
+                            <div id="approvalQueueSummary" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem;"></div>
+                            <div id="approvalQueueBulkActions" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>
+                        </div>
                         <div id="pendingActionsContainer"></div>
                     </div>
                 </div>
@@ -502,6 +528,42 @@
     let allAccounts = [];
     let allGroups = [];
     let pendingActions = [];
+    let approvalFilter = 'all';
+
+    function setApprovalFilter(filter) {
+        approvalFilter = filter;
+        renderPendingActions();
+    }
+
+    function _auditTypeFromAction(action) {
+        if (action.action_type === 'SMART_PAUSE_KEYWORD') return 'keyword';
+        if (action.action_type === 'SMART_ADD_NEGATIVE_KEYWORD') return 'search_term';
+        const nv = action.new_value || {};
+        if (nv.audit_type) return nv.audit_type;
+        if (action.action_type === 'PAUSE_KEYWORD' || action.action_type === 'ADD_NEGATIVE_KEYWORD') return 'keyword';
+        return 'other';
+    }
+
+    function _filterActions(actions) {
+        if (!approvalFilter || approvalFilter === 'all') return actions;
+        if (approvalFilter === 'pending') return actions.filter(a => a.status === 'pending');
+        if (approvalFilter === 'approved') return actions.filter(a => a.status === 'approved' || a.status === 'applied');
+        if (approvalFilter === 'rejected') return actions.filter(a => a.status === 'rejected');
+        if (approvalFilter === 'keywords') return actions.filter(a => _auditTypeFromAction(a) === 'keyword');
+        if (approvalFilter === 'search_terms') return actions.filter(a => _auditTypeFromAction(a) === 'search_term');
+        return actions;
+    }
+
+    async function loadLastAuditRun() {
+        try {
+            const runs = await api('GET', '/audit-runs?limit=1');
+            const el = $('lastAuditRun');
+            if (!runs || !runs.length) { el.textContent = 'No smart audit runs yet'; return; }
+            const r = runs[0];
+            const istTime = r.start_time ? new Date(new Date(r.start_time).getTime() + (5.5 * 60 * 60 * 1000)).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'unknown';
+            el.textContent = `Last smart audit: ${istTime} | ${r.status}`;
+        } catch (e) { $('lastAuditRun').textContent = ''; }
+    }
     let currentDetailAccount = null;
     let editingAccountId = null;
     let dateRange = { preset: 'today', start: '', end: '' };
@@ -988,6 +1050,49 @@
             $('detail-ctr').textContent = formatPct(a.ctr);
             $('detail-cpa').textContent = formatMoney(a.cpa);
             switchPanel('account-detail');
+            if (platform === 'google') loadCampaignTypeTags(id);
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function loadCampaignTypeTags(accountId) {
+        const container = $('campaignTypeTagsContainer');
+        container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">Loading campaigns...</p>';
+        try {
+            const data = await api('GET', '/accounts/' + accountId + '/campaigns-with-tags');
+            const campaigns = data.campaigns || [];
+            if (!campaigns.length) {
+                container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">No Google Ads campaigns found. Make sure the account is connected and live.</p>';
+                return;
+            }
+            let html = '<div class="table-wrapper"><table><thead><tr><th>Campaign Name</th><th>Auto Detected</th><th>Manual Override</th><th>Final Type</th></tr></thead><tbody>';
+            campaigns.forEach(c => {
+                const autoLabel = c.auto_type === 'brand' ? 'Brand' : 'Non-Brand';
+                const finalLabel = c.final_type === 'brand' ? 'Brand' : 'Non-Brand';
+                html += `<tr>
+                    <td>${escapeHtml(c.campaign_name)}</td>
+                    <td>${autoLabel}</td>
+                    <td>
+                        <select class="filter-select" onchange="updateCampaignTypeTag(${accountId}, '${c.campaign_id}', this.value)">
+                            <option value="auto" ${c.manual_type === 'auto' ? 'selected' : ''}>Auto</option>
+                            <option value="brand" ${c.manual_type === 'brand' ? 'selected' : ''}>Brand</option>
+                            <option value="non_brand" ${c.manual_type === 'non_brand' ? 'selected' : ''}>Non-Brand</option>
+                        </select>
+                    </td>
+                    <td>${finalLabel}</td>
+                </tr>`;
+            });
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        } catch (e) {
+            container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">Failed to load campaigns: ' + escapeHtml(e.message) + '</p>';
+        }
+    }
+
+    async function updateCampaignTypeTag(accountId, campaignId, campaignType) {
+        try {
+            await api('PUT', '/accounts/' + accountId + '/campaign-type-tags/' + campaignId, { campaign_type: campaignType });
+            toast('Campaign type updated');
+            loadCampaignTypeTags(accountId);
         } catch (e) { toast(e.message, true); }
     }
 
@@ -1035,6 +1140,7 @@
                 <td class="text-right">${a.adpulse_audit_interval || a.audit_interval_minutes || 60}m</td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="openAccountDetail(${a.id}, '${a.has_google ? 'google' : 'meta'}')">View</button>
+                    ${a.has_google && a.google_is_live ? `<button class="btn btn-sm btn-success" onclick="runSmartAudit(${a.id})" title="Run keyword + search term audit">Smart Audit</button>` : ''}
                     <button class="btn btn-secondary btn-sm" onclick="window.location.href='/'">Edit</button>
                 </td>
             `;
@@ -1386,7 +1492,9 @@
     function actionTypeLabel(type) {
         const labels = {
             'ADD_NEGATIVE_KEYWORD': 'Add Negative Keyword',
+            'SMART_ADD_NEGATIVE_KEYWORD': 'Add Negative (Search Term)',
             'PAUSE_KEYWORD': 'Pause Keyword',
+            'SMART_PAUSE_KEYWORD': 'Pause Keyword (Smart)',
             'REDUCE_BID': 'Reduce Bid',
             'PAUSE_OR_REDUCE_BUDGET': 'Reduce / Pause Budget',
             'FIX_LANDING_PAGE': 'Fix Landing Page',
@@ -1399,14 +1507,22 @@
         return labels[type] || type;
     }
 
+    function actionAuditTypeBadge(action) {
+        const auditType = _auditTypeFromAction(action);
+        if (auditType === 'keyword') return '<span style="font-size:0.7rem;background:#dbeafe;color:#1e40af;padding:0.15rem 0.4rem;border-radius:0.25rem;margin-right:0.4rem;">🔑 Keyword</span>';
+        if (auditType === 'search_term') return '<span style="font-size:0.7rem;background:#dcfce7;color:#166534;padding:0.15rem 0.4rem;border-radius:0.25rem;margin-right:0.4rem;">🔍 Search Term</span>';
+        return '';
+    }
+
     function actionApplyHint(type) {
-        if (type === 'ADD_NEGATIVE_KEYWORD') return 'Auto-applies when approved.';
+        if (type === 'ADD_NEGATIVE_KEYWORD' || type === 'SMART_ADD_NEGATIVE_KEYWORD') return 'Auto-applies when approved.';
+        if (type === 'SMART_PAUSE_KEYWORD') return 'Auto-pauses the keyword in Google Ads when approved.';
         return 'Manual implementation required after approval.';
     }
 
     function actionSeverityClass(type) {
-        if (['FIX_LANDING_PAGE', 'PAUSE_OR_REDUCE_BUDGET', 'PAUSE_KEYWORD'].includes(type)) return 'flag-danger';
-        if (['ALERT_SETUP_ISSUE', 'ALERT_KEYWORD_QUALITY', 'ALERT_KEYWORD_RELEVANCE', 'REVIEW_ADSET'].includes(type)) return 'flag-warning';
+        if (['FIX_LANDING_PAGE', 'PAUSE_OR_REDUCE_BUDGET', 'PAUSE_KEYWORD', 'SMART_PAUSE_KEYWORD'].includes(type)) return 'flag-danger';
+        if (['ALERT_SETUP_ISSUE', 'ALERT_KEYWORD_QUALITY', 'ALERT_KEYWORD_RELEVANCE', 'REVIEW_ADSET', 'SMART_ADD_NEGATIVE_KEYWORD'].includes(type)) return 'flag-warning';
         if (['REDUCE_BID'].includes(type)) return 'flag-warning';
         return 'flag-success';
     }
@@ -1414,35 +1530,107 @@
     async function loadPendingActions() {
         try {
             pendingActions = await api('GET', '/pending-actions');
-            const container = $('pendingActionsContainer');
-            if (!pendingActions.length) { container.innerHTML = '\u003cp style="color:var(--text-muted);"\u003eNo pending actions.\u003c/p\u003e'; return; }
-            container.innerHTML = '';
-            pendingActions.forEach(action => {
-                const el = document.createElement('div');
-                el.className = 'card';
-                el.style.marginBottom = '0.75rem';
-                const meta = [];
-                if (action.campaign_id) meta.push('Campaign: ' + action.campaign_id);
-                if (action.adset_id) meta.push('AdSet: ' + action.adset_id);
-                if (action.estimated_savings) meta.push('Est. savings: ' + formatMoney(action.estimated_savings));
-                el.innerHTML = `
-                    \u003cdiv style="display:flex; justify-content:space-between; align-items:flex-start;"\u003e
-                        \u003cdiv style="flex:1; min-width:0;"\u003e
-                            \u003cdiv style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;"\u003e
-                                \u003cdiv style="font-weight:700; font-size:0.95rem;"\u003e${escapeHtml(action.account_name)} \u0026mdash; ${escapeHtml(action.platform)}\u003c/div\u003e
-                                \u003cspan class="flag-tag ${actionSeverityClass(action.action_type)}"\u003e${actionTypeLabel(action.action_type)}\u003c/span\u003e
-                            \u003c/div\u003e
-                            \u003cdiv style="font-size:0.78rem; color:var(--text-muted); margin-top:0.2rem;"\u003e${action.keyword ? '\u003cstrong\u003e' + escapeHtml(action.keyword) + '\u003c/strong\u003e ' + (action.match_type ? '(' + escapeHtml(action.match_type) + ')' : '') : meta.join(' \u0026bull; ')}\u003c/div\u003e
-                            \u003cdiv style="font-size:0.78rem; color:var(--text-light); margin-top:0.3rem; max-width:600px;"\u003e${escapeHtml(action.reason || '')}\u003c/div\u003e
-                            \u003cdiv style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem; font-style:italic;"\u003e${actionApplyHint(action.action_type)}\u003c/div\u003e
-                        \u003c/div\u003e
-                        \u003cdiv style="display:flex; gap:0.5rem; margin-left:1rem;"\u003e
-                            \u003cbutton class="btn btn-success btn-sm" onclick="reviewAction(${action.id}, 'approve')"\u003e${ICONS.check} Approve\u003c/button\u003e
-                            \u003cbutton class="btn btn-danger btn-sm" onclick="reviewAction(${action.id}, 'reject')"\u003e${ICONS.x} Reject\u003c/button\u003e
-                        \u003c/div\u003e
-                    \u003c/div\u003e`;
-                container.appendChild(el);
-            });
+            loadLastAuditRun();
+            renderPendingActions();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function renderPendingActions() {
+        const container = $('pendingActionsContainer');
+        const filtered = _filterActions(pendingActions);
+        if (!filtered.length) { container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">No matching actions.</p>'; return; }
+
+        // Group by account for summary
+        const accountCounts = {};
+        filtered.forEach(a => {
+            const name = a.account_name || ('Account ' + a.account_id);
+            if (!accountCounts[name]) accountCounts[name] = { keyword: 0, search_term: 0 };
+            const at = _auditTypeFromAction(a);
+            if (at === 'keyword') accountCounts[name].keyword++;
+            if (at === 'search_term') accountCounts[name].search_term++;
+        });
+        let summaryHtml = Object.entries(accountCounts).map(([name, c]) => {
+            const parts = [];
+            if (c.keyword) parts.push(`${c.keyword} keyword issue${c.keyword > 1 ? 's' : ''}`);
+            if (c.search_term) parts.push(`${c.search_term} search term issue${c.search_term > 1 ? 's' : ''}`);
+            return `<strong>${escapeHtml(name)}</strong>: ${parts.join(', ')}`;
+        }).join(' &bull; ');
+        $('approvalQueueSummary').innerHTML = summaryHtml || '';
+
+        // Bulk action buttons for filtered set
+        const pendingOnly = filtered.filter(a => a.status === 'pending');
+        let bulkHtml = '';
+        if (pendingOnly.length) {
+            bulkHtml += `<button class="btn btn-sm btn-success" onclick="bulkReview('approve', 'selected', ${JSON.stringify(pendingOnly.map(a => a.id))})">Approve All Matching</button>`;
+            bulkHtml += `<button class="btn btn-sm btn-danger" onclick="bulkReview('reject', 'selected', ${JSON.stringify(pendingOnly.map(a => a.id))})">Reject All Matching</button>`;
+        }
+        $('approvalQueueBulkActions').innerHTML = bulkHtml;
+
+        container.innerHTML = '';
+        filtered.forEach(action => {
+            const el = document.createElement('div');
+            el.className = 'card';
+            el.style.marginBottom = '0.75rem';
+            const meta = [];
+            if (action.campaign_id) meta.push('Campaign: ' + escapeHtml(action.campaign_id));
+            if (action.adset_id) meta.push('AdGroup: ' + escapeHtml(action.adset_id));
+            const metrics = (action.new_value && action.new_value.metrics) || {};
+            const metricsParts = [];
+            if (metrics.spend !== undefined) metricsParts.push('Spend: ' + formatMoney(metrics.spend));
+            if (metrics.clicks !== undefined) metricsParts.push('Clicks: ' + metrics.clicks);
+            if (metrics.conversions !== undefined) metricsParts.push('Conversions: ' + metrics.conversions);
+            if (metrics.ctr !== undefined) metricsParts.push('CTR: ' + formatPct(metrics.ctr));
+            const metricsHtml = metricsParts.length ? `<div style="font-size:0.72rem;color:var(--text-light);margin-top:0.25rem;">${metricsParts.join(' &bull; ')}</div>` : '';
+            const created = action.created_at ? new Date(action.created_at).toLocaleDateString('en-IN') : '';
+            const isPending = action.status === 'pending';
+            let buttons = '';
+            if (isPending) {
+                buttons = `<div style="display:flex; gap:0.5rem; margin-left:1rem;">
+                    <button class="btn btn-success btn-sm" onclick="reviewAction(${action.id}, 'approve')">${ICONS.check} Approve</button>
+                    <button class="btn btn-danger btn-sm" onclick="reviewAction(${action.id}, 'reject')">${ICONS.x} Reject</button>
+                </div>`;
+            } else {
+                buttons = `<span class="flag-tag ${action.status === 'applied' ? 'flag-success' : (action.status === 'rejected' ? 'flag-danger' : 'flag-warning')}" style="margin-left:1rem;">${escapeHtml(action.status)}</span>`;
+            }
+            el.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                            ${actionAuditTypeBadge(action)}
+                            <div style="font-weight:700; font-size:0.95rem;">${escapeHtml(action.account_name)} &mdash; ${escapeHtml(action.platform)}</div>
+                            <span class="flag-tag ${actionSeverityClass(action.action_type)}">${actionTypeLabel(action.action_type)}</span>
+                        </div>
+                        <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.2rem;">${action.keyword ? '<strong>' + escapeHtml(action.keyword) + '</strong> ' + (action.match_type ? '(' + escapeHtml(action.match_type) + ')' : '') : meta.join(' &bull; ')}</div>
+                        <div style="font-size:0.78rem; color:var(--text-light); margin-top:0.3rem; max-width:600px;">${escapeHtml(action.reason || '')}</div>
+                        ${metricsHtml}
+                        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem; font-style:italic;">${actionApplyHint(action.action_type)} ${created ? '&bull; ' + created : ''}</div>
+                    </div>
+                    ${buttons}
+                </div>`;
+            container.appendChild(el);
+        });
+    }
+
+    async function bulkReview(decision, scope, ids) {
+        if (!confirm((decision === 'approve' ? 'Approve' : 'Reject') + ' ' + ids.length + ' selected items?')) return;
+        let done = 0, failed = 0;
+        for (const id of ids) {
+            try {
+                await api('POST', '/pending-actions/' + id + '/review', { decision, reviewer: currentUser ? currentUser.email : 'admin' });
+                done++;
+            } catch (e) { failed++; }
+        }
+        toast(`${done} approved/rejected, ${failed} failed`);
+        loadPendingActions();
+        loadPendingActionsCount();
+    }
+
+    async function reviewAction(id, decision) {
+        try {
+            await api('POST', '/pending-actions/' + id + '/review', { decision, reviewer: currentUser ? currentUser.email : 'admin' });
+            toast('Action ' + decision + 'd');
+            loadPendingActions();
+            loadPendingActionsCount();
         } catch (e) { toast(e.message, true); }
     }
 
@@ -1469,6 +1657,80 @@
             const result = await api('POST', '/accounts/' + id + '/audit' + dateParams() + (dateParams() ? '&' : '?') + 'platform=' + platform);
             toast('Audit: ' + (result.actions_generated || 0) + ' actions');
             loadPendingActionsCount();
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function runSmartAudit(id) {
+        try {
+            const result = await api('POST', '/accounts/' + id + '/smart-audit');
+            const kw = result.keyword_audit ? result.keyword_audit.actions_generated : 0;
+            const st = result.search_term_audit ? result.search_term_audit.actions_generated : 0;
+            toast(`Smart audit: ${kw} keyword, ${st} search term actions`);
+            loadPendingActionsCount();
+            switchPanel('approvals');
+        } catch (e) { toast(e.message, true); }
+    }
+
+    async function openAuditSettings() {
+        try {
+            const settings = await api('GET', '/audit-settings');
+            const fields = [
+                { key: 'smart_audit_keyword_min_spend_inr', label: 'Non-performing keyword min spend (INR)', type: 'number' },
+                { key: 'smart_audit_search_term_min_clicks', label: 'Search term min clicks to flag', type: 'number' },
+                { key: 'smart_audit_search_term_min_spend_inr', label: 'Search term min spend to flag (INR)', type: 'number' },
+                { key: 'smart_audit_lookback_days', label: 'Audit lookback period (days)', type: 'number' },
+                { key: 'smart_audit_daily_time_ist', label: 'Daily audit time (HH:MM IST)', type: 'text' },
+                { key: 'smart_audit_rejection_suppression_days', label: 'Rejection suppression period (days)', type: 'number' },
+            ];
+            let html = `
+                <div id="auditSettingsModal" class="modal-overlay" onclick="if(event.target===this) closeAuditSettings()" style="display:flex;">
+                    <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                            <h2>Audit Settings</h2>
+                            <button class="btn btn-sm btn-secondary" onclick="closeAuditSettings()">Close</button>
+                        </div>
+                        <div id="auditSettingsForm" style="display:flex;flex-direction:column;gap:0.75rem;">
+                            ${fields.map(f => `
+                                <div class="form-group">
+                                    <label>${f.label}</label>
+                                    <input type="${f.type}" id="auditSetting_${f.key}" value="${escapeHtml(String(settings[f.key] || ''))}" class="filter-input">
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;">
+                            <button class="btn btn-primary" onclick="saveAuditSettings()">Save</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            const modal = document.createElement('div');
+            modal.innerHTML = html;
+            document.body.appendChild(modal.firstElementChild);
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function closeAuditSettings() {
+        const el = $('auditSettingsModal');
+        if (el) el.remove();
+    }
+
+    async function saveAuditSettings() {
+        try {
+            const keys = [
+                'smart_audit_keyword_min_spend_inr',
+                'smart_audit_search_term_min_clicks',
+                'smart_audit_search_term_min_spend_inr',
+                'smart_audit_lookback_days',
+                'smart_audit_daily_time_ist',
+                'smart_audit_rejection_suppression_days',
+            ];
+            for (const key of keys) {
+                const input = $('auditSetting_' + key);
+                if (!input) continue;
+                await api('PUT', '/audit-settings/' + key, { value: input.value });
+            }
+            toast('Audit settings saved');
+            closeAuditSettings();
         } catch (e) { toast(e.message, true); }
     }
 
