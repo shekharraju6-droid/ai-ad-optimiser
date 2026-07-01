@@ -321,10 +321,20 @@
         sortedAccounts.forEach(a => {
             const el = document.createElement('div');
             el.className = 'account-item';
-            el.onclick = () => selectAccount(a.id);
+            // Step 5: only accounts with CRM credentials are selectable
+            const hasCrm = (a.crm_type && a.crm_type !== 'none') || a.lsq_access_key || a.crm_credentials_masked || a.lsq_secret_key_masked;
+            if (!hasCrm) {
+                el.classList.add('disabled');
+                el.title = 'No CRM connected — set up in Manage Accounts';
+                el.style.opacity = '0.5';
+                el.style.cursor = 'not-allowed';
+                el.onclick = () => toast('No CRM connected for this account. Set it up in Manage Accounts.', true);
+            } else {
+                el.onclick = () => selectAccount(a.id);
+            }
             el.innerHTML = `
                 <div class="account-icon">${getInitials(a.name)}</div>
-                <div>${escapeHtml(a.name)}</div>
+                <div>${escapeHtml(a.name)}${hasCrm ? '' : ' <span style="font-size:0.68rem;color:var(--text-light);">(no CRM)</span>'}</div>
             `;
             container.appendChild(el);
         });
