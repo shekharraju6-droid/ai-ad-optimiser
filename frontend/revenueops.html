@@ -875,18 +875,21 @@ async function saveModal(){
 function editInvoice(id){const i=invoices.find(x=>x.id===id);if(i)openInvoiceModal(i)}
 async function deleteInvoice(id){if(!confirm('Delete invoice and its payments?'))return;try{await api('DELETE',`/invoices/${id}`);toast('Invoice deleted');loadInvoices()}catch(e){toast(e.message,'error')}}
 
-// ===== AI INVOICE UPLOAD (single file) =====
+// ===== AI INVOICE UPLOAD (single + bulk) =====
 let uploadedFilePath = null;
+let _selectedUploadFiles = [];
+let _bulkExtractedRows = [];
+let _bulkClients = [];
 
 function openUploadInvoiceModal(){
-    modalMode='create'; modalEditId=null; uploadedFilePath=null;
+    modalMode='create'; modalEditId=null; uploadedFilePath=null; _selectedUploadFiles=[]; _bulkExtractedRows=[];
     $('modalTitle').textContent='📄 Upload Invoice';
     $('modalBody').innerHTML=`
         <div id="uploadDropZone" style="border:2px dashed var(--border);border-radius:10px;padding:2rem;text-align:center;cursor:pointer;transition:0.2s;background:var(--bg-surface);">
             <div style="font-size:2.2rem;">📄</div>
             <p style="margin:0.75rem 0 0.3rem;font-weight:600;color:var(--text-main);">Drop invoice PDF or image here, or click to browse</p>
-            <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Accepted: PDF, JPG, PNG</p>
-            <input type="file" id="uploadFileInput" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="onUploadFileSelected(this)">
+            <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Accepted: PDF, JPG, PNG — select one or multiple files for bulk upload</p>
+            <input type="file" id="uploadFileInput" accept=".pdf,.jpg,.jpeg,.png" multiple style="display:none" onchange="onUploadFileSelected(this)">
         </div>
         <div id="uploadFileName" style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted);display:none;"></div>
         <div id="uploadExtractArea" style="margin-top:1rem;display:none;">
@@ -894,7 +897,7 @@ function openUploadInvoiceModal(){
         </div>
         <div id="uploadSpinner" style="display:none;text-align:center;padding:1.5rem;">
             <div style="display:inline-block;width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite;"></div>
-            <p style="margin-top:0.75rem;color:var(--text-muted);font-size:0.85rem;">Extracting invoice data...</p>
+            <p id="uploadProgressText" style="margin-top:0.75rem;color:var(--text-muted);font-size:0.85rem;">Extracting invoice data...</p>
         </div>
         <div id="uploadError" style="display:none;margin-top:1rem;color:var(--danger);font-size:0.85rem;"></div>
     `;
@@ -907,7 +910,7 @@ function openUploadInvoiceModal(){
         dz.addEventListener('drop', (e) => {
             e.preventDefault();
             dz.style.borderColor='var(--border)'; dz.style.background='var(--bg-surface)';
-            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            if (e.dataTransfer.files && e.dataTransfer.files.length) {
                 $('uploadFileInput').files = e.dataTransfer.files;
                 onUploadFileSelected($('uploadFileInput'));
             }
@@ -920,37 +923,218 @@ function openUploadInvoiceModal(){
 
 let _selectedUploadFile = null;
 function onUploadFileSelected(input){
-    if (!input.files || !input.files[0]) return;
-    _selectedUploadFile = input.files[0];
+    if (!input.files || !input.files.length) return;
+    _selectedUploadFiles = Array.from(input.files);
+    _selectedUploadFile = _selectedUploadFiles[0]; // keep for single-file backward compat
     const nameEl = $('uploadFileName');
     nameEl.style.display='';
-    nameEl.textContent = 'Selected: ' + _selectedUploadFile.name;
+    if (_selectedUploadFiles.length === 1) {
+        nameEl.textContent = 'Selected: ' + _selectedUploadFiles[0].name;
+    } else {
+        nameEl.textContent = `Selected: ${_selectedUploadFiles.length} files — ` + _selectedUploadFiles.map(f=>f.name).join(', ');
+    }
     $('uploadExtractArea').style.display='';
 }
 
 async function extractInvoice(){
-    if (!_selectedUploadFile) { toast('Please select a file first', 'error'); return; }
+    if (!_selectedUploadFiles.length && !_selectedUploadFile) { toast('Please select a file first', 'error'); return; }
+    const files = _selectedUploadFiles.length ? _selectedUploadFiles : [_selectedUploadFile];
     $('uploadSpinner').style.display='';
     $('uploadError').style.display='none';
     $('uploadExtractArea').style.display='none';
-    try {
-        const fd = new FormData();
-        fd.append('file', _selectedUploadFile);
-        const resp = await fetch('/api/revenueops/invoices/upload', {
-            method: 'POST',
-            body: fd,
-            headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('adoptima_token')||'') }
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || 'Extraction failed');
-        uploadedFilePath = data.file_path;
-        renderExtractedInvoiceForm(data);
-    } catch (e) {
-        $('uploadSpinner').style.display='none';
-        $('uploadError').style.display='';
-        $('uploadError').textContent = e.message;
-        $('uploadExtractArea').style.display='';
+    _bulkExtractedRows = [];
+    // Ensure clients loaded for bulk table dropdowns
+    if (clients.length === 0) { try { clients = await api('GET','/clients?limit=9999'); } catch(e){ clients=[]; } }
+    _bulkClients = [...clients];
+    if(currentUser && currentUser.role==='user' && currentUser.assigned_account_ids){
+        const assigned=currentUser.assigned_account_ids;
+        _bulkClients=_bulkClients.filter(c=> assigned.includes(c.account_id));
     }
+    _bulkClients.sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
+
+    for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if ($('uploadProgressText')) $('uploadProgressText').textContent = `Extracting ${i+1} of ${files.length}: ${f.name}...`;
+        try {
+            const fd = new FormData();
+            fd.append('file', f);
+            const resp = await fetch('/api/revenueops/invoices/upload', {
+                method: 'POST',
+                body: fd,
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('adoptima_token')||'') }
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || 'Extraction failed');
+            _bulkExtractedRows.push({
+                file_name: f.name,
+                file_path: data.file_path,
+                extracted: data.extracted_data || {},
+                matched: data.matched_account || {},
+                suggested_due_date: data.suggested_due_date,
+                suggested_bm: data.suggested_bm,
+                suggested_bm_id: data.suggested_bm_id,
+                status: 'ok', // ok | needs_match | failed
+                error: null,
+            });
+        } catch (e) {
+            _bulkExtractedRows.push({
+                file_name: f.name,
+                file_path: null,
+                extracted: {},
+                matched: {},
+                status: 'failed',
+                error: e.message,
+            });
+        }
+        // Delay between Gemini calls to respect rate limits
+        if (i < files.length - 1) {
+            await new Promise(r => setTimeout(r, 1500));
+        }
+    }
+    $('uploadSpinner').style.display='none';
+    if (_bulkExtractedRows.length === 1 && _bulkExtractedRows[0].status === 'ok') {
+        // Single successful file → show detailed review form (existing flow)
+        const row = _bulkExtractedRows[0];
+        uploadedFilePath = row.file_path;
+        renderExtractedInvoiceForm({ extracted_data: row.extracted, matched_account: row.matched, suggested_due_date: row.suggested_due_date, suggested_bm: row.suggested_bm, suggested_bm_id: row.suggested_bm_id, file_path: row.file_path });
+    } else {
+        renderBulkReviewTable();
+    }
+}
+
+function renderBulkReviewTable(){
+    $('modalTitle').textContent='Review Extracted Invoices';
+    const clientOpts = _bulkClients.map(c=>`<option value="${c.id}">${escapeHtml(c.client_name)}</option>`).join('');
+    const rowsHtml = _bulkExtractedRows.map((r, idx) => {
+        const ex = r.extracted || {};
+        const matchedId = r.matched && r.matched.rev_client_id ? r.matched.rev_client_id : '';
+        let rowColor = '#fff';
+        let statusBadge = '';
+        if (r.status === 'failed') { rowColor = '#fef2f2'; statusBadge = '<span style="color:#dc2626;font-weight:600;font-size:0.72rem;">Failed</span>'; }
+        else if (!matchedId) { rowColor = '#fffbeb'; statusBadge = '<span style="color:#d97706;font-weight:600;font-size:0.72rem;">Needs match</span>'; }
+        else { rowColor = '#f0fdf4'; statusBadge = '<span style="color:#059669;font-weight:600;font-size:0.72rem;">Ready</span>'; }
+        const totalAmt = ex.total_amount ?? '';
+        const baseAmt = ex.base_amount ?? '';
+        const totalTax = ex.total_tax ?? (ex.cgst_amount!=null || ex.sgst_amount!=null || ex.igst_amount!=null ? ((ex.cgst_amount||0)+(ex.sgst_amount||0)+(ex.igst_amount||0)) : '');
+        const invNum = ex.invoice_number || '';
+        const invDate = ex.invoice_date || '';
+        const clientSelect = r.status === 'failed'
+            ? '<span style="color:#dc2626;font-size:0.78rem;">'+escapeHtml(r.error||'Extraction failed')+'</span>'
+            : `<select class="filter-input" id="bulk_client_${idx}" style="min-width:140px" onchange="updateBulkRowStatus(${idx})"><option value="">Select</option>${clientOpts}</select>`;
+        const editable = r.status !== 'failed';
+        return `<tr style="background:${rowColor};" id="bulk_row_${idx}">
+            <td style="font-size:0.78rem;max-width:140px;word-break:break-all;">${escapeHtml(r.file_name)}</td>
+            <td>${statusBadge}</td>
+            <td>${editable?`<input id="bulk_invnum_${idx}" value="${escapeHtml(invNum)}" style="width:110px;font-size:0.78rem;">`:'—'}</td>
+            <td>${editable?`<input type="date" id="bulk_invdate_${idx}" value="${escapeHtml(invDate)}" style="width:130px;font-size:0.78rem;">`:'—'}</td>
+            <td>${clientSelect}</td>
+            <td>${editable?`<input type="number" id="bulk_base_${idx}" value="${baseAmt!==''?baseAmt:''}" step="0.01" style="width:80px;font-size:0.78rem;">`:'—'}</td>
+            <td>${editable?`<input type="number" id="bulk_gst_${idx}" value="${totalTax!==''?totalTax:''}" step="0.01" style="width:80px;font-size:0.78rem;">`:'—'}</td>
+            <td>${editable?`<input type="number" id="bulk_total_${idx}" value="${totalAmt!==''?totalAmt:''}" step="0.01" style="width:90px;font-size:0.78rem;">`:'—'}</td>
+            <td>${editable?`<input type="checkbox" id="bulk_ready_${idx}" ${matchedId?'checked':''} onchange="updateBulkReadyCount()">`:'—'}</td>
+        </tr>`;
+    }).join('');
+    $('modalBody').innerHTML=`
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.75rem;">Review extracted invoices below. Green = ready, Yellow = select client manually, Red = extraction failed. Tick the checkbox to include in Save All.</p>
+        <div class="table-wrap"><table style="width:100%;font-size:0.82rem;">
+            <thead><tr><th>File</th><th>Status</th><th>Invoice #</th><th>Date</th><th>Client</th><th>Base</th><th>GST</th><th>Total</th><th>Ready</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+        </table></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1rem;">
+            <span id="bulkReadyCount" style="font-size:0.85rem;font-weight:600;color:var(--text-muted);">0 of ${_bulkExtractedRows.length} ready to save</span>
+            <button class="btn btn-primary" onclick="saveAllBulkInvoices()">💾 Save All</button>
+        </div>
+    `;
+    // Pre-select matched clients
+    _bulkExtractedRows.forEach((r, idx) => {
+        if (r.status !== 'failed' && r.matched && r.matched.rev_client_id) {
+            const sel = $('bulk_client_' + idx);
+            if (sel) sel.value = r.matched.rev_client_id;
+        }
+    });
+    updateBulkReadyCount();
+    $('modalSave').style.display='none';
+}
+
+function updateBulkRowStatus(idx){
+    // When user manually selects a client, mark row as ready
+    const sel = $('bulk_client_' + idx);
+    if (!sel || !sel.value) return;
+    const chk = $('bulk_ready_' + idx);
+    if (chk) chk.checked = true;
+    // Update row background to green
+    const row = $('bulk_row_' + idx);
+    if (row) row.style.background = '#f0fdf4';
+    updateBulkReadyCount();
+}
+
+function updateBulkReadyCount(){
+    let ready = 0;
+    _bulkExtractedRows.forEach((r, idx) => {
+        if (r.status === 'failed') return;
+        const chk = $('bulk_ready_' + idx);
+        if (chk && chk.checked) {
+            const clientSel = $('bulk_client_' + idx);
+            if (clientSel && clientSel.value) ready++;
+        }
+    });
+    const el = $('bulkReadyCount');
+    if (el) el.textContent = `${ready} of ${_bulkExtractedRows.length} ready to save`;
+}
+
+async function saveAllBulkInvoices(){
+    const btn = (typeof event!=='undefined'&&event)?event.target:null;
+    _setSaving(btn, 'Saving...');
+    let saved = 0;
+    let failed = 0;
+    try {
+        for (let idx = 0; idx < _bulkExtractedRows.length; idx++) {
+            const r = _bulkExtractedRows[idx];
+            if (r.status === 'failed') { failed++; continue; }
+            const chk = $('bulk_ready_' + idx);
+            if (!chk || !chk.checked) continue;
+            const clientId = parseInt(($('bulk_client_' + idx) || {}).value || '0');
+            const invNumber = ($('bulk_invnum_' + idx) || {}).value?.trim();
+            const invDate = ($('bulk_invdate_' + idx) || {}).value;
+            const totalAmt = parseFloat(($('bulk_total_' + idx) || {}).value || '0');
+            if (!clientId || !invNumber || !totalAmt) { failed++; continue; }
+            const baseAmt = ($('bulk_base_' + idx) || {}).value ? parseFloat($('bulk_base_' + idx).value) : null;
+            const gstAmt = ($('bulk_gst_' + idx) || {}).value ? parseFloat($('bulk_gst_' + idx).value) : null;
+            const ex = r.extracted || {};
+            const cgst = ex.cgst_amount ?? null;
+            const sgst = ex.sgst_amount ?? null;
+            const igst = ex.igst_amount ?? null;
+            const data = {
+                client_id: clientId,
+                invoice_number: invNumber,
+                invoice_date: invDate || new Date().toISOString().split('T')[0],
+                due_date: r.suggested_due_date || null,
+                invoice_amount: totalAmt,
+                invoice_status: 'invoice_raised',
+                payment_status: 'unpaid',
+                base_amount: baseAmt,
+                gst_amount: gstAmt,
+                cgst_amount: cgst,
+                sgst_amount: sgst,
+                igst_amount: igst,
+                description: ex.description || null,
+                jobcard_number: ex.jobcard_number || null,
+                po_reference: ex.po_reference || null,
+                document_file_path: r.file_path || null,
+                source: 'ai_upload',
+            };
+            try {
+                await api('POST', '/invoices', data);
+                saved++;
+            } catch (e) {
+                console.error('Save failed for row', idx, e);
+                failed++;
+            }
+        }
+        toast(`Saved ${saved} invoice(s)${failed?`, ${failed} failed`:''}`, failed ? 'error' : '');
+        if (saved > 0) { closeModal(); loadInvoices(); }
+    } catch (e) { toast(e.message, 'error'); }
+    finally { _resetSaving(btn); }
 }
 
 function confDot(value){
