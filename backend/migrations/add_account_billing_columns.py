@@ -29,20 +29,31 @@ COLUMNS = [
 ]
 
 
-def _column_exists(conn, table, column):
+def _existing_columns(table):
+    """Return set of existing column names. Uses a separate connection so we
+    don't deadlock inside an open transaction on PostgreSQL."""
     inspector = inspect(engine)
-    cols = [c["name"] for c in inspector.get_columns(table)]
-    return column in cols
+    try:
+        return {c["name"] for c in inspector.get_columns(table)}
+    except Exception:
+        return set()
 
 
 def run_migration():
     active = get_active_db()
     logger.info(f"Running account billing column migration on {active}")
+    # Inspect existing columns BEFORE opening a transaction to avoid locks.
+    try:
+        existing = _existing_columns("accounts")
+    except Exception as e:
+        logger.warning(f"Account billing migration skipped (inspect failed): {e}")
+        return
+    missing = [(n, d) for n, d in COLUMNS if n not in existing]
+    if not missing:
+        logger.info("All account billing columns already present, migration skipped")
+        return
     with engine.begin() as conn:
-        for col_name, col_def in COLUMNS:
-            if _column_exists(conn, "accounts", col_name):
-                logger.info(f"Column accounts.{col_name} already exists, skipping")
-                continue
+        for col_name, col_def in missing:
             if active.startswith("postgresql"):
                 sql = f'ALTER TABLE accounts ADD COLUMN IF NOT EXISTS {col_name} {col_def}'
             else:
