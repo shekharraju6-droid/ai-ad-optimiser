@@ -1,9 +1,12 @@
 import os
 import json
+import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("AdOptima")
 
 router = APIRouter(prefix="/api/voice", tags=["voice-control"])
 
@@ -36,13 +39,16 @@ async def process_voice_command(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="No audio file provided")
         
     try:
-        # Save temporary file locally on the Railway container container instance
+        raw = await file.read()
+        logger.info(f"[Rudra] received file: {file.filename}, size={len(raw)} bytes, content_type={file.content_type}")
+        # Save temporary file locally on the Railway container
         temp_file_path = f"/tmp/{file.filename}"
         with open(temp_file_path, "wb") as buffer:
-            buffer.write(await file.read())
+            buffer.write(raw)
             
         # Upload the audio to Google's temporary staging environment
         uploaded_audio = client.files.upload(file=temp_file_path)
+        logger.info(f"[Rudra] uploaded audio to Gemini: {uploaded_audio.name}")
         
         # Analyze the audio file using Gemini
         response = client.models.generate_content(
@@ -62,13 +68,23 @@ async def process_voice_command(file: UploadFile = File(...)):
                 )
             ),
         )
+        logger.info(f"[Rudra] Gemini raw response: {response.text[:500] if hasattr(response, 'text') else 'NO TEXT'}")
         
         # Clean up temporary storage assets
-        client.files.delete(name=uploaded_audio.name)
-        os.remove(temp_file_path)
+        try:
+            client.files.delete(name=uploaded_audio.name)
+        except Exception as ce:
+            logger.warning(f"[Rudra] failed to delete uploaded file: {ce}")
+        try:
+            os.remove(temp_file_path)
+        except Exception:
+            pass
         
         # Parse the stringified JSON back into a true dictionary to return to frontend
-        return json.loads(response.text)
+        parsed = json.loads(response.text)
+        logger.info(f"[Rudra] parsed action: {parsed.get('action')} module: {parsed.get('target_module')}")
+        return parsed
         
     except Exception as e:
+        logger.error(f"[Rudra] command failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
