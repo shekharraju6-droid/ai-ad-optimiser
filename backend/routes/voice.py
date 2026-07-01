@@ -54,8 +54,10 @@ async def process_voice_command(file: UploadFile = File(...)):
                 response_mime_type="application/json",
                 response_schema=VoiceActionResponse,
                 system_instruction=(
-                    "You are the structural router for an internal enterprise dashboard app. "
-                    "Translate vocal requests strictly into the required JSON schema. Do not chat."
+                    "You are Rudra, the custom voice-activated command center for this dashboard. "
+                    "The user will address you as Rudra. Your only job is to listen to the user's voice "
+                    "instructions, ignore your name prefix if spoken, and translate the request strictly "
+                    "into the required JSON schema structure. Do not chat or reply with text."
                 )
             ),
         )
