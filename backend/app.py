@@ -4,7 +4,7 @@ FastAPI application entry point.
 """
 import os
 import logging
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,6 +12,8 @@ from backend.routes import config, campaigns, search_terms, negatives, optimizat
 
 from backend.db.database import init_db
 from backend.services.scheduler import start_scheduler, stop_scheduler
+
+from voice_router import process_voice_command, execute_command
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("AdOptima")
@@ -59,6 +61,20 @@ def ensure_scheduler():
             _scheduler_started = True
         except Exception as e:
             logger.error(f"Failed to start scheduler: {e}")
+
+
+# Voice Command Endpoint
+@app.post("/api/voice/command")
+async def voice_command(audio: UploadFile = File(...)):
+    """Receive audio from frontend, route through Gemini, return structured action payload."""
+    try:
+        audio_bytes = await audio.read()
+        command = process_voice_command(audio_bytes)
+        result = execute_command(command)
+        return JSONResponse(content=result)
+    except Exception as e:
+        logger.exception("Voice command processing failed")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 @app.middleware("http")

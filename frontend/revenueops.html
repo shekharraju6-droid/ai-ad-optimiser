@@ -77,6 +77,8 @@
         .btn-primary:hover{filter:brightness(1.08);box-shadow:0 5px 16px rgba(79,70,229,.35)}
         .btn-secondary{background:#fff;border-color:var(--border);color:var(--text-muted)}
         .btn-secondary:hover{background:var(--primary-light);color:var(--primary);border-color:var(--primary)}
+        #voiceMicBtn{font-size:1.1rem;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:50%;transition:.15s}
+        #voiceMicBtn:active{transform:scale(.95)}
         .btn-danger{background:var(--danger);color:#fff;box-shadow:0 3px 10px rgba(239,68,68,.22)}
         .btn-danger:hover{filter:brightness(1.08)}
         .btn-sm{padding:.34rem .6rem;font-size:.78rem}
@@ -264,6 +266,7 @@
             <h1 id="pageTitle">Dashboard</h1>
             <div class="topbar-right">
                 <span class="user-badge" id="userBadge">Loading...</span>
+                <button class="btn btn-secondary btn-sm" id="voiceMicBtn" onmousedown="startVoiceRecording()" onmouseup="stopVoiceRecording()" onmouseleave="stopVoiceRecording()" title="Hold to speak">🎤</button>
             </div>
         </div>
         <div class="content" id="content">
@@ -565,6 +568,80 @@ async function checkAuth(){
     }
     // close dropdown on panel switch
     closeDashAccountFilter();
+}
+
+// VOICE COMMAND (fetch-based, 3-layer flow)
+let voiceRecorder = null;
+let voiceChunks = [];
+let voiceRecording = false;
+
+async function startVoiceRecording() {
+    if (voiceRecording) return;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        voiceRecorder = new MediaRecorder(stream);
+        voiceChunks = [];
+        voiceRecorder.ondataavailable = e => { if (e.data.size > 0) voiceChunks.push(e.data); };
+        voiceRecorder.onstop = () => sendVoiceCommand();
+        voiceRecorder.start();
+        voiceRecording = true;
+        const btn = $('voiceMicBtn');
+        if (btn) { btn.style.background = '#dc3545'; btn.textContent = '⏹'; }
+    } catch (err) {
+        alert('Microphone access denied or error: ' + err.message);
+    }
+}
+
+function stopVoiceRecording() {
+    if (!voiceRecording || !voiceRecorder) return;
+    voiceRecording = false;
+    voiceRecorder.stop();
+    const btn = $('voiceMicBtn');
+    if (btn) { btn.style.background = ''; btn.textContent = '🎤'; }
+}
+
+async function sendVoiceCommand() {
+    if (!voiceChunks.length) return;
+    const blob = new Blob(voiceChunks, { type: 'audio/mp3' });
+    const form = new FormData();
+    form.append('audio', blob, 'voice_command.mp3');
+    toast('Processing voice command...', 'info');
+    try {
+        const res = await fetch('/api/voice/command', { method: 'POST', body: form, headers: { 'Authorization': 'Bearer ' + token } });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Voice command failed');
+        const payload = await res.json();
+        handleVoicePayload(payload);
+    } catch (e) {
+        toast(e.message, 'error');
+    } finally {
+        voiceChunks = [];
+    }
+}
+
+function handleVoicePayload(payload) {
+    const cmd = payload.command || {};
+    if (cmd.action === 'REFRESH_ADS') {
+        toast(`Refresh ads: ${cmd.target_platform}`);
+        const container = $('live-ad-container');
+        if (container) container.innerHTML = renderVoiceAdHTML(payload.data);
+    } else if (cmd.action === 'GENERATE_REPORT') {
+        toast(`Generate report: ${cmd.target_platform} (${cmd.timeframe})`);
+        runReport(cmd.timeframe || 'outstanding');
+    } else if (cmd.action === 'SWITCH_DASHBOARD') {
+        const target = (cmd.target_platform || 'dashboard').toLowerCase();
+        const map = { adpulse: 'dashboard', insightdesk: 'dashboard', revenueops: 'dashboard', dashboard: 'dashboard' };
+        showPanel(map[target] || 'dashboard');
+        toast(`Switched to ${target}`);
+    } else {
+        toast('Unknown voice command: ' + cmd.action, 'error');
+    }
+}
+
+function renderVoiceAdHTML(data) {
+    if (!data || !data.ads || !data.ads.length) {
+        return `<div class="card"><div class="card-header"><span class="card-title">Voice Refresh Result</span></div><p>${data.note || 'No data'}</p></div>`;
+    }
+    return `<div class="card"><div class="card-header"><span class="card-title">Voice Refresh: ${data.platform}</span></div><p>${data.ads.length} ads loaded</p></div>`;
 }
 
 // DASHBOARD
