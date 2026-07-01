@@ -32,6 +32,29 @@ class VoiceActionResponse(BaseModel):
     target_module: str = Field(description="The module context: 'revenueops', 'adpulse', 'insightdesk', or 'global'")
     parameters: dict = Field(default={}, description="Key-value pairs extracted from speech (e.g., {'timeframe': '30_days', 'tab_id': 'billing', 'client_name': 'Acme Corp'})")
 
+
+def _build_voice_schema():
+    """Return a Gemini-compatible JSON schema dict from the Pydantic model.
+
+    Gemini's Developer API rejects schemas that contain 'additionalProperties: false'.
+    Pydantic emits that by default, so we strip it and mark the schema as permissive.
+    """
+    schema = VoiceActionResponse.model_json_schema()
+
+    def _strip_additional_properties(obj):
+        if isinstance(obj, dict):
+            if "additionalProperties" in obj:
+                del obj["additionalProperties"]
+            for v in obj.values():
+                _strip_additional_properties(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                _strip_additional_properties(item)
+
+    _strip_additional_properties(schema)
+    schema["additionalProperties"] = True
+    return schema
+
 # 2. The API endpoint handling your spoken audio file
 @router.post("/command")
 async def process_voice_command(file: UploadFile = File(...)):
@@ -59,7 +82,7 @@ async def process_voice_command(file: UploadFile = File(...)):
             ],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=VoiceActionResponse,
+                response_schema=_build_voice_schema(),
                 system_instruction=(
                     "You are Rudra, the custom voice-activated command center for this dashboard. "
                     "The user will address you as Rudra. Your only job is to listen to the user's voice "
