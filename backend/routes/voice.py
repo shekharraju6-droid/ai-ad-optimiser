@@ -13,9 +13,20 @@ client = genai.Client()
 
 # 1. Define the JSON schema Gemini MUST respond with
 class VoiceActionResponse(BaseModel):
-    action: str = Field(description="The matching UI action: 'REFRESH_METRICS', 'SWITCH_TAB', 'OPEN_MODAL'")
-    target_module: str = Field(description="The module context: 'revenueops', 'adpulse', 'insightdesk'")
-    parameters: dict = Field(default={}, description="Key-value pairs extracted from speech (e.g., {'timeframe': '30_days', 'tab_id': 'billing'})")
+    action: str = Field(
+        description=(
+            "The matching UI action. Supported values: "
+            "'REFRESH_METRICS' (parameters: timeframe), "
+            "'SWITCH_TAB' or 'NAVIGATE' (parameters: tab_id or module_name), "
+            "'OPEN_MODAL' (parameters: modal_type), "
+            "'SYNC_LEADS', "
+            "'TOGGLE_LIVE_MODE' (parameters: platform), "
+            "'CREATE_INVOICE' (parameters: client_name), "
+            "'SHOW_OVERDUE'"
+        )
+    )
+    target_module: str = Field(description="The module context: 'revenueops', 'adpulse', 'insightdesk', or 'global'")
+    parameters: dict = Field(default={}, description="Key-value pairs extracted from speech (e.g., {'timeframe': '30_days', 'tab_id': 'billing', 'client_name': 'Acme Corp'})")
 
 # 2. The API endpoint handling your spoken audio file
 @router.post("/command")
