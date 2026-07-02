@@ -185,9 +185,10 @@
                     </div>
                 </div>
                 <div class="um-checks" style="margin-top:0.75rem;">
-                    <label class="um-check"><input type="checkbox" id="umAccessAdPulse"> AdPulse Access</label>
+                    <label class="um-check"><input type="checkbox" id="umAccessAdPulse" onchange="toggleAuditReviewCheckbox()"> AdPulse Access</label>
                     <label class="um-check"><input type="checkbox" id="umAccessInsightDesk"> InsightDesk Access</label>
                     <label class="um-check"><input type="checkbox" id="umAccessRevenueOps"> RevenueOps Access</label>
+                    <label class="um-check" id="umAccessAuditReviewLabel" style="opacity:0.5;" title="Requires AdPulse Access"><input type="checkbox" id="umAccessAuditReview" disabled> AI Audit Review Access</label>
                 </div>
                 <div class="um-section" id="umAssignSection">
                     <div class="um-section-title">Assigned Client/Brand</div>
@@ -665,6 +666,7 @@
             if (u.access_adpulse) access.push('AdPulse');
             if (u.access_insightdesk) access.push('InsightDesk');
             if (u.access_revenueops) access.push('RevenueOps');
+            if (u.access_audit_review) access.push('AI Audit Review');
             const status = u.onboarding_completed !== false ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Pending setup</span>';
             return `<tr>
                 <td>${escapeHtml(u.full_name || '-')}</td>
@@ -677,6 +679,22 @@
         }).join('');
     }
 
+    function toggleAuditReviewCheckbox() {
+        const adpulseChecked = $('umAccessAdPulse').checked;
+        const label = $('umAccessAuditReviewLabel');
+        const cb = $('umAccessAuditReview');
+        if (adpulseChecked) {
+            label.style.opacity = '1';
+            label.title = '';
+            cb.disabled = false;
+        } else {
+            label.style.opacity = '0.5';
+            label.title = 'Requires AdPulse Access';
+            cb.disabled = true;
+            cb.checked = false;
+        }
+    }
+
     function resetUserForm() {
         $('umUserId').value = '';
         $('umFullName').value = '';
@@ -686,6 +704,7 @@
         $('umAccessAdPulse').checked = true;
         $('umAccessInsightDesk').checked = false;
         $('umAccessRevenueOps').checked = false;
+        $('umAccessAuditReview').checked = false;
         $('umLinkBox').classList.add('hidden');
         $('umSetupLink').textContent = '';
         renderAssignList([]);
@@ -702,6 +721,8 @@
         $('umAccessAdPulse').checked = u.access_adpulse;
         $('umAccessInsightDesk').checked = u.access_insightdesk;
         $('umAccessRevenueOps').checked = u.access_revenueops;
+        $('umAccessAuditReview').checked = u.access_audit_review || false;
+        toggleAuditReviewCheckbox();
         $('umLinkBox').classList.add('hidden');
         renderAssignList(u.assigned_account_ids || []);
     }
@@ -719,6 +740,7 @@
                 access_adpulse: $('umAccessAdPulse').checked,
                 access_insightdesk: $('umAccessInsightDesk').checked,
                 access_revenueops: $('umAccessRevenueOps').checked,
+                access_audit_review: $('umAccessAuditReview').checked,
                 assigned_account_ids: Array.from($('umAssignAccounts').querySelectorAll('input:checked')).map(cb => parseInt(cb.value))
             };
             if (!body.full_name || !body.email) { alert('Name and email are required'); return; }

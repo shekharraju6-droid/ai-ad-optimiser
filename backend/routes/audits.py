@@ -65,9 +65,18 @@ def update_audit_setting(key: str, req: AuditSettingUpdate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+def _require_audit_review_access(user: User):
+    """Raise 403 if user lacks AI Audit Review access. Admins/superadmins always pass."""
+    if user.role in ("admin", "superadmin"):
+        return
+    if not getattr(user, "access_audit_review", False):
+        raise HTTPException(status_code=403, detail="You do not have AI Audit Review access")
+
+
 @router.post("/accounts/{account_id}/smart-audit")
-def run_smart_audit_for_account(account_id: int, db: Session = Depends(get_db)):
+def run_smart_audit_for_account(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     """Run keyword + search term audit for a single account on demand."""
+    _require_audit_review_access(user)
     result = run_manual_smart_audit(account_id)
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
@@ -114,8 +123,9 @@ def run_all_audits(start_date: Optional[str] = None, end_date: Optional[str] = N
 
 
 @router.post("/pending-actions/clear-pending")
-def clear_pending_actions(req: ReviewRequest, db: Session = Depends(get_db)):
+def clear_pending_actions(req: ReviewRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     """Delete all pending actions (auto-generated recommendations only)."""
+    _require_audit_review_access(user)
     count = db.query(PendingAction).filter(PendingAction.status == "pending").delete(synchronize_session=False)
     db.commit()
     logger.info(f"Cleared {count} pending actions by {req.reviewer}")
@@ -123,13 +133,15 @@ def clear_pending_actions(req: ReviewRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/pending-actions")
-def get_pending_actions(db: Session = Depends(get_db)):
+def get_pending_actions(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _require_audit_review_access(user)
     actions = list_pending_actions(db)
     return [a.to_dict() for a in actions]
 
 
 @router.post("/pending-actions/{action_id}/review")
-def review_pending_action(action_id: int, req: ReviewRequest, db: Session = Depends(get_db)):
+def review_pending_action(action_id: int, req: ReviewRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    _require_audit_review_access(user)
     result = review_action(action_id, req.decision, req.reviewer)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -396,6 +408,7 @@ def list_audit_runs(limit: int = 30, db: Session = Depends(get_db)):
 @router.get("/adpulse/approval-queue/{account_id}/review")
 def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     """Return all pending recommendations for a single account grouped by type."""
+    _require_audit_review_access(user)
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -473,6 +486,7 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
 @router.post("/adpulse/approval-queue/apply")
 def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     """Process approved/rejected/dismissed recommendations in bulk."""
+    _require_audit_review_access(user)
     results = []
     reviewer = req.reviewer or (user.email or user.role or "admin")
     now = datetime.utcnow()

@@ -120,6 +120,12 @@ def init_db():
             run_brand_migration()
         except Exception as me:
             logger.warning(f"Additive brand keyword audit migration skipped/failed: {me}")
+        # Run safe additive migration for audit review access permission
+        try:
+            from backend.migrations.add_audit_review_access import run_migration as run_audit_review_migration
+            run_audit_review_migration()
+        except Exception as me:
+            logger.warning(f"Additive audit review access migration skipped/failed: {me}")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise

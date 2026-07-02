@@ -405,6 +405,7 @@ class User(Base):
     access_adpulse = Column(Boolean, default=True)
     access_insightdesk = Column(Boolean, default=False)
     access_revenueops = Column(Boolean, default=False)
+    access_audit_review = Column(Boolean, default=False)
     onboarding_token = Column(String, nullable=True, unique=True, index=True)
     onboarding_token_expires_at = Column(DateTime, nullable=True)
     onboarding_completed = Column(Boolean, default=False)
@@ -428,6 +429,7 @@ class User(Base):
             "access_adpulse": self.access_adpulse,
             "access_insightdesk": self.access_insightdesk,
             "access_revenueops": self.access_revenueops,
+            "access_audit_review": self.access_audit_review,
             "onboarding_completed": self.onboarding_completed,
             "assigned_account_ids": self.assigned_account_ids(),
             "created_at": self.created_at.isoformat() if self.created_at else None,

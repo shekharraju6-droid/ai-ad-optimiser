@@ -54,6 +54,7 @@ class UserCreateRequest(BaseModel):
     access_adpulse: bool = True
     access_insightdesk: bool = False
     access_revenueops: bool = False
+    access_audit_review: bool = False
 
 
 class UserUpdateRequest(BaseModel):
@@ -67,6 +68,7 @@ class UserUpdateRequest(BaseModel):
     access_adpulse: Optional[bool] = None
     access_insightdesk: Optional[bool] = None
     access_revenueops: Optional[bool] = None
+    access_audit_review: Optional[bool] = None
 
 
 class SetPasswordRequest(BaseModel):
@@ -223,6 +225,7 @@ def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(
         access_adpulse=req.access_adpulse,
         access_insightdesk=req.access_insightdesk,
         access_revenueops=req.access_revenueops,
+        access_audit_review=req.access_audit_review,
         onboarding_token=token,
         onboarding_token_expires_at=token_expires,
         onboarding_completed=False,
@@ -328,6 +331,8 @@ def update_user(user_id: int, req: UserUpdateRequest, db: Session = Depends(get_
             user.access_insightdesk = req.access_insightdesk
         if req.access_revenueops is not None:
             user.access_revenueops = req.access_revenueops
+        if req.access_audit_review is not None:
+            user.access_audit_review = req.access_audit_review
 
     db.refresh(user)
     return user.to_dict()

@@ -264,7 +264,7 @@
                     <input type="date" id="globalStartDate" class="date-input" onchange="onGlobalCustomDate()">
                     <input type="date" id="globalEndDate" class="date-input" onchange="onGlobalCustomDate()">
                     <button class="btn btn-primary" onclick="refreshAllAccounts()">Refresh All</button>
-                    <button class="btn btn-success" onclick="runGlobalAudit()">Run Audit</button>
+                    <button class="btn btn-success" id="runAuditBtn" onclick="runGlobalAudit()">Run Audit</button>
                 </div>
             </div>
 
@@ -806,9 +806,16 @@
         applyDateInputs();
         // Hide admin-only nav items for BM (role=user)
         const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
-        document.querySelectorAll('.nav-item[data-nav="accounts"], .nav-item[data-nav="approvals"]').forEach(el => {
+        const canAuditReview = isAdmin || (currentUser && currentUser.access_audit_review);
+        document.querySelectorAll('.nav-item[data-nav="accounts"]').forEach(el => {
             el.style.display = isAdmin ? '' : 'none';
         });
+        document.querySelectorAll('.nav-item[data-nav="approvals"]').forEach(el => {
+            el.style.display = canAuditReview ? '' : 'none';
+        });
+        // Hide Run Audit button if no audit review access
+        const runAuditBtn = document.getElementById('runAuditBtn');
+        if (runAuditBtn) runAuditBtn.style.display = canAuditReview ? '' : 'none';
         loadSummary();
         loadPendingActionsCount();
         switchPanel('dashboard');
@@ -1209,7 +1216,7 @@
                 <td class="text-right">${a.adpulse_audit_interval || a.audit_interval_minutes || 60}m</td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="openAccountDetail(${a.id}, '${a.has_google ? 'google' : 'meta'}')">View</button>
-                    ${a.has_google && a.google_is_live ? `<button class="btn btn-sm btn-success" onclick="runSmartAudit(${a.id})" title="Run keyword + search term audit">Smart Audit</button>` : ''}
+                    ${a.has_google && a.google_is_live && (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin' || currentUser.access_audit_review)) ? `<button class="btn btn-sm btn-success" onclick="runSmartAudit(${a.id})" title="Run keyword + search term audit">Smart Audit</button>` : ''}
                     <button class="btn btn-secondary btn-sm" onclick="window.location.href='/'">Edit</button>
                 </td>
             `;
