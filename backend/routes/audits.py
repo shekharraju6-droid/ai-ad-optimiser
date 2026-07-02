@@ -399,7 +399,7 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    if user.role == "user" and account_id not in (user.assigned_account_ids() or []):
+    if user.role in ("user", "newuser") and account_id not in (user.assigned_account_ids() or []):
         raise HTTPException(status_code=403, detail="Access denied to this account")
 
     pending = db.query(PendingAction).filter(

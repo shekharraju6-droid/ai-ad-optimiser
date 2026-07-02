@@ -177,7 +177,8 @@
                     <div class="form-group"><label>Mobile</label><input type="text" id="umMobile" placeholder="+91 9876543210"></div>
                     <div class="form-group"><label>Role</label>
                         <select id="umRole">
-                            <option value="user">BM (User)</option>
+                            <option value="user">BM</option>
+                            <option value="newuser">User</option>
                             <option value="admin">Admin</option>
                             <option value="superadmin" class="superadmin-option">Super Admin</option>
                         </select>
@@ -189,7 +190,7 @@
                     <label class="um-check"><input type="checkbox" id="umAccessRevenueOps"> RevenueOps Access</label>
                 </div>
                 <div class="um-section" id="umAssignSection">
-                    <div class="um-section-title">Assigned Client/Brand (for BM/User)</div>
+                    <div class="um-section-title">Assigned Client/Brand</div>
                     <div class="um-assign" id="umAssignAccounts"></div>
                 </div>
                 <div id="umLinkBox" class="um-link-box hidden">
@@ -648,8 +649,8 @@
 
     function roleBadge(role) {
         const cls = role === 'superadmin' ? 'badge-blue' : (role === 'admin' ? 'badge-green' : 'badge-orange');
-        const text = role === 'user' ? 'BM (User)' : role;
-        return `<span class="badge ${cls}">${text}</span>`;
+        const text = role === 'user' ? 'BM' : (role === 'newuser' ? 'User' : role);
+        return `<span class="badge ${cls}">${text.toUpperCase()}</span>`;
     }
 
     function escapeHtml(s) {

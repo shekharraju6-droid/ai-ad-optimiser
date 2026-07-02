@@ -4,7 +4,7 @@ JWT-based authentication + user management for AdOptima.
 Roles:
   - superadmin: full access + can manage users
   - admin: full access, cannot manage users
-  - user (BM): only sees assigned accounts
+  - user (BM) and newuser (User): only sees assigned accounts
 """
 import os
 import secrets
@@ -49,7 +49,7 @@ class UserCreateRequest(BaseModel):
     full_name: str
     email: str
     mobile: Optional[str] = None
-    role: str = "user"  # superadmin, admin, or user (BM)
+    role: str = "user"  # superadmin, admin, user (BM), or newuser (User)
     assigned_account_ids: List[int] = []
     access_adpulse: bool = True
     access_insightdesk: bool = False
@@ -205,13 +205,12 @@ def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(
     existing = db.query(User).filter(User.email == req.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    if req.role not in ("superadmin", "admin", "user"):
-        raise HTTPException(status_code=400, detail="Role must be 'superadmin', 'admin', or 'user'")
+    if req.role not in ("superadmin", "admin", "user", "newuser"):
+        raise HTTPException(status_code=400, detail="Role must be 'superadmin', 'admin', 'user', or 'newuser'")
     # Only superadmin can create another superadmin
     if req.role == "superadmin" and current_user.role != "superadmin":
         raise HTTPException(status_code=403, detail="Only Super Admin can create superadmin users")
-    token = secrets.token_urlsafe(32)
-    token_expires = datetime.utcnow() + timedelta(hours=ONBOARDING_TOKEN_EXPIRE_HOURS)
+
     user = User(
         email=req.email,
         hashed_password=get_password_hash(secrets.token_urlsafe(16)),  # random temp password
@@ -230,7 +229,9 @@ def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(
     db.flush()
     if req.role == "user" and req.assigned_account_ids:
         _sync_account_assignments(user, req.assigned_account_ids, db)
-    db.commit()
+    if req.role == "newuser" and req.assigned_account_ids:
+        _sync_account_assignments(user, req.assigned_account_ids, db)
+
     db.refresh(user)
     # Prefer explicit env var, otherwise derive from the incoming request so
     # invite links work on Railway/localhost without manual configuration.
@@ -308,23 +309,23 @@ def update_user(user_id: int, req: UserUpdateRequest, db: Session = Depends(get_
         user.mobile = req.mobile
     if req.password:
         user.hashed_password = get_password_hash(req.password)
-    if req.role is not None:
-        if req.role not in ("superadmin", "admin", "user"):
-            raise HTTPException(status_code=400, detail="Invalid role")
-        user.role = req.role
-    if req.rev_role is not None:
-        user.rev_role = req.rev_role
-    if req.is_active is not None:
-        user.is_active = req.is_active
-    if req.access_adpulse is not None:
-        user.access_adpulse = req.access_adpulse
-    if req.access_insightdesk is not None:
-        user.access_insightdesk = req.access_insightdesk
-    if req.access_revenueops is not None:
-        user.access_revenueops = req.access_revenueops
-    if req.assigned_account_ids is not None:
-        _sync_account_assignments(user, req.assigned_account_ids, db)
-    db.commit()
+        if req.role is not None:
+            if req.role not in ("superadmin", "admin", "user", "newuser"):
+                raise HTTPException(status_code=400, detail="Invalid role")
+            user.role = req.role
+        if req.rev_role is not None:
+            user.rev_role = req.rev_role
+        if req.assigned_account_ids is not None:
+            _sync_account_assignments(user, req.assigned_account_ids, db)
+        if req.is_active is not None:
+            user.is_active = req.is_active
+        if req.access_adpulse is not None:
+            user.access_adpulse = req.access_adpulse
+        if req.access_insightdesk is not None:
+            user.access_insightdesk = req.access_insightdesk
+        if req.access_revenueops is not None:
+            user.access_revenueops = req.access_revenueops
+
     db.refresh(user)
     return user.to_dict()
 

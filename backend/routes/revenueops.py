@@ -46,25 +46,27 @@ def _bm_client_filter(query, user: User):
 
     - superadmin/admin: see all clients.
     - business_manager: see only clients where business_manager_id == user.id.
-    - regular user (role=user) without rev_role: see clients whose linked central
+    - regular user (role=user or newuser) without rev_role: see clients whose linked central
       account is in the user's assigned_account_ids. Empty assignment list = no clients.
     """
     if user.role in ("admin", "superadmin"):
         return query
     if user.rev_role == "business_manager":
         return query.filter(RevClient.business_manager_id == user.id)
-    # Regular user: restrict to assigned accounts.
-    assigned_ids = user.assigned_account_ids()
-    if not assigned_ids:
-        return query.filter(false())
-    return query.join(
-        Account,
-        or_(
-            Account.rev_client_id == RevClient.id,
-            RevClient.account_id == Account.id,
-        ),
-        isouter=False,
-    ).filter(Account.id.in_(assigned_ids))
+    # Regular user/BM/User: restrict to assigned accounts.
+    if user.role in ("user", "newuser"):
+        assigned_ids = user.assigned_account_ids()
+        if not assigned_ids:
+            return query.filter(false())
+        return query.join(
+            Account,
+            or_(
+                Account.rev_client_id == RevClient.id,
+                RevClient.account_id == Account.id,
+            ),
+            isouter=False,
+        ).filter(Account.id.in_(assigned_ids))
+    return query
 
 
 def _client_view_query(db: Session, user: User):
@@ -1319,7 +1321,7 @@ def dashboard(
             visible_client_ids = db.query(RevClient.id).filter(
                 RevClient.business_manager_id == user.id
             ).subquery()
-        else:
+        elif user.role in ("user", "newuser"):
             assigned_ids = user.assigned_account_ids()
             if not assigned_ids:
                 visible_client_ids = db.query(RevClient.id).filter(false()).subquery()
@@ -1337,6 +1339,8 @@ def dashboard(
                     .filter(Account.id.in_(assigned_ids))
                     .subquery()
                 )
+        else:
+            visible_client_ids = db.query(RevClient.id).filter(false()).subquery()
 
     q = db.query(RevInvoice)
     if visible_client_ids is not None:

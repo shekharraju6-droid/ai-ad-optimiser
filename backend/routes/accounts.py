@@ -563,7 +563,7 @@ def get_account(account_id: int, start_date: Optional[str] = None, end_date: Opt
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    if user.role == "user" and account_id not in user.assigned_account_ids():
+    if user.role in ("user", "newuser") and account_id not in user.assigned_account_ids():
         raise HTTPException(status_code=403, detail="Access denied to this account")
     data = account.to_dict()
     # Zero out metrics for non-live accounts
@@ -588,7 +588,7 @@ def get_campaigns_with_tags(account_id: int, db: Session = Depends(get_db), user
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    if user.role == "user" and account_id not in user.assigned_account_ids():
+    if user.role in ("user", "newuser") and account_id not in user.assigned_account_ids():
         raise HTTPException(status_code=403, detail="Access denied to this account")
 
     campaigns = []
@@ -629,7 +629,7 @@ def update_campaign_type_tag(account_id: int, campaign_id: str, req: CampaignTyp
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    if user.role == "user" and account_id not in user.assigned_account_ids():
+    if user.role in ("user", "newuser") and account_id not in user.assigned_account_ids():
         raise HTTPException(status_code=403, detail="Access denied to this account")
     if req.campaign_type not in ("brand", "non_brand", "auto"):
         raise HTTPException(status_code=400, detail="campaign_type must be brand, non_brand, or auto")
