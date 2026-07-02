@@ -279,7 +279,7 @@
                     <span class="card-title">Date Range</span>
                     <div class="filters">
                         <div id="dashAccountFilterWrap" class="dash-filter-wrap hidden">
-                            <button class="btn btn-secondary btn-sm" id="dashAccountFilterBtn" onclick="toggleDashAccountFilter(event)">🏢 Accounts</button>
+                            <button class="btn btn-secondary btn-sm" id="dashAccountFilterBtn" onclick="toggleDashAccountFilter(event)">🏢 All Client/Brand</button>
                             <div id="dashAccountFilterDropdown" class="dash-filter-dropdown">
                                 <label class="dash-filter-option dash-filter-all"><input type="checkbox" id="dashAccountSelectAll" onchange="toggleSelectAllDashAccounts()"> Select All</label>
                                 <div id="dashAccountFilterOptions"></div>
@@ -294,7 +294,7 @@
                 <div class="kpi-grid" id="dashKpis"></div>
                 <div class="card">
                     <div class="card-header"><span class="card-title">Overdue Clients</span></div>
-                    <div class="table-wrap"><table id="dashOverdueTable"><thead><tr><th>Client</th><th>Outstanding</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="dashOverdueTable"><thead><tr><th>Client/Brand</th><th>Outstanding</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
 
@@ -308,7 +308,7 @@
                             <select class="filter-select" id="clientStatusFilter" onchange="loadClients()">
                                 <option value="">All Status</option><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option><option value="on_hold">On Hold</option>
                             </select>
-                            <a class="btn btn-secondary btn-sm" href="/" onclick="localStorage.setItem('open_manage_accounts','1')">Manage Accounts</a>
+                            <a class="btn btn-secondary btn-sm" href="/" onclick="localStorage.setItem('open_manage_accounts','1')">Manage Client/Brand</a>
                         </div>
                     </div>
                     <div class="table-wrap"><table id="clientsTable"><thead><tr><th>Client/Brand</th><th>Legal/Billing Entity</th><th>BM</th><th>Status</th><th>Invoice Day</th><th>Due Days</th><th>Contact Person</th><th>Email</th><th>Mobile</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
@@ -332,7 +332,7 @@
                             <button class="btn btn-primary btn-sm" onclick="openInvoiceModal()">+ New Invoice</button>
                         </div>
                     </div>
-                    <div class="table-wrap"><table id="invoicesTable"><thead><tr><th>Invoice #</th><th>Client</th><th>BM</th><th>Invoice raised Date</th><th>Invoice Amount</th><th>Received</th><th>Outstanding</th><th>Due Date</th><th>Overdue</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="invoicesTable"><thead><tr><th>Invoice #</th><th>Client/Brand</th><th>BM</th><th>Invoice raised Date</th><th>Invoice Amount</th><th>Received</th><th>Outstanding</th><th>Due Date</th><th>Overdue</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                     <div id="invPagination" style="margin-top:1rem;display:flex;align-items:center;justify-content:space-between;font-size:.82rem;color:var(--text-muted)">
                         <div>
                             Show:
@@ -360,7 +360,7 @@
                             <button class="btn btn-primary btn-sm" onclick="openPaymentModal()">+ Record Payment</button>
                         </div>
                     </div>
-                    <div class="table-wrap"><table id="paymentsTable"><thead><tr><th>Date</th><th>Client</th><th>Invoice</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="paymentsTable"><thead><tr><th>Date</th><th>Client/Brand</th><th>Invoice</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
 
@@ -375,7 +375,7 @@
                             </select>
                         </div>
                     </div>
-                    <div class="table-wrap"><table id="outstandingTable"><thead><tr><th>Client</th><th>Invoice</th><th>Amount</th><th>Received</th><th>Outstanding</th><th>Due Date</th><th>Overdue Days</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="outstandingTable"><thead><tr><th>Client/Brand</th><th>Invoice</th><th>Amount</th><th>Received</th><th>Outstanding</th><th>Due Date</th><th>Overdue Days</th><th>Status</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
 
@@ -386,7 +386,7 @@
                         <span class="card-title">Reminders</span>
                         <button class="btn btn-primary btn-sm" onclick="openReminderModal()">+ Add Reminder</button>
                     </div>
-                    <div class="table-wrap"><table id="remindersTable"><thead><tr><th>Client</th><th>Invoice</th><th>Type</th><th>Priority</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="remindersTable"><thead><tr><th>Client/Brand</th><th>Invoice</th><th>Type</th><th>Priority</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
 
@@ -397,7 +397,7 @@
                         <span class="card-title">Documents</span>
                         <button class="btn btn-primary btn-sm" onclick="openDocModal()">+ Upload Document</button>
                     </div>
-                    <div class="table-wrap"><table id="docsTable"><thead><tr><th>Name</th><th>Type</th><th>Client</th><th>Invoice</th><th>Uploaded By</th><th>Date</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="docsTable"><thead><tr><th>Name</th><th>Type</th><th>Client/Brand</th><th>Invoice</th><th>Uploaded By</th><th>Date</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
 
@@ -455,7 +455,7 @@
                         <span class="card-title">User Management</span>
                         <button class="btn btn-primary btn-sm" id="addUserBtn" onclick="openUserModal()" style="display:none">+ Add User</button>
                     </div>
-                    <div class="table-wrap"><table id="usersTable"><thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Role</th><th>Assigned Accounts</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table id="usersTable"><thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Role</th><th>Assigned Client/Brand</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
         </div>
@@ -535,12 +535,12 @@ function showPanel(name){
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
     const panel=$('panel-'+name);if(panel)panel.classList.add('active');
     // Highlight the matching nav item
-    const map={dashboard:'📊 Dashboard',clients:'👥 Clients',invoices:'🧾 Invoices',payments:'💳 Payments',outstanding:'⏳ Outstanding',reminders:'🔔 Reminders',documents:'📁 Documents',reports:'📈 Reports',bms:'🧑\u200d💼 BMs','bm-view':'👁 BM View',settings:'⚙️ Settings',users:'🔐 Users'};
+    const map={dashboard:'📊 Dashboard',clients:'👥 Client/Brand',invoices:'🧾 Invoices',payments:'💳 Payments',outstanding:'⏳ Outstanding',reminders:'🔔 Reminders',documents:'📁 Documents',reports:'📈 Reports',bms:'🧑\u200d💼 BMs','bm-view':'👁 BM View',settings:'⚙️ Settings',users:'🔐 Users'};
     document.querySelectorAll('.nav-item').forEach(n=>{
         const txt=n.textContent.trim();
         if(txt===map[name]){n.classList.add('active');const sec=n.closest('.nav-section');if(sec&&!sec.classList.contains('open'))sec.classList.add('open')}
     });
-    const titles={dashboard:'Dashboard',clients:'Clients',invoices:'Invoices',payments:'Payments',outstanding:'Outstanding',reminders:'Reminders',documents:'Documents',reports:'Reports',bms:'Business Managers','bm-view':'BM View',settings:'Settings',users:'User Management'};
+    const titles={dashboard:'Dashboard',clients:'Client/Brand',invoices:'Invoices',payments:'Payments',outstanding:'Outstanding',reminders:'Reminders',documents:'Documents',reports:'Reports',bms:'Business Managers','bm-view':'BM View',settings:'Settings',users:'User Management'};
     $('pageTitle').textContent=titles[name]||name;
     loadPanel(name);
 }
@@ -603,8 +603,8 @@ function updateDashAccountButtonLabel(){
     if(!btn)return;
     const total=dashClientsCache.length;
     const selected=dashAccountFilterSelected.length;
-    if(selected===0 || selected===total){btn.textContent='🏢 All Accounts';}
-    else{btn.textContent=`🏢 Accounts (${selected})`;}
+    if(selected===0 || selected===total){btn.textContent='🏢 All Client/Brand';}
+    else{btn.textContent=`🏢 Client/Brand (${selected})`;}
 }
 
 function renderDashAccountFilter(){
@@ -689,7 +689,7 @@ async function loadDashboard(){
         <div class="kpi-card c-red"><div class="kpi-icon-wrap">⚡</div><div class="kpi-label">Disputed</div><div class="kpi-value">${k.disputed_count}</div></div>
 
         <!-- Row 3 -->
-        <div class="kpi-card c-purple"><div class="kpi-icon-wrap">👥</div><div class="kpi-label">Active Clients</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
+        <div class="kpi-card c-purple"><div class="kpi-icon-wrap">👥</div><div class="kpi-label">Active Client/Brand</div><div class="kpi-value">${k.active_client_count}</div><div class="kpi-sub">${k.clients_no_invoice} without invoice</div></div>
     `;
     $('dashOverdueTable').querySelector('tbody').innerHTML=(k.top_overdue_clients||[]).map(c=>`<tr><td style="font-weight:600">${c.client_name}</td><td style="color:var(--danger);font-weight:600">${fmt(c.outstanding)}</td></tr>`).join('');
 }
@@ -749,7 +749,7 @@ function openClientQuickEdit(id) {
     modalMode='edit'; modalEditId=id;
     $('modalTitle').textContent='Quick Edit: ' + c.client_name;
     $('modalBody').innerHTML=`
-        <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Full account details are managed from the main page → Manage Accounts.</p>
+        <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Full Client/Brand details are managed from the main page → Manage Client/Brand.</p>
         <div class="form-row"><div class="form-group"><label>Status</label><select id="m_clientStatus"><option value="active" ${(c.client_status||'active')==='active'?'selected':''}>Active</option><option value="paused" ${c.client_status==='paused'?'selected':''}>Paused</option><option value="closed" ${c.client_status==='closed'?'selected':''}>Closed</option><option value="on_hold" ${c.client_status==='on_hold'?'selected':''}>On Hold</option></select></div></div>
         <div class="form-row"><div class="form-group"><label>Invoice Day</label><input type="number" id="m_invoiceDay" value="${c.invoice_day||1}" min="1" max="31"></div>
         <div class="form-group"><label>Default Due Days</label><input type="number" id="m_dueDays" value="${c.default_due_days||30}" min="0"></div></div>
@@ -844,7 +844,7 @@ async function openInvoiceModal(edit=null){
     const sortedClients=visibleClients.sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
     const opts=sortedClients.map(c=>`<option value="${c.id}" ${edit&&edit.client_id===c.id?'selected':''}>${escapeHtml(c.client_name)}</option>`).join('');
     $('modalBody').innerHTML=`
-        <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_invClient"><option value="">Select</option>${opts}</select></div>
+        <div class="form-row"><div class="form-group"><label>Client/Brand *</label><select id="m_invClient"><option value="">Select</option>${opts}</select></div>
         <div class="form-group"><label>Invoice # *</label><input id="m_invNumber" value="${edit?edit.invoice_number:''}"></div></div>
         <div class="form-row"><div class="form-group"><label>Invoice Date</label><input type="date" id="m_invDate" value="${edit?edit.invoice_date:new Date().toISOString().split('T')[0]}"></div>
         <div class="form-group"><label>Due Date</label><input type="date" id="m_invDue" value="${edit?edit.due_date||'':''}"></div></div>
@@ -1037,7 +1037,7 @@ function renderBulkReviewTable(){
     $('modalBody').innerHTML=`
         <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.75rem;">Review extracted invoices below. Green = ready, Yellow = select client manually, Red = extraction failed. Tick the checkbox to include in Save All.</p>
         <div class="table-wrap"><table style="width:100%;font-size:0.82rem;">
-            <thead><tr><th>File</th><th>Status</th><th>Invoice #</th><th>Date</th><th>Client</th><th>Base</th><th>GST</th><th>Total</th><th>Ready</th></tr></thead>
+            <thead><tr><th>File</th><th>Status</th><th>Invoice #</th><th>Date</th><th>Client/Brand</th><th>Base</th><th>GST</th><th>Total</th><th>Ready</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
         </table></div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1rem;">
@@ -1169,7 +1169,7 @@ async function renderExtractedInvoiceForm(resp){
         <div class="form-row"><div class="form-group"><label>Invoice Number *${confDot(ex.invoice_number)}</label><input id="ai_invNumber" value="${escapeHtml(ex.invoice_number||'')}"></div>
         <div class="form-group"><label>Invoice Date${confDot(ex.invoice_date)}</label><input type="date" id="ai_invDate" value="${escapeHtml(ex.invoice_date||today)}"></div>
         <div class="form-group"><label>Due Date${confDot(resp.suggested_due_date)}</label><input type="date" id="ai_invDue" value="${escapeHtml(resp.suggested_due_date||'')}"></div></div>
-        <div class="form-row"><div class="form-group"><label>Client *${confDot(ex.client_name)}</label><select id="ai_invClient"><option value="">Select</option>${clientOpts}</select></div>
+        <div class="form-row"><div class="form-group"><label>Client/Brand *${confDot(ex.client_name)}</label><select id="ai_invClient"><option value="">Select</option>${clientOpts}</select></div>
         <div class="form-group"><label>BM</label><input id="ai_invBM" value="${escapeHtml(resp.suggested_bm||'')}" readonly style="background:var(--bg-base);"></div>
         <div class="form-group"><label>Status</label><select id="ai_invStatus"><option value="invoice_raised" selected>Raised</option><option value="not_raised">Not Raised</option><option value="sent_to_client">Sent</option><option value="partially_paid">Partially Paid</option><option value="paid">Paid</option></select></div></div>
         <div class="form-row"><div class="form-group"><label>Base Amount${confDot(ex.base_amount)}</label><input type="number" id="ai_invBase" value="${baseAmt!==''?baseAmt:''}" step="0.01"></div>
@@ -1208,7 +1208,7 @@ async function saveExtractedInvoice(){
         const invNumber = $('ai_invNumber').value.trim();
         const invDate = $('ai_invDate').value;
         const totalAmt = parseFloat($('ai_invAmount').value);
-        if (!clientId || !invNumber || !totalAmt) { toast('Fill required fields: Client, Invoice #, Total Amount', 'error'); return; }
+        if (!clientId || !invNumber || !totalAmt) { toast('Fill required fields: Client/Brand, Invoice #, Total Amount', 'error'); return; }
         const baseAmt = $('ai_invBase').value ? parseFloat($('ai_invBase').value) : null;
         const gstAmt = $('ai_invGst').value ? parseFloat($('ai_invGst').value) : null;
         const cgst = $('ai_invCgst').value ? parseFloat($('ai_invCgst').value) : null;
@@ -1262,7 +1262,7 @@ function openPaymentModal(){
     const sortedClients=[...clients].sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
     const clientOpts=sortedClients.map(c=>`<option value="${c.id}">${c.client_name}</option>`).join('');
     $('modalBody').innerHTML=`
-        <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_payClient"><option value="">Select</option>${clientOpts}</select></div>
+        <div class="form-row"><div class="form-group"><label>Client/Brand *</label><select id="m_payClient"><option value="">Select</option>${clientOpts}</select></div>
         <div class="form-group"><label>Invoice *</label><select id="m_payInvoice"><option value="">Select</option>${invOpts}</select></div></div>
         <div class="form-row"><div class="form-group"><label>Amount *</label><input type="number" id="m_payAmount"></div>
         <div class="form-group"><label>Payment Date *</label><input type="date" id="m_payDate" value="${new Date().toISOString().split('T')[0]}"></div></div>
@@ -1363,7 +1363,7 @@ function openReminderModal(){
     const sortedInvoices=[...invoices].sort((a,b)=>(a.invoice_number||'').localeCompare(b.invoice_number||''));
     const invOpts=sortedInvoices.map(i=>`<option value="${i.id}">${i.invoice_number}</option>`).join('');
     $('modalBody').innerHTML=`
-        <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_remClient"><option value="">Select</option>${clientOpts}</select></div>
+        <div class="form-row"><div class="form-group"><label>Client/Brand *</label><select id="m_remClient"><option value="">Select</option>${clientOpts}</select></div>
         <div class="form-group"><label>Invoice</label><select id="m_remInvoice"><option value="">None</option>${invOpts}</select></div></div>
         <div class="form-row"><div class="form-group"><label>Type</label><select id="m_remType"><option value="due_in_3_days">Due in 3 days</option><option value="due_today">Due today</option><option value="overdue_7_days">Overdue 7 days</option><option value="overdue_15_days">Overdue 15 days</option><option value="overdue_30_days">Overdue 30+ days</option><option value="invoice_not_raised">Invoice not raised</option><option value="followup_pending">Follow-up pending</option><option value="payment_promised">Payment promised</option></select></div>
         <div class="form-group"><label>Priority</label><select id="m_remPriority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div></div>
@@ -1379,7 +1379,7 @@ async function saveReminderModal(){
     _setSaving(btn);
     try{
         const data={client_id:parseInt($('m_remClient').value),invoice_id:$('m_remInvoice').value?parseInt($('m_remInvoice').value):null,reminder_type:$('m_remType').value,priority:$('m_remPriority').value,due_amount:parseFloat($('m_remAmount').value)||0,due_date:$('m_remDueDate').value||null,notes:$('m_remNotes').value||null};
-        if(!data.client_id){toast('Select a client','error');return}
+        if(!data.client_id){toast('Select a Client/Brand','error');return}
         await api('POST','/reminders',data);toast('Reminder added');loadReminders();closeModal();
     }catch(e){toast(e.message,'error')}
     finally{_resetSaving(btn)}
@@ -1409,7 +1409,7 @@ function openDocModal(){
     const sortedInvoices=[...invoices].sort((a,b)=>(a.invoice_number||'').localeCompare(b.invoice_number||''));
     const invOpts=sortedInvoices.map(i=>`<option value="${i.id}">${i.invoice_number}</option>`).join('');
     $('modalBody').innerHTML=`
-        <div class="form-row"><div class="form-group"><label>Client *</label><select id="m_docClient"><option value="">Select</option>${clientOpts}</select></div>
+        <div class="form-row"><div class="form-group"><label>Client/Brand *</label><select id="m_docClient"><option value="">Select</option>${clientOpts}</select></div>
         <div class="form-group"><label>Type</label><select id="m_docType"><option value="invoice_pdf">Invoice PDF</option><option value="po">PO</option><option value="sow">SOW</option><option value="agreement">Agreement</option><option value="payment_proof">Payment Proof</option><option value="credit_note">Credit Note</option><option value="client_communication">Communication</option><option value="other">Other</option></select></div></div>
         <div class="form-row"><div class="form-group"><label>Invoice</label><select id="m_docInvoice"><option value="">None</option>${invOpts}</select></div>
         <div class="form-group"><label>Document Name *</label><input id="m_docName"></div></div>
@@ -1577,8 +1577,8 @@ async function openUserModal(userId=null){
             <div class="form-group"><label style="display:flex;align-items:center;gap:.4rem"><input type="checkbox" id="usrRevenueops" ${u.access_revenueops?'checked':''}> RevenueOps Access</label></div>
         </div>
         <div id="usrAccountSection" style="${u.role==='user'?'':'display:none'}">
-            <label style="font-size:.76rem;font-weight:600;color:var(--text-muted);margin-bottom:.22rem;display:block">Assigned Accounts (BM only)</label>
-            <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem">${acctChecks||'<span style="color:var(--text-light);font-size:.82rem">No accounts available</span>'}</div>
+            <label style="font-size:.76rem;font-weight:600;color:var(--text-muted);margin-bottom:.22rem;display:block">Assigned Client/Brand (BM only)</label>
+            <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem">${acctChecks||'<span style="color:var(--text-light);font-size:.82rem">No Client/Brand available</span>'}</div>
         </div>`;
     $('modalOverlay').style.display='';
     $('modalSave').onclick=saveUserModal;

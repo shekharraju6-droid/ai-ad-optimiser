@@ -109,7 +109,7 @@
             <span class="user-info" id="userInfo">Checking session...</span>
             <span class="user-badge hidden" id="userBadge"></span>
             <button class="btn btn-secondary hidden" id="umBtn" onclick="openUserManagement()">👤 User Management</button>
-            <button class="btn btn-secondary hidden" id="maBtn" onclick="openManageAccounts()">🏦 Manage Accounts</button>
+            <button class="btn btn-secondary hidden" id="maBtn" onclick="openManageAccounts()">🏦 Manage Client/Brand</button>
             <a class="btn btn-secondary" id="integrationsBtn" href="/integrations" style="display:none">Integrations</a>
             <button class="btn btn-secondary" id="loginBtn" onclick="showAuth()">Login</button>
             <button class="btn btn-secondary hidden" id="logoutBtn" onclick="logout()">Logout</button>
@@ -189,7 +189,7 @@
                     <label class="um-check"><input type="checkbox" id="umAccessRevenueOps"> RevenueOps Access</label>
                 </div>
                 <div class="um-section" id="umAssignSection">
-                    <div class="um-section-title">Assigned Accounts (for BM/User)</div>
+                    <div class="um-section-title">Assigned Client/Brand (for BM/User)</div>
                     <div class="um-assign" id="umAssignAccounts"></div>
                 </div>
                 <div id="umLinkBox" class="um-link-box hidden">
@@ -219,15 +219,15 @@
     <div id="centralAccountOverlay" class="um-overlay hidden" onclick="closeCentralAccountModal(event)">
         <div class="um-modal" onclick="event.stopPropagation()" style="max-width:920px;" id="centralAccountModal">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-                <h2 style="margin:0" id="centralAccountModalTitle">Manage Accounts</h2>
+                <h2 style="margin:0" id="centralAccountModalTitle">Manage Client/Brand</h2>
                 <button class="btn btn-secondary" onclick="closeCentralAccountModal()" style="padding:0.3rem 0.6rem;font-size:1rem;line-height:1;">✕</button>
             </div>
 
-            <!-- Accounts List View -->
+            <!-- Client/Brand List View -->
             <div id="centralAccountListView">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-                    <span class="um-section-title" style="margin:0;">All Accounts</span>
-                    <button class="btn btn-primary" id="centralAddAccountBtn" onclick="openCentralAddAccount()">+ Add Account</button>
+                    <span class="um-section-title" style="margin:0;">All Client/Brand</span>
+                    <button class="btn btn-primary" id="centralAddAccountBtn" onclick="openCentralAddAccount()">+ Add Client/Brand</button>
                 </div>
                 <div style="overflow-x:auto;">
                     <table class="um-table" id="centralAccountsTable" style="width:100%;">
@@ -286,7 +286,7 @@
                 <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
                     <button class="btn btn-secondary" onclick="showCentralAccountList()">Cancel</button>
                     <button class="btn btn-secondary" onclick="resetCentralAccountForm()">Reset</button>
-                    <button class="btn btn-primary" onclick="saveCentralAccount()">Save Account</button>
+                    <button class="btn btn-primary" onclick="saveCentralAccount()">Save Client/Brand</button>
                 </div>
             </div>
 
@@ -380,7 +380,7 @@
                 </div>
                 <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
                     <button class="btn btn-secondary" onclick="showCentralAccountList()">Cancel</button>
-                    <button class="btn btn-primary" onclick="updateCentralAccount()">Update Account</button>
+                    <button class="btn btn-primary" onclick="updateCentralAccount()">Update Client/Brand</button>
                 </div>
             </div>
         </div>
@@ -389,8 +389,8 @@
     <!-- Delete confirm modal -->
     <div id="deleteAccountOverlay" class="um-overlay hidden" onclick="closeDeleteConfirm(event)">
         <div class="um-modal" onclick="event.stopPropagation()" style="max-width:420px;">
-            <h2 style="margin-bottom:1rem;">Delete Account</h2>
-            <p style="font-size:0.85rem;margin-bottom:0.75rem;">Are you sure you want to delete this account?</p>
+            <h2 style="margin-bottom:1rem;">Delete Client/Brand</h2>
+            <p style="font-size:0.85rem;margin-bottom:0.75rem;">Are you sure you want to delete this Client/Brand?</p>
             <label class="um-check" style="display:none;" id="deleteRevopsLabel"><input type="checkbox" id="deleteRevopsCheck"> Also delete RevenueOps client and all invoices/payments</label>
             <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
                 <button class="btn btn-secondary" onclick="closeDeleteConfirm()">Cancel</button>
@@ -754,7 +754,7 @@
     let centralDeleteId = null;
 
     function openManageAccounts() {
-        $('centralAccountModalTitle').textContent = 'Manage Accounts';
+        $('centralAccountModalTitle').textContent = 'Manage Client/Brand';
         showCentralAccountList();
         $('centralAccountOverlay').classList.remove('hidden');
         loadCentralAccounts();
@@ -764,7 +764,7 @@
         $('centralAccountListView').classList.remove('hidden');
         $('centralAccountForm').classList.add('hidden');
         $('centralEditForm').classList.add('hidden');
-        $('centralAccountModalTitle').textContent = 'Manage Accounts';
+        $('centralAccountModalTitle').textContent = 'Manage Client/Brand';
     }
 
     function showCentralAccountAddForm() {
@@ -852,7 +852,7 @@
     }
 
     function openCentralAddAccount() {
-        $('centralAccountModalTitle').textContent = 'Add Account';
+        $('centralAccountModalTitle').textContent = 'Add Client/Brand';
         showCentralAccountAddForm();
         resetCentralAccountForm();
         expandAllCaSections();
@@ -905,7 +905,7 @@
             if (refresh) body.adpulse_refresh_interval = parseInt(refresh);
             if (audit) body.adpulse_audit_interval = parseInt(audit);
             await api('POST', '/accounts', body);
-            alert('Account created');
+            alert('Client/Brand created');
             showCentralAccountList();
             loadCentralAccounts();
         } catch (e) { alert(e.message); }
@@ -915,7 +915,7 @@
     function openCentralEditAccount(id) {
         const a = centralAccounts.find(x => x.id === id);
         if (!a) return;
-        $('centralAccountModalTitle').textContent = 'Edit Account: ' + a.name;
+        $('centralAccountModalTitle').textContent = 'Edit Client/Brand: ' + a.name;
         showCentralAccountEditForm();
         $('caEditId').value = a.id;
         $('caEditName').value = a.name || '';
@@ -1004,7 +1004,7 @@
             if (lsqSecret) body.lsq_secret_key = lsqSecret;
             if ($('caEditLsqBaseUrl').value.trim()) body.lsq_base_url = $('caEditLsqBaseUrl').value.trim();
             await api('PUT', '/accounts/' + id, body);
-            alert('Account updated');
+            alert('Client/Brand updated');
             showCentralAccountList();
             loadCentralAccounts();
         } catch (e) { alert(e.message); }
@@ -1038,7 +1038,7 @@
         const deleteRevops = $('deleteRevopsCheck').checked;
         try {
             await api('DELETE', '/accounts/' + centralDeleteId + (deleteRevops ? '?delete_revops=true' : ''));
-            alert('Account deleted');
+            alert('Client/Brand deleted');
             closeDeleteConfirm();
             loadCentralAccounts();
         } catch (e) { alert(e.message); }

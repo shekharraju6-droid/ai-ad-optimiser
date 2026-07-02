@@ -177,7 +177,7 @@
             <div style="border-bottom:1px solid var(--border-color); padding:0.5rem 0;">
                 <a class="home-btn" href="/" style="text-decoration:none; border-bottom:none;">🏠 ChlearSakhaaOps Home</a>
             </div>
-            <div class="sidebar-section-title">Accounts</div>
+            <div class="sidebar-section-title">Client/Brand</div>
             <div id="accountList" class="account-list"></div>
         </aside>
 
@@ -185,7 +185,7 @@
             <div class="topbar">
                 <h1 id="reportTitle">MIS Reports</h1>
                 <div style="display:flex;gap:0.5rem;align-items:center;">
-                    <button id="syncLeadsBtn" class="btn btn-primary" onclick="syncLeadsNow()" disabled title="Sync LeadSquared leads for the selected account" style="display:none;">
+                    <button id="syncLeadsBtn" class="btn btn-primary" onclick="syncLeadsNow()" disabled title="Sync LeadSquared leads for the selected Client/Brand" style="display:none;">
                         ↻ Sync Leads Now
                     </button>
                     <a href="/" class="btn btn-secondary">Back to Dashboard</a>
@@ -197,7 +197,7 @@
                         <div style="text-align:center;">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:64px; height:64px; color:var(--text-light); margin-bottom:1rem;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                             <div style="font-size:1.1rem; font-weight:600; color:var(--text-main);">Welcome to MIS Reports</div>
-                            <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">Select an account from the left panel to view its reports.</div>
+                            <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">Select a Client/Brand from the left panel to view its reports.</div>
                         </div>
                     </div>
                     <div id="reportContent" class="hidden"></div>
@@ -314,7 +314,7 @@
         const container = $('accountList');
         container.innerHTML = '';
         if (!allAccounts.length) {
-            container.innerHTML = '<div style="padding:1rem 1.25rem; color:var(--text-muted); font-size:0.85rem;">No accounts found.</div>';
+            container.innerHTML = '<div style="padding:1rem 1.25rem; color:var(--text-muted); font-size:0.85rem;">No Client/Brand found.</div>';
             return;
         }
         const sortedAccounts = [...allAccounts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -2268,7 +2268,7 @@
                     else {
                         const btn = $('syncLeadsBtn');
                         if (btn && !btn.disabled) btn.click();
-                        else toast('Select an account first to sync leads', true);
+                        else toast('Select a Client/Brand first to sync leads', true);
                     }
                     break;
                 case 'TOGGLE_LIVE_MODE':
