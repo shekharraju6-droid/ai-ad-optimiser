@@ -188,6 +188,33 @@
         .oauth-status.disconnected { color:var(--text-muted); }
         .oauth-buttons { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem; }
         .platform-fields.hidden { display: none; }
+
+        /* Review Modal */
+        .review-tab { flex:1; padding:0.75rem; background:#f9fafb; border:none; border-bottom:3px solid transparent; font-weight:600; font-size:0.85rem; color:var(--text-muted); cursor:pointer; transition:0.15s; }
+        .review-tab:hover { background:#f3f4f6; color:var(--text-main); }
+        .review-tab.active { background:white; color:var(--color-primary); border-bottom-color:var(--color-primary); }
+        .review-tab:disabled { opacity:0.5; cursor:default; }
+        .review-toolbar { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; }
+        .review-search { padding:0.4rem 0.6rem; border:1px solid var(--border-color); border-radius:6px; font-size:0.8rem; min-width:200px; }
+        .review-row { display:flex; align-items:center; padding:0.5rem; border-bottom:1px solid var(--border-color); }
+        .review-row:hover { background:#f9fafb; }
+        .review-row.high-priority { background:#fef2f2; }
+        .review-row.medium-priority { background:#fefce8; }
+        .review-row.brand-mismatch { background:#eff6ff; }
+        .review-campaign-header { font-weight:700; font-size:0.85rem; padding:0.6rem 0.5rem; background:#f3f4f6; border-bottom:1px solid var(--border-color); display:flex; align-items:center; gap:0.5rem; }
+        .review-card { border:1px solid var(--border-color); border-radius:8px; padding:0.75rem; margin-bottom:0.75rem; background:white; }
+        .review-card:hover { border-color:var(--color-primary); }
+        .review-card-header { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; }
+        .review-metric-grid { display:grid; grid-template-columns:repeat(5, 1fr); gap:0.5rem; margin-top:0.5rem; }
+        .review-metric { background:var(--bg-sidebar); padding:0.4rem 0.5rem; border-radius:6px; text-align:center; }
+        .review-metric-label { font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; }
+        .review-metric-value { font-size:0.85rem; font-weight:700; }
+        .badge-pause { background:#fee2e2; color:#991b1b; font-size:0.7rem; font-weight:700; padding:0.2rem 0.5rem; border-radius:4px; text-transform:uppercase; }
+        .badge-enable { background:#d1fae5; color:#065f46; font-size:0.7rem; font-weight:700; padding:0.2rem 0.5rem; border-radius:4px; text-transform:uppercase; }
+        .progress-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:3000; }
+        .progress-card { background:white; border-radius:12px; padding:2rem; width:90%; max-width:400px; text-align:center; }
+        .progress-bar { height:8px; background:var(--border-color); border-radius:4px; margin:1rem 0; overflow:hidden; }
+        .progress-bar-fill { height:100%; background:var(--color-success); width:0%; transition:0.3s; }
     </style>
 </head>
 <body>
@@ -327,6 +354,36 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="reviewModal" class="modal-overlay hidden" style="align-items:flex-start; padding-top:2rem;">
+        <div class="modal" style="width:95%; max-width:1200px; height:85vh; max-height:900px; display:flex; flex-direction:column; padding:0;">
+            <div id="reviewModalHeader" style="padding:1.25rem; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+                <div>
+                    <h2 id="reviewModalTitle" style="margin:0;">Client/Brand — Audit Review</h2>
+                    <div id="reviewModalAuditDate" style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;"></div>
+                </div>
+                <button class="btn btn-sm btn-secondary" onclick="closeReviewModal()">✕ Close</button>
+            </div>
+            <div id="reviewTabs" style="display:flex; border-bottom:1px solid var(--border-color); flex-shrink:0;">
+                <button class="review-tab active" data-tab="keywords" onclick="switchReviewTab('keywords')">Keywords to Pause (0)</button>
+                <button class="review-tab" data-tab="negatives" onclick="switchReviewTab('negatives')">Negative Keywords (0)</button>
+                <button class="review-tab" data-tab="budget" onclick="switchReviewTab('budget')">Budget Changes (0)</button>
+                <button class="review-tab" data-tab="campaigns" onclick="switchReviewTab('campaigns')">Campaign Actions (0)</button>
+            </div>
+            <div id="reviewModalBody" style="flex-grow:1; overflow-y:auto; padding:1rem;">
+                <!-- Content injected by JS -->
+            </div>
+            <div id="reviewModalFooter" style="padding:1rem; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; background:var(--bg-sidebar);">
+                <div id="reviewSelectionCount" style="font-size:0.85rem; font-weight:600;">0 of 0 selected</div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn btn-sm btn-text" onclick="closeReviewModal()">Cancel</button>
+                    <button class="btn btn-sm btn-danger" onclick="confirmRejectSelected()">Reject Selected</button>
+                    <button class="btn btn-sm btn-success" onclick="confirmApproveSelected()">Approve Selected</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Auth Overlay -->
@@ -1536,6 +1593,16 @@
         } catch (e) { toast(e.message, true); }
     }
 
+    function _groupActionsByAccount(actions) {
+        const groups = {};
+        actions.forEach(a => {
+            const key = a.account_id;
+            if (!groups[key]) groups[key] = { account_id: a.account_id, account_name: a.account_name || ('Client/Brand ' + a.account_id), actions: [] };
+            groups[key].actions.push(a);
+        });
+        return Object.values(groups).sort((a, b) => (a.account_name || '').localeCompare(b.account_name || ''));
+    }
+
     function renderPendingActions() {
         const container = $('pendingActionsContainer');
         const filtered = _filterActions(pendingActions);
@@ -1545,15 +1612,19 @@
         const accountCounts = {};
         filtered.forEach(a => {
             const name = a.account_name || ('Client/Brand ' + a.account_id);
-            if (!accountCounts[name]) accountCounts[name] = { keyword: 0, search_term: 0 };
+            if (!accountCounts[name]) accountCounts[name] = { keyword: 0, search_term: 0, budget: 0, campaign: 0 };
             const at = _auditTypeFromAction(a);
             if (at === 'keyword') accountCounts[name].keyword++;
             if (at === 'search_term') accountCounts[name].search_term++;
+            if (a.action_type === 'PAUSE_OR_REDUCE_BUDGET') accountCounts[name].budget++;
+            if (a.action_type === 'PAUSE_CAMPAIGN' || a.action_type === 'ENABLE_CAMPAIGN') accountCounts[name].campaign++;
         });
         let summaryHtml = Object.entries(accountCounts).map(([name, c]) => {
             const parts = [];
             if (c.keyword) parts.push(`${c.keyword} keyword issue${c.keyword > 1 ? 's' : ''}`);
             if (c.search_term) parts.push(`${c.search_term} search term issue${c.search_term > 1 ? 's' : ''}`);
+            if (c.budget) parts.push(`${c.budget} budget change${c.budget > 1 ? 's' : ''}`);
+            if (c.campaign) parts.push(`${c.campaign} campaign action${c.campaign > 1 ? 's' : ''}`);
             return `<strong>${escapeHtml(name)}</strong>: ${parts.join(', ')}`;
         }).join(' &bull; ');
         $('approvalQueueSummary').innerHTML = summaryHtml || '';
@@ -1562,54 +1633,457 @@
         const pendingOnly = filtered.filter(a => a.status === 'pending');
         let bulkHtml = '';
         if (pendingOnly.length) {
-            bulkHtml += `<button class="btn btn-sm btn-success" onclick="bulkReview('approve', 'selected', ${JSON.stringify(pendingOnly.map(a => a.id))})">Approve All Matching</button>`;
             bulkHtml += `<button class="btn btn-sm btn-danger" onclick="bulkReview('reject', 'selected', ${JSON.stringify(pendingOnly.map(a => a.id))})">Reject All Matching</button>`;
         }
         $('approvalQueueBulkActions').innerHTML = bulkHtml;
 
         container.innerHTML = '';
-        filtered.forEach(action => {
-            const el = document.createElement('div');
-            el.className = 'card';
-            el.style.marginBottom = '0.75rem';
-            const meta = [];
-            if (action.campaign_id) meta.push('Campaign: ' + escapeHtml(action.campaign_id));
-            if (action.adset_id) meta.push('AdGroup: ' + escapeHtml(action.adset_id));
-            const metrics = (action.new_value && action.new_value.metrics) || {};
-            const metricsParts = [];
-            if (metrics.spend !== undefined) metricsParts.push('Spend: ' + formatMoney(metrics.spend));
-            if (metrics.clicks !== undefined) metricsParts.push('Clicks: ' + metrics.clicks);
-            if (metrics.conversions !== undefined) metricsParts.push('Conversions: ' + metrics.conversions);
-            if (metrics.ctr !== undefined) metricsParts.push('CTR: ' + formatPct(metrics.ctr));
-            const metricsHtml = metricsParts.length ? `<div style="font-size:0.72rem;color:var(--text-light);margin-top:0.25rem;">${metricsParts.join(' &bull; ')}</div>` : '';
-            const created = action.created_at ? new Date(action.created_at).toLocaleDateString('en-IN') : '';
-            const isPending = action.status === 'pending';
-            let buttons = '';
-            if (isPending) {
-                buttons = `<div style="display:flex; gap:0.5rem; margin-left:1rem;">
-                    <button class="btn btn-success btn-sm" onclick="reviewAction(${action.id}, 'approve')">${ICONS.check} Approve</button>
-                    <button class="btn btn-danger btn-sm" onclick="reviewAction(${action.id}, 'reject')">${ICONS.x} Reject</button>
-                </div>`;
-            } else {
-                buttons = `<span class="flag-tag ${action.status === 'applied' ? 'flag-success' : (action.status === 'rejected' ? 'flag-danger' : 'flag-warning')}" style="margin-left:1rem;">${escapeHtml(action.status)}</span>`;
-            }
-            el.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div style="flex:1; min-width:0;">
-                        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-                            ${actionAuditTypeBadge(action)}
-                            <div style="font-weight:700; font-size:0.95rem;">${escapeHtml(action.account_name)} &mdash; ${escapeHtml(action.platform)}</div>
-                            <span class="flag-tag ${actionSeverityClass(action.action_type)}">${actionTypeLabel(action.action_type)}</span>
+        const accountGroups = _groupActionsByAccount(filtered);
+        accountGroups.forEach(group => {
+            const counts = { keyword: 0, search_term: 0, budget: 0, campaign: 0 };
+            group.actions.forEach(a => {
+                const at = _auditTypeFromAction(a);
+                if (at === 'keyword') counts.keyword++;
+                if (at === 'search_term') counts.search_term++;
+                if (a.action_type === 'PAUSE_OR_REDUCE_BUDGET') counts.budget++;
+                if (a.action_type === 'PAUSE_CAMPAIGN' || a.action_type === 'ENABLE_CAMPAIGN') counts.campaign++;
+            });
+            const breakdown = [];
+            if (counts.keyword) breakdown.push(`🔑 ${counts.keyword} keyword${counts.keyword > 1 ? 's' : ''}`);
+            if (counts.search_term) breakdown.push(`🔍 ${counts.search_term} search term${counts.search_term > 1 ? 's' : ''}`);
+            if (counts.budget) breakdown.push(`💰 ${counts.budget} budget`);
+            if (counts.campaign) breakdown.push(`⏸ ${counts.campaign} campaign`);
+            const lastAudit = group.actions[0].created_at ? new Date(group.actions[0].created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.style.marginBottom = '0.75rem';
+            card.style.cursor = 'pointer';
+            card.onclick = (e) => { if (!e.target.closest('button')) openReviewModal(group.account_id); };
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                    <div>
+                        <div style="font-weight:700; font-size:1rem;">${escapeHtml(group.account_name)}</div>
+                        <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;">
+                            ${breakdown.join(' | ')} &bull; ${group.actions.length} pending &bull; Audit: ${lastAudit}
                         </div>
-                        <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.2rem;">${action.keyword ? '<strong>' + escapeHtml(action.keyword) + '</strong> ' + (action.match_type ? '(' + escapeHtml(action.match_type) + ')' : '') : meta.join(' &bull; ')}</div>
-                        <div style="font-size:0.78rem; color:var(--text-light); margin-top:0.3rem; max-width:600px;">${escapeHtml(action.reason || '')}</div>
-                        ${metricsHtml}
-                        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem; font-style:italic;">${actionApplyHint(action.action_type)} ${created ? '&bull; ' + created : ''}</div>
                     </div>
-                    ${buttons}
-                </div>`;
-            container.appendChild(el);
+                    <button class="btn btn-primary btn-sm" onclick="openReviewModal(${group.account_id})">Review</button>
+                </div>
+            `;
+            container.appendChild(card);
         });
+    }
+
+    let currentReviewAccountId = null;
+    let currentReviewData = null;
+    let currentReviewTab = 'keywords';
+    let reviewState = { selected: new Set(), customBudgets: {}, search: {}, sort: {} };
+
+    async function openReviewModal(accountId) {
+        currentReviewAccountId = accountId;
+        currentReviewTab = 'keywords';
+        reviewState = { selected: new Set(), customBudgets: {}, search: {}, sort: {} };
+        try {
+            const data = await api('GET', '/adpulse/approval-queue/' + accountId + '/review');
+            currentReviewData = data;
+            $('reviewModalTitle').textContent = data.account_name + ' — Audit Review';
+            $('reviewModalAuditDate').textContent = 'Audit: ' + (data.audit_date || '-');
+            updateReviewTabCounts(data);
+            $('reviewModal').classList.remove('hidden');
+            switchReviewTab('keywords');
+        } catch (e) { toast(e.message, true); }
+    }
+
+    function closeReviewModal() {
+        $('reviewModal').classList.add('hidden');
+        currentReviewAccountId = null;
+        currentReviewData = null;
+        reviewState = { selected: new Set(), customBudgets: {}, search: {}, sort: {} };
+    }
+
+    function updateReviewTabCounts(data) {
+        const k = (data.keywords_to_pause || []).length;
+        const n = (data.negatives_to_add || []).length;
+        const b = (data.budget_changes || []).length;
+        const c = (data.campaign_actions || []).length;
+        const tabs = $('reviewTabs').querySelectorAll('.review-tab');
+        tabs[0].textContent = 'Keywords to Pause (' + k + ')';
+        tabs[1].textContent = 'Negative Keywords (' + n + ')';
+        tabs[2].textContent = 'Budget Changes (' + b + ')';
+        tabs[3].textContent = 'Campaign Actions (' + c + ')';
+        tabs.forEach(t => t.disabled = false);
+        if (!k) tabs[0].classList.add('disabled');
+        if (!n) tabs[1].classList.add('disabled');
+        if (!b) tabs[2].classList.add('disabled');
+        if (!c) tabs[3].classList.add('disabled');
+    }
+
+    function switchReviewTab(tab) {
+        currentReviewTab = tab;
+        document.querySelectorAll('.review-tab').forEach(t => t.classList.remove('active'));
+        const activeTab = document.querySelector('.review-tab[data-tab="' + tab + '"]');
+        if (activeTab) activeTab.classList.add('active');
+        renderReviewTab(tab);
+        updateReviewSelectionCount();
+    }
+
+    function _groupByCampaign(items) {
+        const groups = {};
+        items.forEach(item => {
+            const cname = item.campaign_name || 'Unknown';
+            if (!groups[cname]) groups[cname] = { campaign_name: cname, campaign_id: item.campaign_id, items: [] };
+            groups[cname].items.push(item);
+        });
+        return Object.values(groups).sort((a, b) => a.campaign_name.localeCompare(b.campaign_name));
+    }
+
+    function _reviewFilter(items, tab) {
+        const q = (reviewState.search[tab] || '').toLowerCase();
+        if (!q) return items;
+        return items.filter(i => {
+            const text = (i.keyword_text || i.search_term || i.campaign_name || '').toLowerCase();
+            return text.includes(q);
+        });
+    }
+
+    function _reviewSort(items, tab) {
+        const sort = reviewState.sort[tab] || 'spend';
+        const sorted = [...items];
+        if (sort === 'spend') return sorted.sort((a, b) => (b.spend_30d || b.spend || 0) - (a.spend_30d || a.spend || 0));
+        if (sort === 'clicks') return sorted.sort((a, b) => (b.clicks_30d || b.clicks || 0) - (a.clicks_30d || a.clicks || 0));
+        if (sort === 'campaign') return sorted.sort((a, b) => (a.campaign_name || '').localeCompare(b.campaign_name || ''));
+        return sorted;
+    }
+
+    function _keywordRowClass(item) {
+        const spend = item.spend_30d || 0;
+        const conv = item.conversions_30d || 0;
+        if (spend > 2000 && conv === 0) return 'high-priority';
+        if (spend >= 500 && spend <= 2000 && conv === 0) return 'medium-priority';
+        if (item.reason && item.reason.toLowerCase().includes('non-brand')) return 'brand-mismatch';
+        return '';
+    }
+
+    function _negativeRowClass(item) {
+        const spend = item.spend || 0;
+        const conv = item.conversions || 0;
+        const clicks = item.clicks || 0;
+        if (spend > 500 && conv === 0) return 'high-priority';
+        if (clicks > 0 && conv === 0) return 'medium-priority';
+        return '';
+    }
+
+    function formatMoneyINR(n) {
+        if (n === null || n === undefined || isNaN(n)) return '—';
+        return 'INR ' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function renderReviewTab(tab) {
+        const container = $('reviewModalBody');
+        if (!currentReviewData) { container.innerHTML = ''; return; }
+        let items = [];
+        if (tab === 'keywords') items = currentReviewData.keywords_to_pause || [];
+        if (tab === 'negatives') items = currentReviewData.negatives_to_add || [];
+        if (tab === 'budget') items = currentReviewData.budget_changes || [];
+        if (tab === 'campaigns') items = currentReviewData.campaign_actions || [];
+
+        if (!items.length) { container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">No recommendations in this category.</p>'; return; }
+
+        let html = `
+            <div class="review-toolbar">
+                <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.8rem;font-weight:600;">
+                    <input type="checkbox" id="reviewSelectAll_${tab}" onchange="toggleReviewSelectAll('${tab}')"> Select All
+                </label>
+                <select class="filter-input" style="width:150px;" onchange="setReviewSort('${tab}', this.value)">
+                    <option value="spend" ${reviewState.sort[tab] === 'spend' ? 'selected' : ''}>Sort by Spend</option>
+                    <option value="clicks" ${reviewState.sort[tab] === 'clicks' ? 'selected' : ''}>Sort by Clicks</option>
+                    <option value="campaign" ${reviewState.sort[tab] === 'campaign' ? 'selected' : ''}>Sort by Campaign</option>
+                </select>
+                <input type="text" class="review-search" placeholder="Search..." value="${escapeHtml(reviewState.search[tab] || '')}" oninput="setReviewSearch('${tab}', this.value)">
+            </div>
+        `;
+
+        const filtered = _reviewSort(_reviewFilter(items, tab), tab);
+
+        if (tab === 'keywords' || tab === 'negatives') {
+            html += '<div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">';
+            const groups = _groupByCampaign(filtered);
+            groups.forEach(g => {
+                html += `
+                    <div class="review-campaign-header">
+                        <input type="checkbox" onchange="toggleCampaignSelectAll('${tab}', '${escapeHtml(g.campaign_name)}', this.checked)">
+                        <span>${escapeHtml(g.campaign_name)}</span>
+                        <span style="font-size:0.7rem; color:var(--text-muted); font-weight:500;">${g.items.length} item${g.items.length > 1 ? 's' : ''}</span>
+                    </div>
+                `;
+                if (tab === 'keywords') {
+                    html += '<div style="display:grid; grid-template-columns: 30px 1.5fr 1.2fr 1.5fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr; font-size:0.75rem; font-weight:600; color:var(--text-muted); padding:0.4rem 0.5rem; background:var(--bg-sidebar);">';
+                    html += '<div></div><div>Campaign</div><div>Ad Group</div><div>Keyword</div><div>Match</div><div>Spend</div><div>Clicks</div><div>Conv.</div><div>CTR</div><div>CPA</div><div>Reason</div>';
+                    html += '</div>';
+                    g.items.forEach(i => {
+                        html += `
+                            <div class="review-row ${_keywordRowClass(i)}" style="display:grid; grid-template-columns: 30px 1.5fr 1.2fr 1.5fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr; font-size:0.78rem; align-items:center;">
+                                <input type="checkbox" data-review-id="${i.id}" onchange="toggleReviewItem(${i.id})">
+                                <div>${escapeHtml(i.campaign_name)}</div>
+                                <div>${escapeHtml(i.ad_group_name || '')}</div>
+                                <div style="font-weight:600;">${escapeHtml(i.keyword_text)}</div>
+                                <div>${escapeHtml(i.match_type || '')}</div>
+                                <div>${formatMoneyINR(i.spend_30d)}</div>
+                                <div>${i.clicks_30d || 0}</div>
+                                <div>${i.conversions_30d || 0}</div>
+                                <div>${formatPct(i.ctr)}</div>
+                                <div>${i.cpa !== null && i.cpa !== undefined ? formatMoneyINR(i.cpa) : '∞'}</div>
+                                <div style="font-size:0.7rem; color:var(--text-muted);">${escapeHtml(i.reason)}</div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += '<div style="display:grid; grid-template-columns: 30px 1.5fr 1.5fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr; font-size:0.75rem; font-weight:600; color:var(--text-muted); padding:0.4rem 0.5rem; background:var(--bg-sidebar);">';
+                    html += '<div></div><div>Campaign</div><div>Search Term</div><div>Clicks</div><div>Spend</div><div>Conv.</div><div>Level</div><div>Reason</div>';
+                    html += '</div>';
+                    g.items.forEach(i => {
+                        html += `
+                            <div class="review-row ${_negativeRowClass(i)}" style="display:grid; grid-template-columns: 30px 1.5fr 1.5fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr; font-size:0.78rem; align-items:center;">
+                                <input type="checkbox" data-review-id="${i.id}" onchange="toggleReviewItem(${i.id})">
+                                <div>${escapeHtml(i.campaign_name)}</div>
+                                <div style="font-weight:600;">${escapeHtml(i.search_term)}</div>
+                                <div>${i.clicks || 0}</div>
+                                <div>${formatMoneyINR(i.spend)}</div>
+                                <div>${i.conversions || 0}</div>
+                                <div>${escapeHtml(i.level || 'campaign')}</div>
+                                <div style="font-size:0.7rem; color:var(--text-muted);">${escapeHtml(i.reason)}</div>
+                            </div>
+                        `;
+                    });
+                }
+            });
+            html += '</div>';
+        } else if (tab === 'budget') {
+            filtered.forEach(i => {
+                const custom = reviewState.customBudgets[i.id] !== undefined ? reviewState.customBudgets[i.id] : (i.suggested_budget || 0);
+                html += `
+                    <div class="review-card">
+                        <div class="review-card-header">
+                            <input type="checkbox" data-review-id="${i.id}" onchange="toggleReviewItem(${i.id})">
+                            <div style="font-weight:700;">${escapeHtml(i.campaign_name)}</div>
+                        </div>
+                        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem;">${escapeHtml(i.reason)}</div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem; margin-bottom:0.75rem; font-size:0.8rem;">
+                            <div><span style="color:var(--text-muted);">Current daily budget:</span> <strong>${formatMoneyINR(i.current_budget)}</strong></div>
+                            <div><span style="color:var(--text-muted);">Suggested:</span> <strong>${formatMoneyINR(i.suggested_budget)}</strong></div>
+                            <div><span style="color:var(--text-muted);">Your budget:</span> <input type="number" class="filter-input" style="width:120px;" value="${custom}" onchange="setReviewCustomBudget(${i.id}, this.value)" oninput="setReviewCustomBudget(${i.id}, this.value)"></div>
+                        </div>
+                        <div class="review-metric-grid">
+                            <div class="review-metric"><div class="review-metric-label">Spend</div><div class="review-metric-value">${formatMoneyINR(i.spend_30d)}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">Clicks</div><div class="review-metric-value">${i.clicks_30d || 0}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">Conversions</div><div class="review-metric-value">${i.conversions_30d || 0}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">CTR</div><div class="review-metric-value">${formatPct(i.ctr)}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">CPA</div><div class="review-metric-value">${i.cpa !== null ? formatMoneyINR(i.cpa) : '∞'}</div></div>
+                        </div>
+                    </div>
+                `;
+            });
+        } else if (tab === 'campaigns') {
+            filtered.forEach(i => {
+                const badge = i.action === 'pause' ? '<span class="badge-pause">PAUSE</span>' : '<span class="badge-enable">ENABLE</span>';
+                html += `
+                    <div class="review-card">
+                        <div class="review-card-header">
+                            <input type="checkbox" data-review-id="${i.id}" onchange="toggleReviewItem(${i.id})">
+                            ${badge}
+                            <div style="font-weight:700;">${escapeHtml(i.campaign_name)}</div>
+                        </div>
+                        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem;">${escapeHtml(i.reason)}</div>
+                        <div class="review-metric-grid">
+                            <div class="review-metric"><div class="review-metric-label">Spend</div><div class="review-metric-value">${formatMoneyINR(i.spend_30d)}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">Clicks</div><div class="review-metric-value">${i.clicks_30d || 0}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">Conversions</div><div class="review-metric-value">${i.conversions_30d || 0}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">CTR</div><div class="review-metric-value">${formatPct(i.ctr)}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">CPA</div><div class="review-metric-value">${i.cpa !== null ? formatMoneyINR(i.cpa) : '∞'}</div></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        container.innerHTML = html;
+        syncReviewCheckboxes(tab);
+    }
+
+    function setReviewSearch(tab, value) {
+        reviewState.search[tab] = value;
+        renderReviewTab(tab);
+    }
+
+    function setReviewSort(tab, value) {
+        reviewState.sort[tab] = value;
+        renderReviewTab(tab);
+    }
+
+    function setReviewCustomBudget(id, value) {
+        reviewState.customBudgets[id] = parseFloat(value) || 0;
+    }
+
+    function toggleReviewItem(id) {
+        if (reviewState.selected.has(id)) reviewState.selected.delete(id);
+        else reviewState.selected.add(id);
+        updateReviewSelectionCount();
+    }
+
+    function toggleReviewSelectAll(tab) {
+        let items = [];
+        if (tab === 'keywords') items = currentReviewData.keywords_to_pause || [];
+        if (tab === 'negatives') items = currentReviewData.negatives_to_add || [];
+        if (tab === 'budget') items = currentReviewData.budget_changes || [];
+        if (tab === 'campaigns') items = currentReviewData.campaign_actions || [];
+        const filtered = _reviewSort(_reviewFilter(items, tab), tab).map(i => i.id);
+        const checked = $('reviewSelectAll_' + tab).checked;
+        if (checked) filtered.forEach(id => reviewState.selected.add(id));
+        else filtered.forEach(id => reviewState.selected.delete(id));
+        syncReviewCheckboxes(tab);
+        updateReviewSelectionCount();
+    }
+
+    function toggleCampaignSelectAll(tab, campaignName, checked) {
+        let items = [];
+        if (tab === 'keywords') items = currentReviewData.keywords_to_pause || [];
+        if (tab === 'negatives') items = currentReviewData.negatives_to_add || [];
+        const filtered = _reviewSort(_reviewFilter(items, tab), tab).filter(i => i.campaign_name === campaignName);
+        filtered.forEach(i => {
+            if (checked) reviewState.selected.add(i.id);
+            else reviewState.selected.delete(i.id);
+        });
+        syncReviewCheckboxes(tab);
+        updateReviewSelectionCount();
+    }
+
+    function syncReviewCheckboxes(tab) {
+        document.querySelectorAll('#reviewModalBody input[type="checkbox"][data-review-id]').forEach(cb => {
+            const id = parseInt(cb.dataset.reviewId);
+            cb.checked = reviewState.selected.has(id);
+        });
+        const allCheckbox = $('reviewSelectAll_' + tab);
+        if (allCheckbox) {
+            let items = [];
+            if (tab === 'keywords') items = currentReviewData.keywords_to_pause || [];
+            if (tab === 'negatives') items = currentReviewData.negatives_to_add || [];
+            if (tab === 'budget') items = currentReviewData.budget_changes || [];
+            if (tab === 'campaigns') items = currentReviewData.campaign_actions || [];
+            const filtered = _reviewSort(_reviewFilter(items, tab), tab);
+            allCheckbox.checked = filtered.length > 0 && filtered.every(i => reviewState.selected.has(i.id));
+        }
+    }
+
+    function updateReviewSelectionCount() {
+        let total = 0;
+        if (currentReviewData) {
+            total += (currentReviewData.keywords_to_pause || []).length;
+            total += (currentReviewData.negatives_to_add || []).length;
+            total += (currentReviewData.budget_changes || []).length;
+            total += (currentReviewData.campaign_actions || []).length;
+        }
+        $('reviewSelectionCount').textContent = reviewState.selected.size + ' of ' + total + ' selected';
+    }
+
+    function confirmApproveSelected() {
+        if (!reviewState.selected.size) { toast('Select at least one item to approve', true); return; }
+        if (!currentReviewData) return;
+        const counts = { keyword: 0, negative: 0, budget: 0, campaign: 0 };
+        const approved = [];
+        reviewState.selected.forEach(id => {
+            const kw = (currentReviewData.keywords_to_pause || []).find(i => i.id === id);
+            const neg = (currentReviewData.negatives_to_add || []).find(i => i.id === id);
+            const bud = (currentReviewData.budget_changes || []).find(i => i.id === id);
+            const camp = (currentReviewData.campaign_actions || []).find(i => i.id === id);
+            if (kw) { counts.keyword++; approved.push({ id, type: 'pause_keyword', custom_value: null }); }
+            else if (neg) { counts.negative++; approved.push({ id, type: 'add_negative', custom_value: null }); }
+            else if (bud) { counts.budget++; approved.push({ id, type: 'change_budget', custom_value: reviewState.customBudgets[id] !== undefined ? reviewState.customBudgets[id] : bud.suggested_budget }); }
+            else if (camp) { counts.campaign++; approved.push({ id, type: 'pause_campaign', custom_value: null }); }
+        });
+        const lines = [];
+        if (counts.keyword) lines.push(`- ${counts.keyword} keyword${counts.keyword > 1 ? 's' : ''} will be paused`);
+        if (counts.negative) lines.push(`- ${counts.negative} negative keyword${counts.negative > 1 ? 's' : ''} will be added`);
+        if (counts.budget) lines.push(`- ${counts.budget} campaign budget${counts.budget > 1 ? 's' : ''} will be changed`);
+        if (counts.campaign) lines.push(`- ${counts.campaign} campaign${counts.campaign > 1 ? 's' : ''} will be paused`);
+        const msg = `You are about to apply ${approved.length} changes to Google Ads for ${currentReviewData.account_name}:\n${lines.join('\n')}\n\nThis cannot be undone from this tool. Are you sure?`;
+        if (!confirm(msg)) return;
+        submitReviewApply(approved);
+    }
+
+    function confirmRejectSelected() {
+        if (!reviewState.selected.size) { toast('Select at least one item to reject', true); return; }
+        if (!currentReviewData) return;
+        const msg = `Reject ${reviewState.selected.size} recommendations? These will be dismissed and suppressed for 30 days.`;
+        if (!confirm(msg)) return;
+        submitReviewApply([], Array.from(reviewState.selected));
+    }
+
+    async function submitReviewApply(approved, rejected) {
+        const allItems = [
+            ...(currentReviewData.keywords_to_pause || []),
+            ...(currentReviewData.negatives_to_add || []),
+            ...(currentReviewData.budget_changes || []),
+            ...(currentReviewData.campaign_actions || []),
+        ];
+        const selectedIds = new Set(approved.map(a => a.id));
+        if (rejected) rejected.forEach(id => selectedIds.add(id));
+        const dismissed = allItems.filter(i => !selectedIds.has(i.id)).map(i => i.id);
+
+        showReviewProgress(approved.length);
+
+        try {
+            const result = await api('POST', '/adpulse/approval-queue/apply', {
+                approved,
+                rejected: rejected || [],
+                dismissed,
+                reviewer: currentUser ? currentUser.email : 'admin',
+            });
+            const applied = result.applied_count || 0;
+            const failed = result.failed_count || 0;
+            const skipped = (approved.length - applied - failed);
+            updateReviewProgress(applied + failed, approved.length, `Applied: ${applied} ✓ | Failed: ${failed} ✗ | Skipped: ${skipped}`);
+            setTimeout(() => {
+                hideReviewProgress();
+                closeReviewModal();
+                loadPendingActions();
+                loadPendingActionsCount();
+                toast(`Applied: ${applied} ✓ | Failed: ${failed} ✗ | Skipped: ${skipped}`);
+            }, 1200);
+        } catch (e) {
+            hideReviewProgress();
+            toast(e.message, true);
+        }
+    }
+
+    function showReviewProgress(total) {
+        let overlay = $('reviewProgressOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'reviewProgressOverlay';
+            overlay.className = 'progress-overlay';
+            overlay.innerHTML = `
+                <div class="progress-card">
+                    <h3 style="margin:0 0 0.5rem;">Applying changes...</h3>
+                    <div class="progress-bar"><div class="progress-bar-fill" id="reviewProgressFill"></div></div>
+                    <div id="reviewProgressText">0 of ${total} done</div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        } else {
+            overlay.classList.remove('hidden');
+        }
+        updateReviewProgress(0, total, '0 of ' + total + ' done');
+    }
+
+    function updateReviewProgress(done, total, text) {
+        const fill = $('reviewProgressFill');
+        const txt = $('reviewProgressText');
+        if (fill) fill.style.width = total ? Math.round((done / total) * 100) + '%' : '0%';
+        if (txt) txt.textContent = text || (done + ' of ' + total + ' done');
+    }
+
+    function hideReviewProgress() {
+        const overlay = $('reviewProgressOverlay');
+        if (overlay) overlay.classList.add('hidden');
     }
 
     async function bulkReview(decision, scope, ids) {
