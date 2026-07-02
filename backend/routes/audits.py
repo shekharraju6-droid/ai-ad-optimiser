@@ -405,6 +405,70 @@ def list_audit_runs(limit: int = 30, db: Session = Depends(get_db)):
     return [r.to_dict() for r in runs]
 
 
+def _build_campaign_keyword_context(account, pending_actions) -> Dict[str, Any]:
+    """Fetch all keywords for campaigns that have flagged items, return context with flagged status.
+
+    Returns a dict keyed by campaign_id:
+    {
+      "campaign_id": {
+        "campaign_name": "...",
+        "keywords": [
+          {"text": "...", "match_type": "BROAD", "status": "ENABLED", "spend": 100, "clicks": 5, "conversions": 0, "ctr": 3.2, "flagged": true/false}
+        ]
+      }
+    }
+    """
+    # Collect unique campaign_ids from pending keyword actions
+    flagged_campaign_ids = set()
+    flagged_keyword_keys = set()  # (campaign_id, keyword_text)
+    for action in pending_actions:
+        if action.action_type in ("SMART_PAUSE_KEYWORD", "PAUSE_KEYWORD"):
+            cid = action.campaign_id or ""
+            kw = (action.keyword or "").lower()
+            flagged_campaign_ids.add(cid)
+            flagged_keyword_keys.add((cid, kw))
+
+    if not flagged_campaign_ids:
+        return {}
+
+    # Try to fetch all keywords from Google Ads for those campaigns
+    try:
+        connector = get_connector(account, platform="google")
+        if not connector or not connector.is_valid:
+            return {}
+        all_keywords = connector.fetch_keywords()
+    except Exception as e:
+        logger.warning(f"Failed to fetch keyword context: {e}")
+        return {}
+
+    context: Dict[str, Any] = {}
+    for kw in all_keywords:
+        cid = kw.get("campaign_id", "")
+        if cid not in flagged_campaign_ids:
+            continue
+        if cid not in context:
+            context[cid] = {
+                "campaign_name": kw.get("campaign_name", ""),
+                "keywords": [],
+            }
+        kw_text = (kw.get("text") or "").lower()
+        is_flagged = (cid, kw_text) in flagged_keyword_keys
+        context[cid]["keywords"].append({
+            "text": kw.get("text", ""),
+            "match_type": _format_match_type(kw.get("match_type", "")),
+            "status": kw.get("status", "ENABLED"),
+            "spend": kw.get("spend", 0) or 0,
+            "clicks": kw.get("clicks", 0) or 0,
+            "conversions": kw.get("conversions", 0) or 0,
+            "ctr": kw.get("ctr", 0) or 0,
+            "flagged": is_flagged,
+        })
+    # Sort keywords: flagged first, then by spend descending
+    for cid in context:
+        context[cid]["keywords"].sort(key=lambda k: (not k["flagged"], -(k["spend"] or 0)))
+    return context
+
+
 @router.get("/adpulse/approval-queue/{account_id}/review")
 def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     """Return all pending recommendations for a single account grouped by type."""
@@ -472,6 +536,9 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
 
     # Default audit date = latest action created_at, else today
     audit_dt = active_only[0].created_at if active_only else datetime.utcnow()
+    # Build campaign context: all keywords per campaign_id (flagged + clean)
+    campaign_context = _build_campaign_keyword_context(account, active_only)
+
     return {
         "account_id": account_id,
         "account_name": account.name,
@@ -480,6 +547,7 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
         "negatives_to_add": negatives_to_add,
         "budget_changes": budget_changes,
         "campaign_actions": campaign_actions,
+        "campaign_context": campaign_context,
     }
 
 

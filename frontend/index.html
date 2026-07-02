@@ -1869,6 +1869,44 @@
                             </div>
                         `;
                     });
+                    // Add context table: all keywords in this campaign (flagged + clean)
+                    const ctx = (currentReviewData.campaign_context || {})[g.campaign_id];
+                    if (ctx && ctx.keywords && ctx.keywords.length) {
+                        html += `
+                            <div style="margin:0.5rem 1rem; border:1px solid var(--border-color); border-radius:6px; overflow:hidden;">
+                                <div style="padding:0.4rem 0.6rem; background:var(--bg-sidebar); font-size:0.75rem; font-weight:600; color:var(--text-muted);">
+                                    All Keywords in this Campaign (${ctx.keywords.length} total)
+                                </div>
+                                <table style="width:100%; font-size:0.72rem; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:var(--bg-sidebar);">
+                                            <th style="text-align:left; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Keyword</th>
+                                            <th style="text-align:left; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Status</th>
+                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Spend</th>
+                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Clicks</th>
+                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Conv</th>
+                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">CTR</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${ctx.keywords.map(k => `
+                                            <tr style="border-bottom:1px solid var(--border-color); ${k.flagged ? 'background:#fef2f2;' : ''}">
+                                                <td style="padding:0.3rem 0.4rem;">${k.flagged ? '⚠️' : '✅'} ${escapeHtml(k.text)}</td>
+                                                <td style="padding:0.3rem 0.4rem; color:var(--text-muted);">${escapeHtml(k.status || '')}</td>
+                                                <td style="padding:0.3rem 0.4rem; text-align:right;">${formatMoneyINR(k.spend)}</td>
+                                                <td style="padding:0.3rem 0.4rem; text-align:right;">${k.clicks || 0}</td>
+                                                <td style="padding:0.3rem 0.4rem; text-align:right;">${k.conversions || 0}</td>
+                                                <td style="padding:0.3rem 0.4rem; text-align:right;">${formatPct(k.ctr)}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                                <div style="padding:0.3rem 0.6rem; font-size:0.68rem; color:var(--text-muted); border-top:1px solid var(--border-color);">
+                                    ⚠️ = Flagged by AI &nbsp;&nbsp; ✅ = No issues found
+                                </div>
+                            </div>
+                        `;
+                    }
                 } else {
                     g.items.forEach(i => {
                         const disabled = i.campaign_status && i.campaign_status.toUpperCase() !== 'ENABLED';
