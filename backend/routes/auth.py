@@ -211,6 +211,9 @@ def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(
     if req.role == "superadmin" and current_user.role != "superadmin":
         raise HTTPException(status_code=403, detail="Only Super Admin can create superadmin users")
 
+    token = secrets.token_urlsafe(32)
+    token_expires = datetime.utcnow() + timedelta(hours=ONBOARDING_TOKEN_EXPIRE_HOURS)
+
     user = User(
         email=req.email,
         hashed_password=get_password_hash(secrets.token_urlsafe(16)),  # random temp password
