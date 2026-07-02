@@ -936,7 +936,7 @@
             const ctr = data.total_impressions ? (data.total_clicks / data.total_impressions) * 100 : 0;
             $('kpi-avg-ctr').textContent = formatPct(ctr);
             renderDashboardGroups(data.groups || [], data.ungrouped || []);
-            // Auto-refresh live account metrics in background after rendering
+            // Auto-refresh live account metrics in background after rendering (non-blocking)
             refreshLiveAccountsInBackground();
         } catch (e) { toast(e.message, true); }
     }
@@ -944,11 +944,13 @@
     async function refreshLiveAccountsInBackground() {
         try {
             const accounts = await api('GET', '/accounts');
-            for (const a of accounts) {
-                if (!a.is_live) continue;
+            const liveAccounts = accounts.filter(a => a.is_live);
+            // Fire all refresh requests in parallel so the dashboard isn't blocked
+            const refreshTasks = liveAccounts.map(a => {
                 const platform = a.has_google ? 'google' : 'meta';
-                await api('POST', '/accounts/' + a.id + '/refresh' + dateParams() + (dateParams() ? '&' : '?') + 'platform=' + platform).catch(() => {});
-            }
+                return api('POST', '/accounts/' + a.id + '/refresh' + dateParams() + (dateParams() ? '&' : '?') + 'platform=' + platform).catch(() => null);
+            });
+            await Promise.all(refreshTasks);
             // Reload summary with fresh data
             const data = await api('GET', '/accounts/summary' + dateParams());
             $('kpi-total-spend').textContent = formatMoney(data.total_spend);
