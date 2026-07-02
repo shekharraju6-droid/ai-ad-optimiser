@@ -150,6 +150,7 @@ class GoogleAdsConnector(AdsConnector):
               metrics.conversions
             FROM campaign
             WHERE {date_clause}
+              AND campaign.status = 'ENABLED'
         """
         try:
             service = self.client.get_service("GoogleAdsService")
@@ -328,6 +329,7 @@ class GoogleAdsConnector(AdsConnector):
             SELECT
               campaign.id,
               campaign.name,
+              campaign.status,
               ad_group.id,
               ad_group.name,
               search_term_view.search_term,
@@ -340,6 +342,7 @@ class GoogleAdsConnector(AdsConnector):
             FROM search_term_view
             WHERE {date_clause}
               AND campaign.status = 'ENABLED'
+              AND ad_group.status = 'ENABLED'
               AND metrics.impressions > 0
               {campaign_filter}
         """
@@ -356,6 +359,7 @@ class GoogleAdsConnector(AdsConnector):
                 results.append({
                     "campaign_id": str(row.campaign.id),
                     "campaign_name": row.campaign.name,
+                    "campaign_status": str(row.campaign.status),
                     "ad_group_id": str(row.ad_group.id),
                     "ad_group_name": row.ad_group.name,
                     "term": row.search_term_view.search_term,

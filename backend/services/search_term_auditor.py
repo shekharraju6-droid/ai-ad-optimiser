@@ -164,7 +164,7 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
 
         search_terms = connector.fetch_search_terms()
 
-        # Group by campaign
+        # Group by campaign and capture campaign status
         by_campaign: Dict[str, Dict[str, Any]] = {}
         for term in search_terms:
             cid = term.get("campaign_id")
@@ -173,6 +173,7 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
             if cid not in by_campaign:
                 by_campaign[cid] = {
                     "campaign_name": term.get("campaign_name", ""),
+                    "campaign_status": str(term.get("campaign_status") or "ENABLED").upper(),
                     "terms": [],
                 }
             by_campaign[cid]["terms"].append(term)
@@ -182,6 +183,7 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
         total_classified = 0
 
         for cid, camp_data in by_campaign.items():
+            camp_status = camp_data.get("campaign_status", "ENABLED")
             # Fetch existing negatives once per campaign for dedup
             try:
                 existing_negatives = connector.fetch_campaign_negative_keywords(cid)
@@ -252,6 +254,7 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
                             "gemini_reason": classification.get("reason", ""),
                         },
                         status="pending",
+                        campaign_status="ENABLED",
                     ))
 
         for action in actions:

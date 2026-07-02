@@ -39,6 +39,18 @@ def run_migration():
     active = get_active_db()
     logger.info(f"Running brand keyword audit migration on {active}")
 
+    existing_pending_cols = _existing_columns("pending_actions")
+    if "campaign_status" not in existing_pending_cols:
+        with engine.begin() as conn:
+            if active.startswith("postgresql"):
+                sql = "ALTER TABLE pending_actions ADD COLUMN IF NOT EXISTS campaign_status VARCHAR DEFAULT 'ENABLED'"
+            else:
+                sql = "ALTER TABLE pending_actions ADD COLUMN campaign_status VARCHAR DEFAULT 'ENABLED'"
+            logger.info("Adding column pending_actions.campaign_status")
+            conn.execute(text(sql))
+    else:
+        logger.info("pending_actions.campaign_status already present")
+
     # Add brand_keywords column to accounts if missing
     try:
         existing_accounts_cols = _existing_columns("accounts")

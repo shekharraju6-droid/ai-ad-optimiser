@@ -78,6 +78,16 @@ def _keyword_already_flagged(db: Session, account_id: int, campaign_id: str, key
     return existing is not None
 
 
+def _campaign_status(campaigns: List[Dict[str, Any]], campaign_id: str) -> str:
+    """Return campaign status at audit time (ENABLED/PAUSED/REMOVED/UNKNOWN)."""
+    for camp in campaigns:
+        if str(camp.get("id")) == str(campaign_id):
+            status = camp.get("status")
+            if status:
+                return str(status).upper()
+    return "UNKNOWN"
+
+
 def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
     """Run keyword audit for a single Google Ads account. Returns summary and created actions."""
     close_session = False
@@ -117,6 +127,7 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
             conversions = kw.get("conversions", 0) or 0
             clicks = kw.get("clicks", 0) or 0
             ctr = kw.get("ctr", 0) or 0
+            camp_status = _campaign_status(campaigns, cid)
 
             # CHECK A: Non-brand keyword in Brand campaign
             if campaign_type == "brand" and keyword_text:
@@ -142,6 +153,7 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
                                 "check": "non_brand_in_brand_campaign",
                             },
                             status="pending",
+                            campaign_status=camp_status,
                         ))
 
             # CHECK B: Non-performing keyword (any campaign)
@@ -168,6 +180,7 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
                             "check": "non_performing_keyword",
                         },
                         status="pending",
+                        campaign_status=camp_status,
                     ))
 
         for action in actions:

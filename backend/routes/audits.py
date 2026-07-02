@@ -35,10 +35,20 @@ class ApplyItem(BaseModel):
     custom_value: Optional[float] = None
 
 
+class MergedApplyItem(BaseModel):
+    """Frontend sends merged item ids + the representative action type."""
+    ids: List[int]
+    type: str
+    custom_value: Optional[float] = None
+
+
 class BulkApplyRequest(BaseModel):
     approved: List[ApplyItem] = Field(default_factory=list)
+    merged_approved: List[MergedApplyItem] = Field(default_factory=list)
     rejected: List[int] = Field(default_factory=list)
+    merged_rejected: List[MergedApplyItem] = Field(default_factory=list)
     dismissed: List[int] = Field(default_factory=list)
+    merged_dismissed: List[MergedApplyItem] = Field(default_factory=list)
     reviewer: str = "admin"
 
 
@@ -170,6 +180,211 @@ def _format_match_type(mt):
     return mt
 
 
+def _parse_inr(value: float) -> str:
+    try:
+        return f"INR {value:,.0f}"
+    except Exception:
+        return f"INR {value}"
+
+
+def _classify_keyword_finding(action: PendingAction) -> Optional[Dict[str, Any]]:
+    """Map a keyword PendingAction to a structured finding with category + icon."""
+    nv = action.new_value or {}
+    if not isinstance(nv, dict):
+        nv = {}
+    check = nv.get("check", "")
+    metrics = nv.get("metrics", {})
+    spend = metrics.get("spend", 0) or 0
+    clicks = metrics.get("clicks", 0) or 0
+    conversions = metrics.get("conversions", 0) or 0
+
+    if check == "non_brand_in_brand_campaign":
+        return {
+            "category": "Keyword",
+            "icon": "🔑",
+            "detail": f"Non-brand keyword found in Brand campaign — does not contain any brand term",
+            "check": check,
+        }
+    if check == "non_performing_keyword" or (spend > 0 and conversions == 0):
+        return {
+            "category": "Spend",
+            "icon": "💰",
+            "detail": f"Spent {_parse_inr(spend)} with {clicks:,.0f} clicks and {conversions} conversions in 30 days",
+            "check": check,
+        }
+    return {
+        "category": "Performance",
+        "icon": "📊",
+        "detail": action.reason or "Performance issue flagged",
+        "check": check,
+    }
+
+
+def _classify_search_term_finding(action: PendingAction) -> Dict[str, Any]:
+    """Map a search term PendingAction to a structured finding."""
+    nv = action.new_value or {}
+    if not isinstance(nv, dict):
+        nv = {}
+    metrics = nv.get("metrics", {})
+    spend = metrics.get("spend", 0) or 0
+    clicks = metrics.get("clicks", 0) or 0
+    conversions = metrics.get("conversions", 0) or 0
+    reason = action.reason or ""
+    gemini_reason = nv.get("gemini_reason", "")
+    irrelevant_detail = f"Irrelevant search term — {gemini_reason}" if gemini_reason else (
+        reason if reason else "Irrelevant search term"
+    )
+    findings = [
+        {
+            "category": "Relevance",
+            "icon": "🔍",
+            "detail": irrelevant_detail,
+        }
+    ]
+    if spend > 0 and conversions == 0:
+        findings.append({
+            "category": "Spend",
+            "icon": "💰",
+            "detail": f"Spent {_parse_inr(spend)} with 0 conversions",
+        })
+    return findings
+
+
+def _merge_keyword_actions(actions: List[PendingAction]) -> List[Dict[str, Any]]:
+    """Group pending keyword pause actions by campaign + keyword_text and merge findings."""
+    groups: Dict[str, Dict[str, Any]] = {}
+    for action in actions:
+        if action.action_type not in ("SMART_PAUSE_KEYWORD", "PAUSE_KEYWORD"):
+            continue
+        nv = action.new_value or {}
+        if not isinstance(nv, dict):
+            nv = {}
+        campaign_id = action.campaign_id or ""
+        keyword_text = action.keyword or ""
+        key = f"{campaign_id}::{keyword_text}"
+        metrics = nv.get("metrics", {})
+        spend = metrics.get("spend", 0) or 0
+        clicks = metrics.get("clicks", 0) or 0
+        conversions = metrics.get("conversions", 0) or 0
+        ctr = metrics.get("ctr", 0) or 0
+        campaign_name = nv.get("campaign_name") or action.campaign_id or "Unknown"
+
+        if key not in groups:
+            groups[key] = {
+                "keyword_text": keyword_text,
+                "campaign_name": campaign_name,
+                "campaign_id": campaign_id,
+                "ad_group_name": nv.get("ad_group_name"),
+                "ad_group_id": nv.get("ad_group_id") or action.adset_id,
+                "match_type": _format_match_type(action.match_type),
+                "spend_30d": spend,
+                "clicks_30d": clicks,
+                "conversions_30d": conversions,
+                "ctr": ctr,
+                "queue_item_ids": [],
+                "findings": [],
+                "campaign_status": action.campaign_status or "ENABLED",
+                "_seen_categories": set(),
+            }
+        grp = groups[key]
+        grp["queue_item_ids"].append(action.id)
+        # Aggregate metrics to the highest spend values across merged items
+        if spend > grp["spend_30d"]:
+            grp["spend_30d"] = spend
+            grp["clicks_30d"] = clicks
+            grp["conversions_30d"] = conversions
+            grp["ctr"] = ctr
+            grp["match_type"] = _format_match_type(action.match_type)
+            grp["ad_group_name"] = nv.get("ad_group_name") or grp["ad_group_name"]
+            grp["ad_group_id"] = nv.get("ad_group_id") or action.adset_id or grp["ad_group_id"]
+        finding = _classify_keyword_finding(action)
+        cat = finding["category"]
+        if cat not in grp["_seen_categories"]:
+            grp["_seen_categories"].add(cat)
+            grp["findings"].append(finding)
+
+    result = []
+    for grp in groups.values():
+        grp.pop("_seen_categories", None)
+        result.append(grp)
+    return result
+
+
+def _merge_generic_actions(items: List[Dict[str, Any]], key_fields=("campaign_id",)) -> List[Dict[str, Any]]:
+    """Merge duplicate generic recommendations by key fields, collecting ids."""
+    groups: Dict[str, Dict[str, Any]] = {}
+    for item in items:
+        key_parts = [str(item.get(f, "")) for f in key_fields]
+        key = "::".join(key_parts)
+        if key not in groups:
+            grp = dict(item)
+            grp["id"] = item.get("id")
+            grp["queue_item_ids"] = [item.get("id")]
+            grp["findings"] = [{"category": "Campaign", "icon": "⚙️", "detail": item.get("reason", "")}]
+            groups[key] = grp
+        else:
+            grp = groups[key]
+            grp["queue_item_ids"].append(item.get("id"))
+            if item.get("reason"):
+                grp["findings"].append({"category": "Campaign", "icon": "⚙️", "detail": item.get("reason")})
+    return list(groups.values())
+
+
+def _merge_search_term_actions(actions: List[PendingAction]) -> List[Dict[str, Any]]:
+    """Group pending negative-keyword actions by campaign + search_term and merge findings."""
+    groups: Dict[str, Dict[str, Any]] = {}
+    for action in actions:
+        if action.action_type not in ("SMART_ADD_NEGATIVE_KEYWORD", "ADD_NEGATIVE_KEYWORD"):
+            continue
+        nv = action.new_value or {}
+        if not isinstance(nv, dict):
+            nv = {}
+        campaign_id = action.campaign_id or ""
+        term = action.keyword or ""
+        key = f"{campaign_id}::{term}"
+        metrics = nv.get("metrics", {})
+        spend = metrics.get("spend", 0) or 0
+        clicks = metrics.get("clicks", 0) or 0
+        conversions = metrics.get("conversions", 0) or 0
+        ctr = metrics.get("ctr", 0) or 0
+        campaign_name = nv.get("campaign_name") or action.campaign_id or "Unknown"
+
+        if key not in groups:
+            groups[key] = {
+                "search_term": term,
+                "campaign_name": campaign_name,
+                "campaign_id": campaign_id,
+                "level": nv.get("level") or "campaign",
+                "match_type": _format_match_type(action.match_type),
+                "spend": spend,
+                "clicks": clicks,
+                "conversions": conversions,
+                "ctr": ctr,
+                "queue_item_ids": [],
+                "findings": [],
+                "campaign_status": action.campaign_status or "ENABLED",
+                "_seen_categories": set(),
+            }
+        grp = groups[key]
+        grp["queue_item_ids"].append(action.id)
+        if spend > grp["spend"]:
+            grp["spend"] = spend
+            grp["clicks"] = clicks
+            grp["conversions"] = conversions
+            grp["ctr"] = ctr
+        for finding in _classify_search_term_finding(action):
+            cat = finding["category"]
+            if cat not in grp["_seen_categories"]:
+                grp["_seen_categories"].add(cat)
+                grp["findings"].append(finding)
+
+    result = []
+    for grp in groups.values():
+        grp.pop("_seen_categories", None)
+        result.append(grp)
+    return result
+
+
 @router.get("/audit-runs")
 def list_audit_runs(limit: int = 30, db: Session = Depends(get_db)):
     """Return recent smart audit runs (keyword + search term audits)."""
@@ -192,58 +407,21 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
         PendingAction.status == "pending",
     ).order_by(PendingAction.created_at.desc()).all()
 
-    keywords_to_pause = []
-    negatives_to_add = []
+    # Filter out items from campaigns that were paused at audit time
+    active_only = [a for a in pending if (a.campaign_status or "ENABLED").upper() == "ENABLED"]
+
+    keywords_to_pause = _merge_keyword_actions(active_only)
+    negatives_to_add = _merge_search_term_actions(active_only)
     budget_changes = []
     campaign_actions = []
 
-    for action in pending:
+    for action in active_only:
         nv = action.new_value or {}
         metrics = nv.get("metrics", {}) if isinstance(nv, dict) else {}
         campaign_name = (nv.get("campaign_name") if isinstance(nv, dict) else None) or action.campaign_id or "Unknown"
         campaign_id = action.campaign_id or ""
 
-        if action.action_type in ("SMART_PAUSE_KEYWORD", "PAUSE_KEYWORD"):
-            spend = metrics.get("spend", 0) or 0
-            clicks = metrics.get("clicks", 0) or 0
-            conversions = metrics.get("conversions", 0) or 0
-            ctr = metrics.get("ctr", 0) or 0
-            cpa = round(spend / conversions, 2) if conversions else None
-            keywords_to_pause.append({
-                "id": action.id,
-                "campaign_name": campaign_name,
-                "campaign_id": campaign_id,
-                "ad_group_name": nv.get("ad_group_name") if isinstance(nv, dict) else None,
-                "ad_group_id": nv.get("ad_group_id") if isinstance(nv, dict) else action.adset_id,
-                "keyword_text": action.keyword or "",
-                "match_type": _format_match_type(action.match_type),
-                "spend_30d": spend,
-                "clicks_30d": clicks,
-                "conversions_30d": conversions,
-                "ctr": ctr,
-                "cpa": cpa,
-                "reason": action.reason or "",
-                "criterion_id": nv.get("criterion_id") if isinstance(nv, dict) else None,
-            })
-
-        elif action.action_type in ("SMART_ADD_NEGATIVE_KEYWORD", "ADD_NEGATIVE_KEYWORD"):
-            spend = metrics.get("spend", 0) or 0
-            clicks = metrics.get("clicks", 0) or 0
-            conversions = metrics.get("conversions", 0) or 0
-            negatives_to_add.append({
-                "id": action.id,
-                "campaign_name": campaign_name,
-                "campaign_id": campaign_id,
-                "search_term": action.keyword or "",
-                "clicks": clicks,
-                "spend": spend,
-                "conversions": conversions,
-                "level": nv.get("level") if isinstance(nv, dict) else "campaign",
-                "reason": action.reason or "",
-                "match_type": _format_match_type(action.match_type),
-            })
-
-        elif action.action_type in ("PAUSE_OR_REDUCE_BUDGET",):
+        if action.action_type in ("PAUSE_OR_REDUCE_BUDGET",):
             suggested = nv.get("suggested_budget") if isinstance(nv, dict) else None
             budget_changes.append({
                 "id": action.id,
@@ -257,6 +435,7 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
                 "ctr": metrics.get("ctr", 0) or 0,
                 "cpa": round(metrics.get("spend", 0) / conversions, 2) if conversions else None,
                 "reason": action.reason or "",
+                "campaign_status": action.campaign_status or "ENABLED",
             })
 
         elif action.action_type in ("PAUSE_CAMPAIGN", "ENABLE_CAMPAIGN", "ALERT_PERFORMANCE_ISSUE", "ALERT_SETUP_ISSUE"):
@@ -271,10 +450,15 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
                 "ctr": metrics.get("ctr", 0) or 0,
                 "cpa": round(metrics.get("spend", 0) / conversions, 2) if conversions else None,
                 "reason": action.reason or "",
+                "campaign_status": action.campaign_status or "ENABLED",
             })
 
+    # Merge budget/campaign duplicates if any
+    budget_changes = _merge_generic_actions(budget_changes, key_fields=("campaign_id",))
+    campaign_actions = _merge_generic_actions(campaign_actions, key_fields=("campaign_id",))
+
     # Default audit date = latest action created_at, else today
-    audit_dt = pending[0].created_at if pending else datetime.utcnow()
+    audit_dt = active_only[0].created_at if active_only else datetime.utcnow()
     return {
         "account_id": account_id,
         "account_name": account.name,
@@ -299,30 +483,58 @@ def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(ge
     except Exception:
         pass
 
-    approved_ids = {item.id for item in req.approved}
-    approved_items = {item.id: item for item in req.approved}
+    # Flatten merged approvals/rejections/dismissals into individual DB ids
+    def _flatten_ids(items, merged_field):
+        ids = {item.id for item in items}
+        for merged in merged_field:
+            ids.update(merged.ids)
+        return ids
 
-    # Process approved items one-by-one
+    approved_ids = _flatten_ids(req.approved, req.merged_approved)
+    rejected_ids = _flatten_ids(req.rejected, req.merged_rejected)
+    dismissed_ids = _flatten_ids(req.dismissed, req.merged_dismissed)
+
+    # Map custom_value per DB id (legacy single + merged)
+    custom_by_id: Dict[int, float] = {}
     for item in req.approved:
-        action = db.query(PendingAction).filter(PendingAction.id == item.id).first()
-        if not action:
-            results.append({"id": item.id, "status": "failed", "message": "Action not found"})
-            continue
-        if action.status != "pending":
-            results.append({"id": item.id, "status": "skipped", "message": f"Already {action.status}"})
-            continue
+        if item.custom_value is not None:
+            custom_by_id[item.id] = item.custom_value
+    for merged in req.merged_approved:
+        for db_id in merged.ids:
+            if merged.custom_value is not None:
+                custom_by_id[db_id] = merged.custom_value
 
-        account = db.query(Account).filter(Account.id == action.account_id).first()
-        if not account:
-            results.append({"id": item.id, "status": "failed", "message": "Account not found"})
-            continue
+    # Track applied API mutations so we don't call Google Ads twice for merged items
+    applied_mutations: Dict[str, Dict[str, Any]] = {}
+
+    def _apply_once(action: PendingAction, custom_value: Optional[float] = None) -> Dict[str, Any]:
+        """Apply the Google Ads mutation once per campaign/keyword/action_type."""
+        nv = action.new_value or {}
+        if not isinstance(nv, dict):
+            nv = {}
+        if action.action_type in ("SMART_PAUSE_KEYWORD", "PAUSE_KEYWORD"):
+            mutation_key = f"pause_keyword::{action.campaign_id}::{action.keyword}"
+        elif action.action_type in ("SMART_ADD_NEGATIVE_KEYWORD", "ADD_NEGATIVE_KEYWORD"):
+            mutation_key = f"negative::{action.campaign_id}::{action.keyword}"
+        elif action.action_type == "PAUSE_OR_REDUCE_BUDGET":
+            mutation_key = f"budget::{action.campaign_id}"
+        else:
+            mutation_key = f"other::{action.action_type}::{action.campaign_id}"
+
+        if mutation_key in applied_mutations:
+            return applied_mutations[mutation_key]
 
         result = {"success": False, "error": "Unknown action type"}
+        account = db.query(Account).filter(Account.id == action.account_id).first()
+        if not account:
+            result = {"success": False, "error": "Account not found"}
+            applied_mutations[mutation_key] = result
+            return result
+
         try:
             if action.action_type in ("SMART_PAUSE_KEYWORD", "PAUSE_KEYWORD") and action.platform == "google" and account.google_is_live:
                 connector = get_connector(account, platform="google")
                 if connector and connector.is_valid:
-                    nv = action.new_value or {}
                     result = connector.pause_keyword(
                         nv.get("ad_group_id") or action.adset_id or "",
                         nv.get("criterion_id") or "",
@@ -342,15 +554,12 @@ def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(ge
                     result = {"success": False, "error": "Live Google connector not valid"}
 
             elif action.action_type in ("PAUSE_OR_REDUCE_BUDGET",) and action.platform == "google":
-                # For budget changes, use custom_value if provided; otherwise fall back to suggested
-                nv = action.new_value or {}
-                new_budget = item.custom_value if item.custom_value is not None else nv.get("suggested_budget")
+                new_budget = custom_value if custom_value is not None else nv.get("suggested_budget")
                 if new_budget is None:
                     result = {"success": False, "error": "No budget value provided"}
                 elif account.google_is_live:
                     connector = get_connector(account, platform="google")
                     if connector and connector.is_valid:
-                        # update_campaign_budget currently raises NotImplementedError; use campaign budget mutation via google_ads
                         from backend.services.google_ads import GoogleAdsApiClient
                         from backend.services.config import load_config
                         config = load_config()
@@ -385,23 +594,41 @@ def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(ge
         except Exception as e:
             result = {"success": False, "error": str(e)}
 
-        if result.get("success"):
+        applied_mutations[mutation_key] = result
+        return result
+
+    def _mark_action(action: PendingAction, outcome: str, message: str):
+        now = datetime.utcnow()
+        if outcome == "applied":
             action.status = "applied"
             action.applied_at = now
             action.error_message = None
-            action.reviewed_by = reviewer
-            action.reviewed_at = now
-            results.append({"id": item.id, "status": "applied", "message": result.get("message", "Applied")})
         else:
-            action.status = "failed"
-            action.error_message = result.get("error", "Unknown error")
-            action.reviewed_by = reviewer
-            action.reviewed_at = now
-            results.append({"id": item.id, "status": "failed", "message": result.get("error", "Unknown error")})
+            action.status = "failed" if outcome == "failed" else action.status
+            action.error_message = message
+        action.reviewed_by = reviewer
+        action.reviewed_at = now
+        results.append({"id": action.id, "status": outcome, "message": message})
+
+    # Process all approved DB ids (legacy + flattened merged)
+    for db_id in approved_ids:
+        action = db.query(PendingAction).filter(PendingAction.id == db_id).first()
+        if not action:
+            results.append({"id": db_id, "status": "failed", "message": "Action not found"})
+            continue
+        if action.status != "pending":
+            results.append({"id": db_id, "status": "skipped", "message": f"Already {action.status}"})
+            continue
+
+        result = _apply_once(action, custom_by_id.get(db_id))
+        if result.get("success"):
+            _mark_action(action, "applied", result.get("message", "Applied"))
+        else:
+            _mark_action(action, "failed", result.get("error", "Unknown error"))
 
     # Rejected items: set rejected + suppress search terms for 30 days
-    for rid in req.rejected:
-        action = db.query(PendingAction).filter(PendingAction.id == rid).first()
+    for db_id in rejected_ids:
+        action = db.query(PendingAction).filter(PendingAction.id == db_id).first()
         if action and action.status == "pending":
             action.status = "rejected"
             action.reviewed_by = reviewer
@@ -426,8 +653,8 @@ def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(ge
                     ))
 
     # Dismissed items: mark as dismissed (will be re-evaluated next audit)
-    for did in req.dismissed:
-        action = db.query(PendingAction).filter(PendingAction.id == did).first()
+    for db_id in dismissed_ids:
+        action = db.query(PendingAction).filter(PendingAction.id == db_id).first()
         if action and action.status == "pending":
             action.status = "dismissed"
             action.reviewed_by = reviewer
@@ -437,8 +664,8 @@ def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(ge
 
     return {
         "results": results,
-        "rejected_count": len(req.rejected),
-        "dismissed_count": len(req.dismissed),
+        "rejected_count": len(rejected_ids),
+        "dismissed_count": len(dismissed_ids),
         "applied_count": sum(1 for r in results if r["status"] == "applied"),
         "failed_count": sum(1 for r in results if r["status"] == "failed"),
     }

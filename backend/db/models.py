@@ -297,7 +297,8 @@ class PendingAction(Base):
     new_value = Column(JSON, nullable=True)  # flexible payload
     reason = Column(Text, nullable=True)
     estimated_savings = Column(Float, nullable=True)
-    status = Column(String, default="pending")  # pending, approved, rejected, applied, failed
+    status = Column(String, default="pending")  # pending, approved, rejected, applied, failed, dismissed
+    campaign_status = Column(String, default="ENABLED")  # ENABLED/PAUSED/REMOVED at audit time
     requested_by = Column(String, nullable=True)
     reviewed_by = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -328,6 +329,7 @@ class PendingAction(Base):
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
             "applied_at": self.applied_at.isoformat() if self.applied_at else None,
             "error_message": self.error_message,
+            "campaign_status": self.campaign_status,
         }
 
 

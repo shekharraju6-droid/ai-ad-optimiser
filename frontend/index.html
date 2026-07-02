@@ -196,12 +196,21 @@
         .review-tab:disabled { opacity:0.5; cursor:default; }
         .review-toolbar { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; }
         .review-search { padding:0.4rem 0.6rem; border:1px solid var(--border-color); border-radius:6px; font-size:0.8rem; min-width:200px; }
-        .review-row { display:flex; align-items:center; padding:0.5rem; border-bottom:1px solid var(--border-color); }
+        .review-row { display:flex; align-items:flex-start; padding:0.6rem 0.5rem; border-bottom:1px solid var(--border-color); }
         .review-row:hover { background:#f9fafb; }
         .review-row.high-priority { background:#fef2f2; }
         .review-row.medium-priority { background:#fefce8; }
         .review-row.brand-mismatch { background:#eff6ff; }
+        .review-row.paused-campaign { opacity:0.55; background:#f3f4f6; }
+        .review-row.paused-campaign input[type="checkbox"] { pointer-events:none; }
+        .review-finding { font-size:0.74rem; padding:0.25rem 0.5rem; margin:0.15rem 0; border-left:3px solid; border-radius:4px; background:#fafafa; }
+        .review-finding.spend { border-left-color:#f59e0b; }
+        .review-finding.keyword { border-left-color:#3b82f6; }
+        .review-finding.performance { border-left-color:#8b5cf6; }
+        .review-finding.relevance { border-left-color:#10b981; }
+        .review-finding.campaign { border-left-color:#6b7280; }
         .review-campaign-header { font-weight:700; font-size:0.85rem; padding:0.6rem 0.5rem; background:#f3f4f6; border-bottom:1px solid var(--border-color); display:flex; align-items:center; gap:0.5rem; }
+        .review-campaign-header .paused-badge { font-size:0.65rem; color:#b45309; background:#fef3c7; padding:0.1rem 0.4rem; border-radius:4px; margin-left:auto; }
         .review-card { border:1px solid var(--border-color); border-radius:8px; padding:0.75rem; margin-bottom:0.75rem; background:white; }
         .review-card:hover { border-color:var(--color-primary); }
         .review-card-header { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; }
@@ -229,7 +238,7 @@
                     <a class="nav-item" href="/" style="text-decoration:none;">🏠 ChlearSakhaaOps Home</a>
                     <div class="nav-item active" data-nav="dashboard" onclick="switchPanel('dashboard')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg> Client/Brand Dashboard</div>
                     <div class="nav-item" data-nav="accounts" onclick="switchPanel('accounts')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Manage Client/Brand</div>
-                    <div class="nav-item" data-nav="approvals" onclick="switchPanel('approvals')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Approval Queue <span id="pendingBadge" class="pending-badge hidden">0</span></div>
+                    <div class="nav-item" data-nav="approvals" onclick="switchPanel('approvals')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> AI Audit Review <span id="pendingBadge" class="pending-badge hidden">0</span></div>
                     <div class="nav-item" onclick="logout()" style="color:var(--color-danger);"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg> Logout</div>
                 </div>
             </div>
@@ -329,7 +338,7 @@
                 <div id="panel-approvals" class="panel">
                     <div class="card">
                         <div class="card-header">
-                            <h2 class="card-title">Approval Queue</h2>
+                            <h2 class="card-title">AI Audit Review</h2>
                             <div style="display:flex;gap:0.5rem;align-items:center;">
                                 <button class="btn btn-sm btn-secondary" onclick="openAuditSettings()" title="Audit thresholds">⚙️ Audit Settings</button>
                                 <button class="btn btn-sm btn-danger" onclick="clearAllPendingActions()" title="Remove all pending recommendations">🗑️ Clear All Pending</button>
@@ -786,7 +795,7 @@
         if (panel) panel.classList.add('active');
         const nav = document.querySelector('.nav-item[data-nav="' + name + '"]');
         if (nav) nav.classList.add('active');
-        const titles = { dashboard: 'Client/Brand Dashboard', accounts: 'Manage Client/Brand', approvals: 'Approval Queue', 'account-detail': 'Client/Brand Detail' };
+        const titles = { dashboard: 'Client/Brand Dashboard', accounts: 'Manage Client/Brand', approvals: 'AI Audit Review', 'account-detail': 'Client/Brand Detail' };
         $('pageTitle').textContent = titles[name] || 'AdOptima';
         if (name === 'accounts') loadAccounts();
         if (name === 'approvals') loadPendingActions();
@@ -1541,7 +1550,7 @@
     async function loadPendingActionsCount() {
         try {
             const data = await api('GET', '/pending-actions');
-            const count = (data || []).filter(x => x.status === 'pending').length;
+            const count = (data || []).filter(x => x.status === 'pending' && (!x.campaign_status || x.campaign_status.toUpperCase() === 'ENABLED')).length;
             $('pendingBadge').textContent = count;
             $('pendingBadge').classList.toggle('hidden', count === 0);
         } catch (e) {}
@@ -1588,6 +1597,8 @@
     async function loadPendingActions() {
         try {
             pendingActions = await api('GET', '/pending-actions');
+            // Filter out paused-campaign items from queue list counts
+            pendingActions = (pendingActions || []).filter(a => !a.campaign_status || a.campaign_status.toUpperCase() === 'ENABLED');
             loadLastAuditRun();
             renderPendingActions();
         } catch (e) { toast(e.message, true); }
@@ -1596,6 +1607,7 @@
     function _groupActionsByAccount(actions) {
         const groups = {};
         actions.forEach(a => {
+            if (a.campaign_status && a.campaign_status.toUpperCase() !== 'ENABLED') return;
             const key = a.account_id;
             if (!groups[key]) groups[key] = { account_id: a.account_id, account_name: a.account_name || ('Client/Brand ' + a.account_id), actions: [] };
             groups[key].actions.push(a);
@@ -1611,6 +1623,7 @@
         // Group by Client/Brand for summary
         const accountCounts = {};
         filtered.forEach(a => {
+            if (a.campaign_status && a.campaign_status.toUpperCase() !== 'ENABLED') return;
             const name = a.account_name || ('Client/Brand ' + a.account_id);
             if (!accountCounts[name]) accountCounts[name] = { keyword: 0, search_term: 0, budget: 0, campaign: 0 };
             const at = _auditTypeFromAction(a);
@@ -1758,19 +1771,32 @@
     function _keywordRowClass(item) {
         const spend = item.spend_30d || 0;
         const conv = item.conversions_30d || 0;
-        if (spend > 2000 && conv === 0) return 'high-priority';
-        if (spend >= 500 && spend <= 2000 && conv === 0) return 'medium-priority';
-        if (item.reason && item.reason.toLowerCase().includes('non-brand')) return 'brand-mismatch';
-        return '';
+        const classes = [];
+        if (item.campaign_status && item.campaign_status.toUpperCase() !== 'ENABLED') classes.push('paused-campaign');
+        if (spend > 2000 && conv === 0) classes.push('high-priority');
+        if (spend >= 500 && spend <= 2000 && conv === 0) classes.push('medium-priority');
+        const hasBrandFinding = (item.findings || []).some(f => f.category === 'Keyword');
+        if (hasBrandFinding) classes.push('brand-mismatch');
+        return classes.join(' ');
     }
 
     function _negativeRowClass(item) {
         const spend = item.spend || 0;
         const conv = item.conversions || 0;
         const clicks = item.clicks || 0;
-        if (spend > 500 && conv === 0) return 'high-priority';
-        if (clicks > 0 && conv === 0) return 'medium-priority';
-        return '';
+        const classes = [];
+        if (item.campaign_status && item.campaign_status.toUpperCase() !== 'ENABLED') classes.push('paused-campaign');
+        if (spend > 500 && conv === 0) classes.push('high-priority');
+        if (clicks > 0 && conv === 0) classes.push('medium-priority');
+        return classes.join(' ');
+    }
+
+    function _renderFindings(findings) {
+        if (!findings || !findings.length) return '';
+        return '<div style="margin-top:0.4rem;">' + findings.map(f => {
+            const catClass = (f.category || '').toLowerCase().replace(/[^a-z]/g, '');
+            return `<div class="review-finding ${catClass}"><strong>${f.icon || ''} ${escapeHtml(f.category)}:</strong> ${escapeHtml(f.detail)}</div>`;
+        }).join('') + '</div>';
     }
 
     function formatMoneyINR(n) {
@@ -1806,52 +1832,47 @@
         const filtered = _reviewSort(_reviewFilter(items, tab), tab);
 
         if (tab === 'keywords' || tab === 'negatives') {
-            html += '<div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">';
+            html += '<div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;" id="reviewTableWrapper">';
             const groups = _groupByCampaign(filtered);
             groups.forEach(g => {
+                const paused = g.items.length > 0 && g.items[0].campaign_status && g.items[0].campaign_status.toUpperCase() !== 'ENABLED';
                 html += `
-                    <div class="review-campaign-header">
-                        <input type="checkbox" onchange="toggleCampaignSelectAll('${tab}', '${escapeHtml(g.campaign_name)}', this.checked)">
+                    <div class="review-campaign-header" ${paused ? 'style="opacity:0.7;"' : ''}>
+                        <input type="checkbox" ${paused ? 'disabled' : ''} onchange="toggleCampaignSelectAll('${tab}', '${escapeHtml(g.campaign_name)}', this.checked)">
                         <span>${escapeHtml(g.campaign_name)}</span>
                         <span style="font-size:0.7rem; color:var(--text-muted); font-weight:500;">${g.items.length} item${g.items.length > 1 ? 's' : ''}</span>
+                        ${paused ? '<span class="paused-badge">⚠️ Campaign paused</span>' : ''}
                     </div>
                 `;
                 if (tab === 'keywords') {
-                    html += '<div style="display:grid; grid-template-columns: 30px 1.5fr 1.2fr 1.5fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr; font-size:0.75rem; font-weight:600; color:var(--text-muted); padding:0.4rem 0.5rem; background:var(--bg-sidebar);">';
-                    html += '<div></div><div>Campaign</div><div>Ad Group</div><div>Keyword</div><div>Match</div><div>Spend</div><div>Clicks</div><div>Conv.</div><div>CTR</div><div>CPA</div><div>Reason</div>';
-                    html += '</div>';
                     g.items.forEach(i => {
+                        const disabled = i.campaign_status && i.campaign_status.toUpperCase() !== 'ENABLED';
+                        const repId = i.queue_item_ids ? i.queue_item_ids[0] : i.id;
                         html += `
-                            <div class="review-row ${_keywordRowClass(i)}" style="display:grid; grid-template-columns: 30px 1.5fr 1.2fr 1.5fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr; font-size:0.78rem; align-items:center;">
-                                <input type="checkbox" data-review-id="${i.id}" onchange="toggleReviewItem(${i.id})">
-                                <div>${escapeHtml(i.campaign_name)}</div>
-                                <div>${escapeHtml(i.ad_group_name || '')}</div>
-                                <div style="font-weight:600;">${escapeHtml(i.keyword_text)}</div>
-                                <div>${escapeHtml(i.match_type || '')}</div>
-                                <div>${formatMoneyINR(i.spend_30d)}</div>
-                                <div>${i.clicks_30d || 0}</div>
-                                <div>${i.conversions_30d || 0}</div>
-                                <div>${formatPct(i.ctr)}</div>
-                                <div>${i.cpa !== null && i.cpa !== undefined ? formatMoneyINR(i.cpa) : '∞'}</div>
-                                <div style="font-size:0.7rem; color:var(--text-muted);">${escapeHtml(i.reason)}</div>
+                            <div class="review-row ${_keywordRowClass(i)}" style="display:flex; flex-direction:column; align-items:flex-start;">
+                                <div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
+                                    <input type="checkbox" data-review-id="${repId}" ${disabled ? 'disabled' : ''} onchange="toggleReviewMergedItem('${tab}', '${i.campaign_id || ''}', '${escapeHtml(i.keyword_text || i.search_term || '')}', this.checked)">
+                                    <div style="font-weight:600; font-size:0.85rem;">${escapeHtml(i.keyword_text)}</div>
+                                    <div style="margin-left:auto; font-size:0.75rem; color:var(--text-muted);">${escapeHtml(i.match_type || '')} | ${formatMoneyINR(i.spend_30d)} | ${i.clicks_30d || 0} clicks | ${i.conversions_30d || 0} conv | ${formatPct(i.ctr)} CTR</div>
+                                </div>
+                                <div style="font-size:0.72rem; color:var(--text-muted); margin-left:1.9rem; margin-top:0.1rem;">Campaign: ${escapeHtml(i.campaign_name)} · Ad group: ${escapeHtml(i.ad_group_name || '-')}</div>
+                                <div style="margin-left:1.9rem;">${_renderFindings(i.findings)}</div>
                             </div>
                         `;
                     });
                 } else {
-                    html += '<div style="display:grid; grid-template-columns: 30px 1.5fr 1.5fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr; font-size:0.75rem; font-weight:600; color:var(--text-muted); padding:0.4rem 0.5rem; background:var(--bg-sidebar);">';
-                    html += '<div></div><div>Campaign</div><div>Search Term</div><div>Clicks</div><div>Spend</div><div>Conv.</div><div>Level</div><div>Reason</div>';
-                    html += '</div>';
                     g.items.forEach(i => {
+                        const disabled = i.campaign_status && i.campaign_status.toUpperCase() !== 'ENABLED';
+                        const repId = i.queue_item_ids ? i.queue_item_ids[0] : i.id;
                         html += `
-                            <div class="review-row ${_negativeRowClass(i)}" style="display:grid; grid-template-columns: 30px 1.5fr 1.5fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr; font-size:0.78rem; align-items:center;">
-                                <input type="checkbox" data-review-id="${i.id}" onchange="toggleReviewItem(${i.id})">
-                                <div>${escapeHtml(i.campaign_name)}</div>
-                                <div style="font-weight:600;">${escapeHtml(i.search_term)}</div>
-                                <div>${i.clicks || 0}</div>
-                                <div>${formatMoneyINR(i.spend)}</div>
-                                <div>${i.conversions || 0}</div>
-                                <div>${escapeHtml(i.level || 'campaign')}</div>
-                                <div style="font-size:0.7rem; color:var(--text-muted);">${escapeHtml(i.reason)}</div>
+                            <div class="review-row ${_negativeRowClass(i)}" style="display:flex; flex-direction:column; align-items:flex-start;">
+                                <div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
+                                    <input type="checkbox" data-review-id="${repId}" ${disabled ? 'disabled' : ''} onchange="toggleReviewMergedItem('${tab}', '${i.campaign_id || ''}', '${escapeHtml(i.search_term || '')}', this.checked)">
+                                    <div style="font-weight:600; font-size:0.85rem;">${escapeHtml(i.search_term)}</div>
+                                    <div style="margin-left:auto; font-size:0.75rem; color:var(--text-muted);">${formatMoneyINR(i.spend)} | ${i.clicks || 0} clicks | ${i.conversions || 0} conv | ${formatPct(i.ctr)} CTR</div>
+                                </div>
+                                <div style="font-size:0.72rem; color:var(--text-muted); margin-left:1.9rem; margin-top:0.1rem;">Campaign: ${escapeHtml(i.campaign_name)} · Level: ${escapeHtml(i.level || 'campaign')}</div>
+                                <div style="margin-left:1.9rem;">${_renderFindings(i.findings)}</div>
                             </div>
                         `;
                     });
@@ -1935,10 +1956,32 @@
         if (tab === 'negatives') items = currentReviewData.negatives_to_add || [];
         if (tab === 'budget') items = currentReviewData.budget_changes || [];
         if (tab === 'campaigns') items = currentReviewData.campaign_actions || [];
-        const filtered = _reviewSort(_reviewFilter(items, tab), tab).map(i => i.id);
         const checked = $('reviewSelectAll_' + tab).checked;
-        if (checked) filtered.forEach(id => reviewState.selected.add(id));
-        else filtered.forEach(id => reviewState.selected.delete(id));
+        _reviewSort(_reviewFilter(items, tab), tab).forEach(i => {
+            const ids = i.queue_item_ids || [i.id];
+            ids.forEach(id => {
+                if (checked) reviewState.selected.add(id);
+                else reviewState.selected.delete(id);
+            });
+        });
+        syncReviewCheckboxes(tab);
+        updateReviewSelectionCount();
+    }
+
+    function _mergedIdsForKey(tab, campaignId, text) {
+        const all = [];
+        if (tab === 'keywords') all.push(...(currentReviewData.keywords_to_pause || []));
+        if (tab === 'negatives') all.push(...(currentReviewData.negatives_to_add || []));
+        const item = all.find(i => i.campaign_id === campaignId && (i.keyword_text === text || i.search_term === text));
+        return (item && item.queue_item_ids) ? item.queue_item_ids : [];
+    }
+
+    function toggleReviewMergedItem(tab, campaignId, text, checked) {
+        const ids = _mergedIdsForKey(tab, campaignId, text);
+        ids.forEach(id => {
+            if (checked) reviewState.selected.add(id);
+            else reviewState.selected.delete(id);
+        });
         syncReviewCheckboxes(tab);
         updateReviewSelectionCount();
     }
@@ -1949,8 +1992,11 @@
         if (tab === 'negatives') items = currentReviewData.negatives_to_add || [];
         const filtered = _reviewSort(_reviewFilter(items, tab), tab).filter(i => i.campaign_name === campaignName);
         filtered.forEach(i => {
-            if (checked) reviewState.selected.add(i.id);
-            else reviewState.selected.delete(i.id);
+            const ids = i.queue_item_ids || [i.id];
+            ids.forEach(id => {
+                if (checked) reviewState.selected.add(id);
+                else reviewState.selected.delete(id);
+            });
         });
         syncReviewCheckboxes(tab);
         updateReviewSelectionCount();
@@ -1958,8 +2004,17 @@
 
     function syncReviewCheckboxes(tab) {
         document.querySelectorAll('#reviewModalBody input[type="checkbox"][data-review-id]').forEach(cb => {
-            const id = parseInt(cb.dataset.reviewId);
-            cb.checked = reviewState.selected.has(id);
+            const repId = parseInt(cb.dataset.reviewId);
+            let ids = [repId];
+            const allItems = [
+                ...(currentReviewData.keywords_to_pause || []),
+                ...(currentReviewData.negatives_to_add || []),
+                ...(currentReviewData.budget_changes || []),
+                ...(currentReviewData.campaign_actions || []),
+            ];
+            const item = allItems.find(i => (i.queue_item_ids || [i.id]).includes(repId));
+            if (item && item.queue_item_ids) ids = item.queue_item_ids;
+            cb.checked = ids.every(id => reviewState.selected.has(id));
         });
         const allCheckbox = $('reviewSelectAll_' + tab);
         if (allCheckbox) {
@@ -1968,8 +2023,8 @@
             if (tab === 'negatives') items = currentReviewData.negatives_to_add || [];
             if (tab === 'budget') items = currentReviewData.budget_changes || [];
             if (tab === 'campaigns') items = currentReviewData.campaign_actions || [];
-            const filtered = _reviewSort(_reviewFilter(items, tab), tab);
-            allCheckbox.checked = filtered.length > 0 && filtered.every(i => reviewState.selected.has(i.id));
+            const filtered = _reviewSort(_reviewFilter(items, tab), tab).filter(i => !i.campaign_status || i.campaign_status.toUpperCase() === 'ENABLED');
+            allCheckbox.checked = filtered.length > 0 && filtered.every(i => (i.queue_item_ids || [i.id]).every(id => reviewState.selected.has(id)));
         }
     }
 
@@ -1988,25 +2043,34 @@
         if (!reviewState.selected.size) { toast('Select at least one item to approve', true); return; }
         if (!currentReviewData) return;
         const counts = { keyword: 0, negative: 0, budget: 0, campaign: 0 };
-        const approved = [];
+        const mergedApproved = [];
         reviewState.selected.forEach(id => {
-            const kw = (currentReviewData.keywords_to_pause || []).find(i => i.id === id);
-            const neg = (currentReviewData.negatives_to_add || []).find(i => i.id === id);
-            const bud = (currentReviewData.budget_changes || []).find(i => i.id === id);
-            const camp = (currentReviewData.campaign_actions || []).find(i => i.id === id);
-            if (kw) { counts.keyword++; approved.push({ id, type: 'pause_keyword', custom_value: null }); }
-            else if (neg) { counts.negative++; approved.push({ id, type: 'add_negative', custom_value: null }); }
-            else if (bud) { counts.budget++; approved.push({ id, type: 'change_budget', custom_value: reviewState.customBudgets[id] !== undefined ? reviewState.customBudgets[id] : bud.suggested_budget }); }
-            else if (camp) { counts.campaign++; approved.push({ id, type: 'pause_campaign', custom_value: null }); }
+            const kw = (currentReviewData.keywords_to_pause || []).find(i => (i.queue_item_ids || [i.id]).includes(id));
+            const neg = (currentReviewData.negatives_to_add || []).find(i => (i.queue_item_ids || [i.id]).includes(id));
+            const bud = (currentReviewData.budget_changes || []).find(i => (i.queue_item_ids || [i.id]).includes(id));
+            const camp = (currentReviewData.campaign_actions || []).find(i => (i.queue_item_ids || [i.id]).includes(id));
+            if (kw) {
+                counts.keyword += (kw.queue_item_ids || [kw.id]).length;
+                mergedApproved.push({ ids: kw.queue_item_ids || [kw.id], type: 'pause_keyword', custom_value: null });
+            } else if (neg) {
+                counts.negative += (neg.queue_item_ids || [neg.id]).length;
+                mergedApproved.push({ ids: neg.queue_item_ids || [neg.id], type: 'add_negative', custom_value: null });
+            } else if (bud) {
+                counts.budget += (bud.queue_item_ids || [bud.id]).length;
+                mergedApproved.push({ ids: bud.queue_item_ids || [bud.id], type: 'change_budget', custom_value: reviewState.customBudgets[bud.id] !== undefined ? reviewState.customBudgets[bud.id] : bud.suggested_budget });
+            } else if (camp) {
+                counts.campaign += (camp.queue_item_ids || [camp.id]).length;
+                mergedApproved.push({ ids: camp.queue_item_ids || [camp.id], type: 'pause_campaign', custom_value: null });
+            }
         });
         const lines = [];
         if (counts.keyword) lines.push(`- ${counts.keyword} keyword${counts.keyword > 1 ? 's' : ''} will be paused`);
         if (counts.negative) lines.push(`- ${counts.negative} negative keyword${counts.negative > 1 ? 's' : ''} will be added`);
         if (counts.budget) lines.push(`- ${counts.budget} campaign budget${counts.budget > 1 ? 's' : ''} will be changed`);
         if (counts.campaign) lines.push(`- ${counts.campaign} campaign${counts.campaign > 1 ? 's' : ''} will be paused`);
-        const msg = `You are about to apply ${approved.length} changes to Google Ads for ${currentReviewData.account_name}:\n${lines.join('\n')}\n\nThis cannot be undone from this tool. Are you sure?`;
+        const msg = `You are about to apply ${reviewState.selected.size} changes to Google Ads for ${currentReviewData.account_name}:\n${lines.join('\n')}\n\nThis cannot be undone from this tool. Are you sure?`;
         if (!confirm(msg)) return;
-        submitReviewApply(approved);
+        submitReviewApply(mergedApproved);
     }
 
     function confirmRejectSelected() {
@@ -2014,39 +2078,45 @@
         if (!currentReviewData) return;
         const msg = `Reject ${reviewState.selected.size} recommendations? These will be dismissed and suppressed for 30 days.`;
         if (!confirm(msg)) return;
-        submitReviewApply([], Array.from(reviewState.selected));
+        const rejectedIds = Array.from(reviewState.selected);
+        submitReviewApply([], rejectedIds);
     }
 
-    async function submitReviewApply(approved, rejected) {
+    async function submitReviewApply(mergedApproved, rejectedIds) {
         const allItems = [
             ...(currentReviewData.keywords_to_pause || []),
             ...(currentReviewData.negatives_to_add || []),
             ...(currentReviewData.budget_changes || []),
             ...(currentReviewData.campaign_actions || []),
         ];
-        const selectedIds = new Set(approved.map(a => a.id));
-        if (rejected) rejected.forEach(id => selectedIds.add(id));
-        const dismissed = allItems.filter(i => !selectedIds.has(i.id)).map(i => i.id);
+        const selectedIds = new Set();
+        (mergedApproved || []).forEach(m => (m.ids || []).forEach(id => selectedIds.add(id)));
+        if (rejectedIds) rejectedIds.forEach(id => selectedIds.add(id));
+        const dismissed = [];
+        allItems.forEach(i => {
+            (i.queue_item_ids || [i.id]).forEach(id => {
+                if (!selectedIds.has(id)) dismissed.push(id);
+            });
+        });
 
-        showReviewProgress(approved.length);
+        showReviewProgress(selectedIds.size);
 
         try {
             const result = await api('POST', '/adpulse/approval-queue/apply', {
-                approved,
-                rejected: rejected || [],
-                dismissed,
+                merged_approved: mergedApproved || [],
+                merged_rejected: rejectedIds ? rejectedIds.map(id => ({ ids: [id], type: '' })) : [],
+                merged_dismissed: dismissed.map(id => ({ ids: [id], type: '' })),
                 reviewer: currentUser ? currentUser.email : 'admin',
             });
             const applied = result.applied_count || 0;
             const failed = result.failed_count || 0;
-            const skipped = (approved.length - applied - failed);
-            updateReviewProgress(applied + failed, approved.length, `Applied: ${applied} ✓ | Failed: ${failed} ✗ | Skipped: ${skipped}`);
+            updateReviewProgress(applied + failed, selectedIds.size, `Applied: ${applied} ✓ | Failed: ${failed} ✗`);
             setTimeout(() => {
                 hideReviewProgress();
                 closeReviewModal();
                 loadPendingActions();
                 loadPendingActionsCount();
-                toast(`Applied: ${applied} ✓ | Failed: ${failed} ✗ | Skipped: ${skipped}`);
+                toast(`Applied: ${applied} ✓ | Failed: ${failed} ✗`);
             }, 1200);
         } catch (e) {
             hideReviewProgress();
