@@ -711,20 +711,29 @@
     }
 
     function editUser(id) {
-        const u = umUsers.find(x => x.id === id);
-        if (!u) return;
-        $('umUserId').value = u.id;
-        $('umFullName').value = u.full_name || '';
-        $('umEmail').value = u.email || '';
-        $('umMobile').value = u.mobile || '';
-        $('umRole').value = u.role || 'user';
-        $('umAccessAdPulse').checked = u.access_adpulse;
-        $('umAccessInsightDesk').checked = u.access_insightdesk;
-        $('umAccessRevenueOps').checked = u.access_revenueops;
-        $('umAccessAuditReview').checked = u.access_audit_review || false;
-        toggleAuditReviewCheckbox();
-        $('umLinkBox').classList.add('hidden');
-        renderAssignList(u.assigned_account_ids || []);
+        try {
+            const u = umUsers.find(x => x.id === id);
+            if (!u) { alert('User not found (id=' + id + ')'); return; }
+            $('umUserId').value = u.id;
+            $('umFullName').value = u.full_name || '';
+            $('umEmail').value = u.email || '';
+            $('umMobile').value = u.mobile || '';
+            $('umRole').value = u.role || 'user';
+            $('umAccessAdPulse').checked = u.access_adpulse;
+            $('umAccessInsightDesk').checked = u.access_insightdesk;
+            $('umAccessRevenueOps').checked = u.access_revenueops;
+            $('umAccessAuditReview').checked = u.access_audit_review || false;
+            toggleAuditReviewCheckbox();
+            $('umLinkBox').classList.add('hidden');
+            $('umSetupLink').textContent = '';
+            renderAssignList(u.assigned_account_ids || []);
+            // Scroll the form into view inside the overlay
+            const form = document.querySelector('.um-form');
+            if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (e) {
+            alert('editUser error: ' + e.message);
+            console.error('editUser error:', e);
+        }
     }
 
     async function saveUser() {
