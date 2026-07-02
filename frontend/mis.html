@@ -150,41 +150,51 @@
         input[type="date"].date-input { position: relative; z-index: 1; background: var(--color-bg-input); }
 
         /* DSU Report tables - using variable-based colors */
-        .dsu-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--color-bg-card); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); overflow: hidden; }
-        .dsu-table th { padding: 10px 12px; border: 1px solid var(--color-border); text-align: left; background: var(--color-bg-card-hover); color: var(--color-text-secondary); font-weight: 600; font-size: 12px; }
-        .dsu-table td { padding: 8px 12px; border: 1px solid var(--color-border); background: var(--color-bg-card); text-align: left; color: var(--color-text-primary); }
+        .dsu-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--color-bg-card); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); overflow: hidden; }
+        .dsu-table th { padding: 8px 12px; border: 1px solid var(--color-border); text-align: left; background: var(--color-accent-light); color: var(--color-accent-text); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .dsu-table td { padding: 8px 12px; border: 1px solid var(--color-border); background: var(--color-bg-card); text-align: left; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+        .dsu-table td[style*="font-weight:500"], .dsu-table td[style*="font-weight: 500"] { font-variant-numeric: normal; }
         .dsu-table tbody tr:nth-child(even) td { background: var(--color-bg-card-hover); }
         .dsu-table tbody tr:hover td { background: var(--color-bg-card-hover); }
-        .dsu-table .text-right { text-align: right; }
+        .dsu-table .text-right { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
         .dsu-table .text-center { text-align: center; }
-        .dsu-banner { text-align: center; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 8px; color: var(--color-text-primary); }
-        .dsu-mode-row { text-align: center; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px; }
-        .dsu-mode-row label { display: inline-flex; align-items: center; gap: 4px; margin: 0 8px; cursor: pointer; font-weight: 500; }
+        .dsu-banner { text-align: center; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0.02em; padding: 12px 16px; background: var(--color-accent-light) !important; color: var(--color-accent-text) !important; border: 1px solid var(--color-accent) !important; }
+        .dsu-mode-row { text-align: center; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; padding: 8px; color: var(--color-text-primary); background: var(--color-bg-card) !important; }
+        .dsu-mode-row label { display: inline-flex; align-items: center; gap: 4px; margin: 0 8px; cursor: pointer; font-weight: 500; color: var(--color-text-primary); }
         .dsu-mode-row input[type="radio"] { width: 16px; height: 16px; accent-color: var(--color-accent); }
-        .dsu-mis-row { text-align: center; font-size: 13px; font-weight: 600; padding: 6px; }
-        .dsu-range-label { margin-left: 1rem; color: var(--color-accent-text); font-weight: 500; }
+        .dsu-mode-row select { padding: 6px 10px; border: 1px solid var(--color-border-input); border-radius: var(--radius-sm); font-size: 12px; font-family: 'Inter', sans-serif; background: var(--color-bg-input); color: var(--color-text-primary); }
+        .dsu-mode-row select:focus { outline: none; border-color: var(--color-border-focus); }
+        .dsu-mode-row input[type="date"] { padding: 4px 8px; border: 1px solid var(--color-border-input); border-radius: var(--radius-sm); font-size: 12px; font-family: 'Inter', sans-serif; background: var(--color-bg-input); color: var(--color-text-primary); }
+        .dsu-mis-row { text-align: center; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; padding: 8px; color: var(--color-accent); background: var(--color-bg-card) !important; }
+        .dsu-range-label { margin-left: 1rem; color: var(--color-accent); font-weight: 600; font-family: 'DM Sans', sans-serif; font-size: 13px; }
         .dsu-total-row td { background: var(--color-accent-light) !important; border: 1px solid var(--color-border-strong) !important; font-weight: 600; color: var(--color-text-primary); }
         .dsu-grand-row td { background: var(--color-warning-light) !important; border: 1px solid var(--color-warning) !important; font-weight: 600; color: var(--color-text-primary); }
         .dsu-section-row td { background: var(--color-bg-card-hover) !important; border: 1px solid var(--color-border-strong) !important; font-weight: 600; color: var(--color-text-primary); text-align: center; letter-spacing: 0.03em; font-size: 12px; }
         .dsu-table4-wrap { max-width: 720px; margin: 0 auto; }
         .dsi-table4-wrap { max-width: 720px; margin: 0 auto; }
 
+        /* Report title, labels, containers */
+        .report-title { font-family: 'DM Sans', sans-serif; font-size: 20px; font-weight: 700; color: var(--color-text-primary); padding-bottom: 10px; border-bottom: 3px solid var(--color-accent); margin-bottom: 16px; display: inline-block; }
+        .report-notice { background: var(--color-accent-light); border: 1px solid var(--color-accent); border-radius: var(--radius-md); padding: 12px 16px; font-size: 12px; font-weight: 500; color: var(--color-accent-text); letter-spacing: 0.02em; margin-bottom: 12px; }
+        .table-label { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700; color: var(--color-text-primary); background: var(--color-bg-card-hover); padding: 8px 14px; border-radius: var(--radius-sm); display: inline-block; margin-bottom: 8px; }
+        .report-container { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-sm); }
+
         /* DSI Table 1 & 2 compact layout */
         .dsi-t1t2-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         @media (max-width: 1100px) { .dsi-t1t2-wrap { grid-template-columns: 1fr; } }
-        .dsi-t1t2-wrap .dsu-table { font-size: 12px; }
-        .dsi-t1t2-wrap .dsu-table th { padding: 4px 6px; font-size: 11px; }
-        .dsi-t1t2-wrap .dsu-table td { padding: 3px 6px; }
-        .dsi-t1t2-wrap .dsu-banner { padding: 4px; font-size: 10px; letter-spacing: 0.02em; }
-        .dsi-t1t2-wrap .dsu-mis-row { padding: 4px; font-size: 12px; }
+        .dsi-t1t2-wrap .dsu-table { font-size: 11px; }
+        .dsi-t1t2-wrap .dsu-table th { padding: 4px 6px; font-size: 10px; }
+        .dsi-t1t2-wrap .dsu-table td { padding: 4px 6px; }
+        .dsi-t1t2-wrap .dsu-banner { padding: 6px 10px; font-size: 10px; letter-spacing: 0.02em; }
+        .dsi-t1t2-wrap .dsu-mis-row { padding: 4px; font-size: 11px; }
         .dsi-t1t2-wrap .dsu-total-row td { padding: 4px 6px; }
 
-        .dsu-table7 { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--color-bg-card); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); overflow: hidden; }
-        .dsu-table7 th { padding: 10px 12px; border: 1px solid var(--color-border); text-align: left; background: var(--color-bg-card-hover); color: var(--color-text-secondary); font-weight: 600; font-size: 12px; }
-        .dsu-table7 td { padding: 8px 12px; border: 1px solid var(--color-border); background: var(--color-bg-card); text-align: left; color: var(--color-text-primary); }
+        .dsu-table7 { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--color-bg-card); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); overflow: hidden; }
+        .dsu-table7 th { padding: 8px 12px; border: 1px solid var(--color-border); text-align: left; background: var(--color-accent-light); color: var(--color-accent-text); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .dsu-table7 td { padding: 8px 12px; border: 1px solid var(--color-border); background: var(--color-bg-card); text-align: left; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
         .dsu-table7 tbody tr:nth-child(even) td { background: var(--color-bg-card-hover); }
         .dsu-table7 tbody tr:hover td { background: var(--color-bg-card-hover); }
-        .dsu-table7 .text-right { text-align: right; }
+        .dsu-table7 .text-right { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
         .dsu-table7 .text-center { text-align: center; }
         .dsu-table7 .balance-positive { color: var(--color-success-text); font-weight: 600; }
         .dsu-table7 .balance-negative { color: var(--color-danger-text); font-weight: 600; }
@@ -646,7 +656,7 @@
             }).join('');
             const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
             return `
-                <div style="background:#c7d2fe;border:1px solid #a5b4fc;border-radius:8px;overflow:hidden;margin-bottom:0.75rem">
+                <div class="report-container" style="margin-bottom:12px">
                     <table class="dsu-table">
                         <thead>${headerRows}
                             <tr><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend ↓</th></tr>
@@ -667,15 +677,15 @@
             }).join('');
             const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
             return `
-                <div style="background:#c7d2fe;border:1px solid #a5b4fc;border-radius:8px;padding:0.75rem;text-align:center;margin-bottom:0.75rem">
-                    <div style="font-size:.75rem;font-weight:700;letter-spacing:.04em">${subtitle}</div>
-                    <div style="font-size:.95rem;font-weight:700;margin-top:.25rem">${title}</div>
-                    <div style="font-size:.8rem;color:#4338ca;margin-top:.25rem">MIS</div>
+                <div class="report-container" style="text-align:center;margin-bottom:12px">
+                    <div style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--color-text-muted);letter-spacing:0.04em">${subtitle}</div>
+                    <div style="font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--color-text-primary);margin-top:4px">${title}</div>
+                    <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--color-accent);margin-top:4px">MIS</div>
                 </div>
                 <table>
                     <thead><tr><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend ↓</th></tr></thead>
                     <tbody>${body}
-                        <tr style="background:#c7d2fe;font-weight:700">
+                        <tr style="background:var(--color-accent-light);font-weight:600">
                             <td>TOTAL</td><td class="text-right">${fmtNum(total.leads)}</td><td class="text-right">${totalCpl}</td><td class="text-right">${fmtMoney(total.spend)}</td>
                         </tr>
                     </tbody>
@@ -706,9 +716,9 @@
                     </label>
                     ${custom?`
                         <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                            <input type="date" id="dsuT1Start" value="${dsuT1Range.start}" onchange="dsuT1Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                            <input type="date" id="dsuT1Start" value="${dsuT1Range.start}" onchange="dsuT1Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
                             <span style="font-size:0.7rem">to</span>
-                            <input type="date" id="dsuT1End" value="${dsuT1Range.end}" onchange="dsuT1Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                            <input type="date" id="dsuT1End" value="${dsuT1Range.end}" onchange="dsuT1Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
                         </div>
                     `:''}
                     <span class="dsu-range-label">${label}</span>
@@ -734,7 +744,7 @@
             return `
                 <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;flex-wrap:wrap;">
                     <span>Table 2:</span>
-                    <select id="dsuT2Preset" onchange="dsuT2Preset(this.value)" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;min-width:120px;"
+                    <select id="dsuT2Preset" onchange="dsuT2Preset(this.value)" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);min-width:120px;"
                         onfocus="this.style.background='#fff'">
                         <option value="yesterday" ${dsuT2Range.preset==='yesterday'?'selected':''}>Yesterday</option>
                         <option value="today" ${dsuT2Range.preset==='today'?'selected':''}>Today</option>
@@ -747,9 +757,9 @@
                     </select>
                     ${custom?`
                         <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                            <input type="date" id="dsuT2Start" value="${dsuT2Range.start}" onchange="dsuT2Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                            <input type="date" id="dsuT2Start" value="${dsuT2Range.start}" onchange="dsuT2Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
                             <span style="font-size:0.7rem">to</span>
-                            <input type="date" id="dsuT2End" value="${dsuT2Range.end}" onchange="dsuT2Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                            <input type="date" id="dsuT2End" value="${dsuT2Range.end}" onchange="dsuT2Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
                         </div>
                     `:''}
                     <span class="dsu-range-label">${label}</span>
@@ -798,13 +808,13 @@
             ${dsuTabBar()}
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">DSU Course Performance Report</div>
+                    <div class="report-title">DSU Course Performance Report</div>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem">
-                    <div style="padding:0">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+                    <div class="report-container" style="padding:0;box-shadow:none">
                         ${renderDSUTable(d.title, d.rows, d.total, t1Header)}
                     </div>
-                    <div style="padding:0">
+                    <div class="report-container" style="padding:0;box-shadow:none">
                         ${renderDSUTable(c.title, c.rows, c.total, t2Header)}
                     </div>
                 </div>
@@ -841,7 +851,7 @@
             ${dsuTabBar()}
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Table 3: Lead Attribution Pivot (Student Source × Student Stage)</div>
+                    <div class="report-title">Table 3: Lead Attribution Pivot (Student Source × Student Stage)</div>
                 </div>
                 <div style="overflow-x:auto;">
                 <table class="dsu-table">
@@ -890,7 +900,7 @@
             ${dsuTabBar()}
             <div class="card" style="padding:0.75rem;">
                 <div class="card-header" style="margin-bottom:0.5rem;">
-                    <div class="card-title" style="font-size:0.9rem;">Table 4: Application Submitted and CPA by Campus/Program</div>
+                    <div class="report-title" style="font-size:0.9rem;">Table 4: Application Submitted and CPA by Campus/Program</div>
                 </div>
                 <div class="dsu-table4-wrap">
                 <table class="dsu-table">
@@ -916,9 +926,9 @@
             const rowCount = rows.length || 1;
             const sectionBody = rows.map((r, idx) => {
                 const budgetCell = (idx === 0 && total.budget > 0)
-                    ? `<td class="text-right" rowspan="${rowCount}" style="vertical-align:middle;background:#fff;font-weight:700">${fmtMoney(total.budget)}</td>`
+                    ? `<td class="text-right" rowspan="${rowCount}" style="vertical-align:middle;background:var(--color-bg-card);font-weight:700">${fmtMoney(total.budget)}</td>`
                     : '';
-                const statusColor = r.status === 'Live' ? 'color:#059669;font-weight:600' : 'color:#6b7280;font-weight:600';
+                const statusColor = r.status === 'Live' ? 'color:var(--color-success-text);font-weight:600' : 'color:var(--color-text-muted);font-weight:600';
                 return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-center" style="${statusColor}">${escapeHtml(r.status)}</td>${budgetCell}<td class="text-right">${fmtMoney(r.spend)}</td><td class="text-right">${idx === 0 ? fmtMoney(total.remaining) : ''}</td></tr>`;
             }).join('');
 
@@ -935,7 +945,7 @@
             ${dsuTabBar()}
             <div class="card" style="padding:0.75rem;">
                 <div class="card-header" style="margin-bottom:0.5rem;">
-                    <div class="card-title" style="font-size:0.9rem;">Table 5: Budget MIS by Campus/Program</div>
+                    <div class="report-title" style="font-size:0.9rem;">Table 5: Budget MIS by Campus/Program</div>
                 </div>
                 <div class="dsu-table4-wrap">
                 <table class="dsu-table">
@@ -967,7 +977,7 @@
             ${dsuTabBar()}
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Table 6: Lead Stage Summary</div>
+                    <div class="report-title">Table 6: Lead Stage Summary</div>
                 </div>
                 <table class="dsu-table">
                     <thead><tr><th>Stage</th><th class="text-right">Count</th><th class="text-right">Percentage</th></tr></thead>
@@ -1006,19 +1016,19 @@
         const body = rows.map(r => {
             const monthlyCells = r.is_first_in_month
                 ? `
-                    <td class="text-right ${balanceClass(r.available_balance)}" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:#fff">
+                    <td class="text-right ${balanceClass(r.available_balance)}" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
                         ${fmtMoney(r.received_monthly)}
                     </td>
-                    <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:#fff">
+                    <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
                         ${fmtMoney(r.google_spend)}
                     </td>
-                    <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:#fff">
+                    <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
                         ${fmtMoney(r.meta_spend)}
                     </td>
-                    <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:#fff">
+                    <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
                         ${fmtMoney(r.total_spend)}
                     </td>
-                    <td class="text-right ${balanceClass(r.available_balance)}" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:#fff">
+                    <td class="text-right ${balanceClass(r.available_balance)}" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
                         ${fmtMoney(r.available_balance)}
                     </td>`
                 : '';
@@ -1355,7 +1365,7 @@
             }).join('');
             const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
             return `
-                <div style="background:#c7d2fe;border:1px solid #a5b4fc;border-radius:8px;overflow:hidden;margin-bottom:0.75rem">
+                <div class="report-container" style="margin-bottom:12px">
                     <table class="dsu-table">
                         <thead>${headerRows}
                             <tr><th>Department</th><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend</th></tr>
@@ -1391,9 +1401,9 @@
                     </label>
                     ${custom?`
                         <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                            <input type="date" id="dsiT1Start" value="${dsiT1Range.start}" onchange="dsiT1Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                            <input type="date" id="dsiT1Start" value="${dsiT1Range.start}" onchange="dsiT1Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
                             <span style="font-size:0.7rem">to</span>
-                            <input type="date" id="dsiT1End" value="${dsiT1Range.end}" onchange="dsiT1Custom()" class="date-input" style="padding:0.25rem 0.4rem;border:1px solid #a5b4fc;border-radius:4px;font-size:0.7rem;background:#fff;">
+                            <input type="date" id="dsiT1End" value="${dsiT1Range.end}" onchange="dsiT1Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
                         </div>
                     `:''}
                     <span class="dsu-range-label">${label}</span>
@@ -1414,10 +1424,10 @@
             ${dsiTabBar()}
             ${dsiT1DateSelector()}
             <div class="dsi-t1t2-wrap">
-                <div style="padding:0">
+                <div class="report-container" style="padding:0;box-shadow:none">
                     ${renderDSITable(d.title, d.rows, d.total, t1Header)}
                 </div>
-                <div style="padding:0">
+                <div class="report-container" style="padding:0;box-shadow:none">
                     ${renderDSITable(c.title, c.rows, c.total, t2Header)}
                 </div>
             </div>
@@ -1446,7 +1456,7 @@
             ${dsiTabBar()}
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Table 3: Lead Attribution Pivot (Course × Student Stage)</div>
+                    <div class="report-title">Table 3: Lead Attribution Pivot (Course × Student Stage)</div>
                 </div>
                 <div style="overflow-x:auto;">
                 <table class="dsu-table">
@@ -1529,14 +1539,14 @@
             ${dsiTabBar()}
             <div class="card" style="padding:0.75rem">
                 <div class="card-header" style="margin-bottom:0.5rem">
-                    <div class="card-title" style="font-size:0.9rem">Table 4: Application Submitted and CPA by Department</div>
+                    <div class="report-title" style="font-size:0.9rem">Table 4: Application Submitted and CPA by Department</div>
                 </div>
                 <div class="dsi-table4-wrap">
                 <table class="dsu-table" style="font-size:0.78rem">
                     <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-right" style="padding:0.35rem 0.5rem;white-space:nowrap">Application Submitted</th><th class="text-right" style="padding:0.35rem 0.5rem">CPA</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Target</th></tr></thead>
                     <tbody>
                         ${body}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td colspan="2" style="padding:0.35rem 0.5rem">${gt.course}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtSubmitted}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gtCpa}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
+                        <tr class="dsu-grand-row"><td colspan="2" style="padding:4px 6px">${gt.course}</td><td class="text-right" style="padding:4px 6px">${gtSubmitted}</td><td class="text-right" style="padding:4px 6px">${gtCpa}</td><td class="text-right" style="padding:4px 6px">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:4px 6px">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -1583,7 +1593,7 @@
         }
 
         const body = rows.map((r, i) => {
-            const statusColor = r.status === 'Live' ? 'color:#059669;font-weight:600' : 'color:#6b7280;font-weight:600';
+            const statusColor = r.status === 'Live' ? 'color:var(--color-success-text);font-weight:600' : 'color:var(--color-text-muted);font-weight:600';
             const deptCell = deptRowSpan[i]
                 ? `<td style="font-weight:700;vertical-align:middle;text-align:center;padding:0.35rem 0.5rem" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
                 : '';
@@ -1616,7 +1626,7 @@
 
         const entryRows = (entries || []).map(e => {
             const isEditing = dsiEditingBudgetId === e.id;
-            return `<tr style="${isEditing ? 'background:#fef3c7' : ''}">
+            return `<tr style="${isEditing ? 'background:var(--color-warning-light)' : ''}">
                 <td style="white-space:nowrap;padding:0.35rem 0.5rem">${escapeHtml(fmtDate(e.date))}</td>
                 <td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(e.amount)}</td>
                 <td style="padding:0.35rem 0.5rem">${escapeHtml(e.invoice || '-')}</td>
@@ -1634,7 +1644,7 @@
             ${dsiTabBar()}
             <div class="card" style="padding:0.75rem">
                 <div class="card-header" style="flex-wrap:wrap;margin-bottom:0.5rem">
-                    <div class="card-title" style="font-size:0.9rem">Table 5: Budget MIS by Department</div>
+                    <div class="report-title" style="font-size:0.9rem">Table 5: Budget MIS by Department</div>
                 </div>
 
                 <!-- Budget Received Entry Form -->
@@ -1676,7 +1686,7 @@
                     <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-center" style="padding:0.35rem 0.5rem">Status</th><th class="text-right" style="padding:0.35rem 0.5rem">Media Budget Received</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Remaining Budget</th></tr></thead>
                     <tbody>
                         ${body}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td colspan="2" style="padding:0.35rem 0.5rem">${gt.course}</td><td style="padding:0.35rem 0.5rem"></td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.budget)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(gt.remaining)}</td></tr>
+                        <tr class="dsu-grand-row"><td colspan="2" style="padding:4px 6px">${gt.course}</td><td style="padding:4px 6px"></td><td class="text-right" style="padding:4px 6px">${fmtMoney(gt.budget)}</td><td class="text-right" style="padding:4px 6px">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:4px 6px">${fmtMoney(gt.remaining)}</td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -1687,7 +1697,7 @@
                     <thead><tr><th style="padding:0.35rem 0.5rem">Date</th><th class="text-right" style="padding:0.35rem 0.5rem">Amount Received</th><th style="padding:0.35rem 0.5rem">Invoice #</th><th style="padding:0.35rem 0.5rem">Section</th><th class="text-center" style="padding:0.35rem 0.5rem">Actions</th></tr></thead>
                     <tbody>
                         ${entryRows || '<tr><td colspan="5" style="text-align:center;padding:0.75rem;color:var(--text-muted)">No budget entries yet.</td></tr>'}
-                        <tr class="dsu-total-row" style="background:#c7d2fe"><td style="padding:0.35rem 0.5rem">TOTAL RECEIVED</td><td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(totalReceived)}</td><td colspan="3" style="padding:0.35rem 0.5rem"></td></tr>
+                        <tr class="dsu-grand-row"><td style="padding:4px 6px">TOTAL RECEIVED</td><td class="text-right" style="padding:4px 6px">${fmtMoney(totalReceived)}</td><td colspan="3" style="padding:4px 6px"></td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -1870,7 +1880,7 @@
         $('reportContent').innerHTML = `
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Report Controls</div>
+                    <div class="report-title">Report Controls</div>
                     <div style="display:flex; gap:0.5rem;">
                         <button class="btn btn-success" onclick="exportExcel()">Export Excel</button>
                         <button class="btn btn-primary" onclick="exportPDF()">Export PDF</button>
@@ -1913,7 +1923,7 @@
 
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Executive Summary</div>
+                    <div class="report-title">Executive Summary</div>
                     <div class="status-badge ${(sf.connected || ls.connected) ? 'live' : 'offline'}"><span class="status-dot"></span>${(sf.connected || ls.connected) ? 'Live CRM' : 'No CRM Connected'}</div>
                 </div>
                 <div class="metric-grid">
@@ -1927,7 +1937,7 @@
             </div>
 
             <div class="card">
-                <div class="card-header"><div class="card-title">Source-wise Breakdown</div></div>
+                <div class="card-header"><div class="report-title">Source-wise Breakdown</div></div>
                 <table id="sourceTable">
                     <thead><tr><th>Source</th><th class="text-right">Leads</th><th class="text-right">Opportunities</th><th class="text-right">Pipeline Value</th><th class="text-right">Won Value</th><th class="text-right">Est. Spend</th><th>Notes</th></tr></thead>
                     <tbody>
@@ -1949,7 +1959,7 @@
             </div>
 
             <div class="card">
-                <div class="card-header"><div class="card-title">CRM Leads Detail</div></div>
+                <div class="card-header"><div class="report-title">CRM Leads Detail</div></div>
                 ${allLeads.length ? `
                 <div style="max-height:400px; overflow:auto;">
                 <table>
@@ -1972,7 +1982,7 @@
             </div>
 
             <div class="card">
-                <div class="card-header"><div class="card-title">Opportunities / Pipeline</div></div>
+                <div class="card-header"><div class="report-title">Opportunities / Pipeline</div></div>
                 ${allOpps.length ? `
                 <div style="max-height:400px; overflow:auto;">
                 <table>
@@ -1994,7 +2004,7 @@
             </div>
 
             <div class="card">
-                <div class="card-header"><div class="card-title">Manager Remarks</div></div>
+                <div class="card-header"><div class="report-title">Manager Remarks</div></div>
                 <div class="form-row">
                     <div class="form-group" style="flex:2;">
                         <label>Overall Notes</label>
@@ -2146,10 +2156,10 @@
                 return;
             }
 
-            const border = '1px solid #1f2937';
-            const redFill = '#991b1b';
-            const lightRedFill = '#b91c1c';
-            const whiteText = 'color:#fff;';
+            const border = '1px solid var(--color-border-strong)';
+            const redFill = 'var(--color-danger-text)';
+            const lightRedFill = 'var(--color-danger)';
+            const whiteText = 'color:var(--color-text-on-accent);';
             const cellPad = 'padding:0.15rem 0.25rem;';
             const fontSize = 'font-size:0.72rem;';
             const center = 'text-align:center;';
@@ -2181,9 +2191,9 @@
                 if (totalRow) {
                     tr.style.background = redFill;
                 } else if (idx % 2 === 1) {
-                    tr.style.background = '#f9fafb';
+                    tr.style.background = 'var(--color-bg-card-hover)';
                 }
-                const textStyle = totalRow ? whiteText + ' font-weight:700;' : 'color:#1f2937;';
+                const textStyle = totalRow ? whiteText + ' font-weight:700;' : 'color:var(--color-text-primary);';
                 const fmtPct = (val) => (val === '' || val === null || val === undefined) ? '' : Number(val).toFixed(1) + '%';
                 tr.innerHTML = `
                     <td style="border:${border}; ${cellPad} ${fontSize} ${textStyle} font-weight:${totalRow ? '700' : '600'}; white-space:nowrap;">${escapeHtml(row.lead_status)}</td>
@@ -2308,7 +2318,7 @@
                 toast("Voice command failed: " + (err.message || 'network error'), true);
             } finally {
                 statusText.style.display = 'none';
-                micBtn.style.backgroundColor = '#4F46E5';
+                micBtn.style.backgroundColor = 'var(--color-accent)';
             }
         }
 
@@ -2323,7 +2333,7 @@
                 console.error('[Rudra] failed to start recognition:', err);
                 toast("Microphone access denied or not supported", true);
                 statusText.style.display = 'none';
-                micBtn.style.backgroundColor = '#4F46E5';
+                micBtn.style.backgroundColor = 'var(--color-accent)';
             }
         });
 
