@@ -6,7 +6,7 @@
     <title>ChlearSakhaaOps AI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
         // Apply dark mode before render to avoid flash
         (function() {
@@ -138,7 +138,9 @@
             flex-direction: column;
             transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
         }
-        h1, h2, h3, h4, .font-outfit { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, h4, .font-outfit { font-family: 'DM Sans', -apple-system, sans-serif; }
+        .brand { font-family: 'DM Sans', -apple-system, sans-serif; }
+        .module-title { font-family: 'DM Sans', -apple-system, sans-serif; }
 
         /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -317,6 +319,7 @@
             font-size: 16px; font-weight: 600;
             color: var(--color-text-primary);
             margin-bottom: 1rem;
+            font-family: 'DM Sans', -apple-system, sans-serif;
         }
 
         /* Form */
@@ -1240,7 +1243,7 @@
             else if (status === 'On Hold') statusClass = 'badge-orange';
             else if (status === 'Closed') statusClass = 'badge-gray';
             return `<tr>
-                <td style="font-weight:600">${escapeHtml(a.name || '-')}</td>
+                <td style="font-weight:600;font-family:'DM Sans',sans-serif;">${escapeHtml(a.name || '-')}</td>
                 <td>${escapeHtml(a.brand_name || '-')}</td>
                 <td>${escapeHtml(group ? group.name : '-')}</td>
                 <td>${escapeHtml(a.contact_person || '-')}</td>
