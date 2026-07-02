@@ -613,18 +613,16 @@
     <!-- Central Account Modal -->
     <div id="centralAccountOverlay" class="um-overlay hidden" onclick="closeCentralAccountModal(event)">
         <div class="um-modal" onclick="event.stopPropagation()" style="max-width:920px;" id="centralAccountModal">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-                <h2 style="margin:0" id="centralAccountModalTitle">Manage Client/Brand</h2>
-                <button class="btn btn-secondary" onclick="closeCentralAccountModal()" style="padding:0.3rem 0.6rem;font-size:1rem;line-height:1;">✕</button>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                <h2 style="margin:0;font-family:'DM Sans',sans-serif;font-size:18px;font-weight:600;color:var(--color-text-primary);" id="centralAccountModalTitle">Manage Client/Brand</h2>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button class="btn btn-primary" id="centralAddAccountBtn" onclick="openCentralAddAccount()">+ Add Client/Brand</button>
+                    <button class="btn btn-secondary" onclick="closeCentralAccountModal()" style="padding:0.3rem 0.6rem;font-size:1rem;line-height:1;">✕</button>
+                </div>
             </div>
 
             <!-- Client/Brand List View -->
             <div id="centralAccountListView">
-                <!-- Header bar -->
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-                    <span style="font-family:'DM Sans',sans-serif;font-size:18px;font-weight:600;color:var(--color-text-primary);">Manage Client/Brand</span>
-                    <button class="btn btn-primary" id="centralAddAccountBtn" onclick="openCentralAddAccount()">+ Add Client/Brand</button>
-                </div>
                 <!-- Toolbar -->
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
                     <input type="text" id="centralAccountSearch" placeholder="Search client/brand..." oninput="filterCentralAccounts()" style="flex:1;min-width:200px;max-width:400px;padding:8px 12px;border:1px solid var(--color-border-input);border-radius:var(--radius-md);font-size:13px;font-family:'Inter',sans-serif;background:var(--color-bg-input);color:var(--color-text-primary);transition:border-color 0.15s ease;">
