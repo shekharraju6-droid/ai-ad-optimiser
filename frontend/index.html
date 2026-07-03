@@ -1918,8 +1918,9 @@
         if (tab === 'budget') items = currentReviewData.budget_changes || [];
         if (tab === 'campaigns') items = currentReviewData.campaign_actions || [];
 
-        if (!items.length) { container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">No recommendations in this category.</p>'; return; }
+        if (!items.length) { container.innerHTML = '<p style="color:var(--color-text-muted);padding:1rem;">No recommendations in this category.</p>'; return; }
 
+        try {
         let html = `
             <div class="review-toolbar">
                 <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.8rem;font-weight:600;">
@@ -1937,7 +1938,7 @@
         const filtered = _reviewSort(_reviewFilter(items, tab), tab);
 
         if (tab === 'keywords' || tab === 'negatives') {
-            html += '<div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;" id="reviewTableWrapper">';
+            html += '<div style="border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden;" id="reviewTableWrapper">';
             const groups = _groupByCampaign(filtered);
             groups.forEach(g => {
                 const paused = g.items.length > 0 && g.items[0].campaign_status && g.items[0].campaign_status.toUpperCase() !== 'ENABLED';
@@ -1945,7 +1946,7 @@
                     <div class="review-campaign-header" ${paused ? 'style="opacity:0.7;"' : ''}>
                         <input type="checkbox" ${paused ? 'disabled' : ''} onchange="toggleCampaignSelectAll('${tab}', '${escapeHtml(g.campaign_name)}', this.checked)">
                         <span>${escapeHtml(g.campaign_name)}</span>
-                        <span style="font-size:0.7rem; color:var(--text-muted); font-weight:500;">${g.items.length} item${g.items.length > 1 ? 's' : ''}</span>
+                        <span style="font-size:0.7rem; color:var(--color-text-muted); font-weight:500;">${g.items.length} item${g.items.length > 1 ? 's' : ''}</span>
                         ${paused ? '<span class="paused-badge">⚠️ Campaign paused</span>' : ''}
                     </div>
                 `;
@@ -1958,9 +1959,9 @@
                                 <div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
                                     <input type="checkbox" data-review-id="${repId}" ${disabled ? 'disabled' : ''} onchange="toggleReviewMergedItem('${tab}', '${i.campaign_id || ''}', '${escapeHtml(i.keyword_text || i.search_term || '')}', this.checked)">
                                     <div style="font-weight:600; font-size:0.85rem;">${escapeHtml(i.keyword_text)}</div>
-                                    <div style="margin-left:auto; font-size:0.75rem; color:var(--text-muted);">${escapeHtml(i.match_type || '')} | ${formatMoneyINR(i.spend_30d)} | ${i.clicks_30d || 0} clicks | ${i.conversions_30d || 0} conv | ${formatPct(i.ctr)} CTR</div>
+                                    <div style="margin-left:auto; font-size:0.75rem; color:var(--color-text-muted);">${escapeHtml(i.match_type || '')} | ${formatMoneyINR(i.spend_30d)} | ${i.clicks_30d || 0} clicks | ${i.conversions_30d || 0} conv | ${formatPct(i.ctr)} CTR</div>
                                 </div>
-                                <div style="font-size:0.72rem; color:var(--text-muted); margin-left:1.9rem; margin-top:0.1rem;">Campaign: ${escapeHtml(i.campaign_name)} · Ad group: ${escapeHtml(i.ad_group_name || '-')}</div>
+                                <div style="font-size:0.72rem; color:var(--color-text-muted); margin-left:1.9rem; margin-top:0.1rem;">Campaign: ${escapeHtml(i.campaign_name)} · Ad group: ${escapeHtml(i.ad_group_name || '-')}</div>
                                 <div style="margin-left:1.9rem;">${_renderFindings(i.findings)}</div>
                             </div>
                         `;
@@ -1969,26 +1970,26 @@
                     const ctx = (currentReviewData.campaign_context || {})[g.campaign_id];
                     if (ctx && ctx.keywords && ctx.keywords.length) {
                         html += `
-                            <div style="margin:0.5rem 1rem; border:1px solid var(--border-color); border-radius:6px; overflow:hidden;">
-                                <div style="padding:0.4rem 0.6rem; background:var(--bg-sidebar); font-size:0.75rem; font-weight:600; color:var(--text-muted);">
+                            <div style="margin:0.5rem 1rem; border:1px solid var(--color-border); border-radius:var(--radius-sm); overflow:hidden;">
+                                <div style="padding:0.4rem 0.6rem; background:var(--color-bg-sidebar); font-size:0.75rem; font-weight:600; color:var(--color-text-muted);">
                                     All Keywords in this Campaign (${ctx.keywords.length} total)
                                 </div>
                                 <table style="width:100%; font-size:0.72rem; border-collapse:collapse;">
                                     <thead>
-                                        <tr style="background:var(--bg-sidebar);">
-                                            <th style="text-align:left; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Keyword</th>
-                                            <th style="text-align:left; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Status</th>
-                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Spend</th>
-                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Clicks</th>
-                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">Conv</th>
-                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--border-color);">CTR</th>
+                                        <tr style="background:var(--color-bg-sidebar);">
+                                            <th style="text-align:left; padding:0.3rem 0.4rem; border-bottom:1px solid var(--color-border);">Keyword</th>
+                                            <th style="text-align:left; padding:0.3rem 0.4rem; border-bottom:1px solid var(--color-border);">Status</th>
+                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--color-border);">Spend</th>
+                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--color-border);">Clicks</th>
+                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--color-border);">Conv</th>
+                                            <th style="text-align:right; padding:0.3rem 0.4rem; border-bottom:1px solid var(--color-border);">CTR</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         ${ctx.keywords.map(k => `
-                                            <tr style="border-bottom:1px solid var(--border-color); ${k.flagged ? 'background:#fef2f2;' : ''}">
+                                            <tr style="border-bottom:1px solid var(--color-border); ${k.flagged ? 'background:var(--color-danger-light);' : ''}">
                                                 <td style="padding:0.3rem 0.4rem;">${k.flagged ? '⚠️' : '✅'} ${escapeHtml(k.text)}</td>
-                                                <td style="padding:0.3rem 0.4rem; color:var(--text-muted);">${escapeHtml(k.status || '')}</td>
+                                                <td style="padding:0.3rem 0.4rem; color:var(--color-text-muted);">${escapeHtml(k.status || '')}</td>
                                                 <td style="padding:0.3rem 0.4rem; text-align:right;">${formatMoneyINR(k.spend)}</td>
                                                 <td style="padding:0.3rem 0.4rem; text-align:right;">${k.clicks || 0}</td>
                                                 <td style="padding:0.3rem 0.4rem; text-align:right;">${k.conversions || 0}</td>
@@ -1997,7 +1998,7 @@
                                         `).join('')}
                                     </tbody>
                                 </table>
-                                <div style="padding:0.3rem 0.6rem; font-size:0.68rem; color:var(--text-muted); border-top:1px solid var(--border-color);">
+                                <div style="padding:0.3rem 0.6rem; font-size:0.68rem; color:var(--color-text-muted); border-top:1px solid var(--color-border);">
                                     ⚠️ = Flagged by AI &nbsp;&nbsp; ✅ = No issues found
                                 </div>
                             </div>
@@ -2012,9 +2013,9 @@
                                 <div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
                                     <input type="checkbox" data-review-id="${repId}" ${disabled ? 'disabled' : ''} onchange="toggleReviewMergedItem('${tab}', '${i.campaign_id || ''}', '${escapeHtml(i.search_term || '')}', this.checked)">
                                     <div style="font-weight:600; font-size:0.85rem;">${escapeHtml(i.search_term)}</div>
-                                    <div style="margin-left:auto; font-size:0.75rem; color:var(--text-muted);">${formatMoneyINR(i.spend)} | ${i.clicks || 0} clicks | ${i.conversions || 0} conv | ${formatPct(i.ctr)} CTR</div>
+                                    <div style="margin-left:auto; font-size:0.75rem; color:var(--color-text-muted);">${formatMoneyINR(i.spend)} | ${i.clicks || 0} clicks | ${i.conversions || 0} conv | ${formatPct(i.ctr)} CTR</div>
                                 </div>
-                                <div style="font-size:0.72rem; color:var(--text-muted); margin-left:1.9rem; margin-top:0.1rem;">Campaign: ${escapeHtml(i.campaign_name)} · Level: ${escapeHtml(i.level || 'campaign')}</div>
+                                <div style="font-size:0.72rem; color:var(--color-text-muted); margin-left:1.9rem; margin-top:0.1rem;">Campaign: ${escapeHtml(i.campaign_name)} · Level: ${escapeHtml(i.level || 'campaign')}</div>
                                 <div style="margin-left:1.9rem;">${_renderFindings(i.findings)}</div>
                             </div>
                         `;
@@ -2024,25 +2025,26 @@
             html += '</div>';
         } else if (tab === 'budget') {
             filtered.forEach(i => {
-                const custom = reviewState.customBudgets[i.id] !== undefined ? reviewState.customBudgets[i.id] : (i.suggested_budget || 0);
+                const budgetId = i.queue_item_ids ? i.queue_item_ids[0] : i.id;
+                const custom = reviewState.customBudgets[budgetId] !== undefined ? reviewState.customBudgets[budgetId] : (i.suggested_budget || 0);
                 html += `
                     <div class="review-card">
                         <div class="review-card-header">
-                            <input type="checkbox" data-review-id="${i.id}" onchange="toggleReviewItem(${i.id})">
+                            <input type="checkbox" data-review-id="${budgetId}" onchange="toggleReviewItem(${budgetId})">
                             <div style="font-weight:700;">${escapeHtml(i.campaign_name)}</div>
                         </div>
-                        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem;">${escapeHtml(i.reason)}</div>
+                        <div style="font-size:0.78rem; color:var(--color-text-muted); margin-bottom:0.5rem;">${escapeHtml(i.reason || (i.findings || []).map(f => f.detail).join('; '))}</div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem; margin-bottom:0.75rem; font-size:0.8rem;">
-                            <div><span style="color:var(--text-muted);">Current daily budget:</span> <strong>${formatMoneyINR(i.current_budget)}</strong></div>
-                            <div><span style="color:var(--text-muted);">Suggested:</span> <strong>${formatMoneyINR(i.suggested_budget)}</strong></div>
-                            <div><span style="color:var(--text-muted);">Your budget:</span> <input type="number" class="filter-input" style="width:120px;" value="${custom}" onchange="setReviewCustomBudget(${i.id}, this.value)" oninput="setReviewCustomBudget(${i.id}, this.value)"></div>
+                            <div><span style="color:var(--color-text-muted);">Current daily budget:</span> <strong>${formatMoneyINR(i.current_budget)}</strong></div>
+                            <div><span style="color:var(--color-text-muted);">Suggested:</span> <strong>${formatMoneyINR(i.suggested_budget)}</strong></div>
+                            <div><span style="color:var(--color-text-muted);">Your budget:</span> <input type="number" class="filter-input" style="width:120px;" value="${custom}" onchange="setReviewCustomBudget(${budgetId}, this.value)" oninput="setReviewCustomBudget(${budgetId}, this.value)"></div>
                         </div>
                         <div class="review-metric-grid">
                             <div class="review-metric"><div class="review-metric-label">Spend</div><div class="review-metric-value">${formatMoneyINR(i.spend_30d)}</div></div>
                             <div class="review-metric"><div class="review-metric-label">Clicks</div><div class="review-metric-value">${i.clicks_30d || 0}</div></div>
                             <div class="review-metric"><div class="review-metric-label">Conversions</div><div class="review-metric-value">${i.conversions_30d || 0}</div></div>
                             <div class="review-metric"><div class="review-metric-label">CTR</div><div class="review-metric-value">${formatPct(i.ctr)}</div></div>
-                            <div class="review-metric"><div class="review-metric-label">CPA</div><div class="review-metric-value">${i.cpa !== null ? formatMoneyINR(i.cpa) : '∞'}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">CPA</div><div class="review-metric-value">${i.cpa !== null && i.cpa !== undefined ? formatMoneyINR(i.cpa) : '∞'}</div></div>
                         </div>
                     </div>
                 `;
@@ -2050,20 +2052,21 @@
         } else if (tab === 'campaigns') {
             filtered.forEach(i => {
                 const badge = i.action === 'pause' ? '<span class="badge-pause">PAUSE</span>' : '<span class="badge-enable">ENABLE</span>';
+                const campId = i.queue_item_ids ? i.queue_item_ids[0] : i.id;
                 html += `
                     <div class="review-card">
                         <div class="review-card-header">
-                            <input type="checkbox" data-review-id="${i.id}" onchange="toggleReviewItem(${i.id})">
+                            <input type="checkbox" data-review-id="${campId}" onchange="toggleReviewItem(${campId})">
                             ${badge}
                             <div style="font-weight:700;">${escapeHtml(i.campaign_name)}</div>
                         </div>
-                        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem;">${escapeHtml(i.reason)}</div>
+                        <div style="font-size:0.78rem; color:var(--color-text-muted); margin-bottom:0.5rem;">${escapeHtml(i.reason || (i.findings || []).map(f => f.detail).join('; '))}</div>
                         <div class="review-metric-grid">
                             <div class="review-metric"><div class="review-metric-label">Spend</div><div class="review-metric-value">${formatMoneyINR(i.spend_30d)}</div></div>
                             <div class="review-metric"><div class="review-metric-label">Clicks</div><div class="review-metric-value">${i.clicks_30d || 0}</div></div>
                             <div class="review-metric"><div class="review-metric-label">Conversions</div><div class="review-metric-value">${i.conversions_30d || 0}</div></div>
                             <div class="review-metric"><div class="review-metric-label">CTR</div><div class="review-metric-value">${formatPct(i.ctr)}</div></div>
-                            <div class="review-metric"><div class="review-metric-label">CPA</div><div class="review-metric-value">${i.cpa !== null ? formatMoneyINR(i.cpa) : '∞'}</div></div>
+                            <div class="review-metric"><div class="review-metric-label">CPA</div><div class="review-metric-value">${i.cpa !== null && i.cpa !== undefined ? formatMoneyINR(i.cpa) : '∞'}</div></div>
                         </div>
                     </div>
                 `;
@@ -2071,6 +2074,10 @@
         }
         container.innerHTML = html;
         syncReviewCheckboxes(tab);
+        } catch(e) {
+            console.error('renderReviewTab error:', e, 'tab:', tab, 'items:', items);
+            container.innerHTML = '<p style="color:var(--color-danger-text);padding:1rem;">Error rendering: ' + escapeHtml(e.message) + '</p>';
+        }
     }
 
     function setReviewSearch(tab, value) {
