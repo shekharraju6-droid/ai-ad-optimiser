@@ -497,6 +497,7 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
         metrics = nv.get("metrics", {}) if isinstance(nv, dict) else {}
         campaign_name = (nv.get("campaign_name") if isinstance(nv, dict) else None) or action.campaign_id or "Unknown"
         campaign_id = action.campaign_id or ""
+        conversions = metrics.get("conversions", 0) or 0
 
         if action.action_type in ("PAUSE_OR_REDUCE_BUDGET",):
             suggested = nv.get("suggested_budget") if isinstance(nv, dict) else None
@@ -508,7 +509,7 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
                 "suggested_budget": suggested,
                 "spend_30d": metrics.get("spend", 0) or 0,
                 "clicks_30d": metrics.get("clicks", 0) or 0,
-                "conversions_30d": metrics.get("conversions", 0) or 0,
+                "conversions_30d": conversions,
                 "ctr": metrics.get("ctr", 0) or 0,
                 "cpa": round(metrics.get("spend", 0) / conversions, 2) if conversions else None,
                 "reason": action.reason or "",
@@ -523,7 +524,7 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
                 "action": action.action_type.lower().replace("_campaign", ""),
                 "spend_30d": metrics.get("spend", 0) or 0,
                 "clicks_30d": metrics.get("clicks", 0) or 0,
-                "conversions_30d": metrics.get("conversions", 0) or 0,
+                "conversions_30d": conversions,
                 "ctr": metrics.get("ctr", 0) or 0,
                 "cpa": round(metrics.get("spend", 0) / conversions, 2) if conversions else None,
                 "reason": action.reason or "",
