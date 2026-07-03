@@ -376,7 +376,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h2 class="card-title">Manage Client/Brand</h2>
-                            <div style="font-size:0.8rem;color:var(--text-light);">Showing Client/Brand with Google Ads or Meta Ads. Full management on main page →</div>
+                            <div style="font-size:0.8rem;color:var(--color-text-muted);">Showing Client/Brand with Google Ads or Meta Ads. Full management on main page →</div>
                         </div>
                         <div class="table-wrapper">
                             <table>
@@ -392,7 +392,7 @@
                         <div class="card-header">
                             <div>
                                 <h2 class="card-title" id="detail-account-name">Client/Brand Detail</h2>
-                                <div id="detail-account-meta" style="font-size:0.78rem; color:var(--text-muted); margin-top:0.3rem;"></div>
+                                <div id="detail-account-meta" style="font-size:0.78rem; color:var(--color-text-muted); margin-top:0.3rem;"></div>
                             </div>
                             <div style="display:flex; gap:0.5rem;">
                                 <select id="detailDatePreset" class="date-input" onchange="applyDetailDatePreset(this.value)" style="width:130px;">
@@ -421,9 +421,9 @@
                         <div class="card" style="margin-top:1rem;">
                             <div class="card-header">
                                 <h3 class="card-title">Campaign Type Tags</h3>
-                                <div style="font-size:0.78rem;color:var(--text-light);">Auto = detected from name. Manual override controls brand vs non-brand classification.</div>
+                                <div style="font-size:0.78rem;color:var(--color-text-muted);">Auto = detected from name. Manual override controls brand vs non-brand classification.</div>
                             </div>
-                            <div id="campaignTypeTagsContainer"><p style="color:var(--text-muted);padding:1rem;">Loading campaigns...</p></div>
+                            <div id="campaignTypeTagsContainer"><p style="color:var(--color-text-muted);padding:1rem;">Loading campaigns...</p></div>
                         </div>
                     </div>
                 </div>
@@ -435,11 +435,11 @@
                             <div style="display:flex;gap:0.5rem;align-items:center;">
                                 <button class="btn btn-sm btn-secondary" onclick="openAuditSettings()" title="Audit thresholds">⚙️ Audit Settings</button>
                                 <button class="btn btn-sm btn-danger" onclick="clearAllPendingActions()" title="Remove all pending recommendations">🗑️ Clear All Pending</button>
-                                <span id="lastAuditRun" style="font-size:0.75rem;color:var(--text-light);"></span>
+                                <span id="lastAuditRun" style="font-size:0.75rem;color:var(--color-text-muted);"></span>
                                 <button class="btn btn-secondary btn-sm" onclick="loadPendingActions()"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh</button>
                             </div>
                         </div>
-                        <div id="approvalQueueControls" style="padding:0.75rem 1rem; border-bottom:1px solid var(--border-color);">
+                        <div id="approvalQueueControls" style="padding:0.75rem 1rem; border-bottom:1px solid var(--color-border);">
                             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
                                 <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('all')">All</button>
                                 <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('keywords')">Keywords</button>
@@ -448,7 +448,7 @@
                                 <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('approved')">Approved</button>
                                 <button class="btn btn-sm btn-secondary" onclick="setApprovalFilter('rejected')">Rejected</button>
                             </div>
-                            <div id="approvalQueueSummary" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem;"></div>
+                            <div id="approvalQueueSummary" style="font-size:0.78rem;color:var(--color-text-muted);margin-bottom:0.5rem;"></div>
                             <div id="approvalQueueBulkActions" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>
                         </div>
                         <div id="pendingActionsContainer"></div>
@@ -461,14 +461,14 @@
     <!-- Review Modal -->
     <div id="reviewModal" class="modal-overlay hidden" style="align-items:flex-start; padding-top:2rem;">
         <div class="modal" style="width:95%; max-width:1200px; height:85vh; max-height:900px; display:flex; flex-direction:column; padding:0;">
-            <div id="reviewModalHeader" style="padding:1.25rem; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+            <div id="reviewModalHeader" style="padding:1.25rem; border-bottom:1px solid var(--color-border); display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
                 <div>
-                    <h2 id="reviewModalTitle" style="margin:0;">Client/Brand — Audit Review</h2>
-                    <div id="reviewModalAuditDate" style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;"></div>
+                    <h2 id="reviewModalTitle" style="margin:0;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;color:var(--color-text-primary);">Client/Brand — Audit Review</h2>
+                    <div id="reviewModalAuditDate" style="font-size:0.78rem; color:var(--color-text-muted); margin-top:0.25rem;"></div>
                 </div>
                 <button class="btn btn-sm btn-secondary" onclick="closeReviewModal()">✕ Close</button>
             </div>
-            <div id="reviewTabs" style="display:flex; border-bottom:1px solid var(--border-color); flex-shrink:0;">
+            <div id="reviewTabs" style="display:flex; border-bottom:1px solid var(--color-border); flex-shrink:0;">
                 <button class="review-tab active" data-tab="keywords" onclick="switchReviewTab('keywords')">Keywords to Pause (0)</button>
                 <button class="review-tab" data-tab="negatives" onclick="switchReviewTab('negatives')">Negative Keywords (0)</button>
                 <button class="review-tab" data-tab="budget" onclick="switchReviewTab('budget')">Budget Changes (0)</button>
@@ -477,10 +477,10 @@
             <div id="reviewModalBody" style="flex-grow:1; overflow-y:auto; padding:1rem;">
                 <!-- Content injected by JS -->
             </div>
-            <div id="reviewModalFooter" style="padding:1rem; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; background:var(--bg-sidebar);">
-                <div id="reviewSelectionCount" style="font-size:0.85rem; font-weight:600;">0 of 0 selected</div>
+            <div id="reviewModalFooter" style="padding:1rem; border-top:1px solid var(--color-border); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; background:var(--color-bg-sidebar);">
+                <div id="reviewSelectionCount" style="font-size:0.85rem; font-weight:600;color:var(--color-text-primary);">0 of 0 selected</div>
                 <div style="display:flex; gap:0.5rem;">
-                    <button class="btn btn-sm btn-text" onclick="closeReviewModal()">Cancel</button>
+                    <button class="btn btn-sm btn-secondary" onclick="closeReviewModal()">Cancel</button>
                     <button class="btn btn-sm btn-danger" onclick="confirmRejectSelected()">Reject Selected</button>
                     <button class="btn btn-sm btn-success" onclick="confirmApproveSelected()">Approve Selected</button>
                 </div>
@@ -536,12 +536,12 @@
                     <div class="form-group">
                         <label>Google Ads Customer ID</label>
                         <input type="text" id="accGoogleExternalId" placeholder="123-456-7890 (optional)" onblur="validateGoogleCustomerId()">
-                        <div id="googleCustomerIdHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">Find this in the top-right corner of the Google Ads account. Format: 123-456-7890. Leave blank if not yet available.</div>
+                        <div id="googleCustomerIdHelp" style="font-size:0.75rem; color:var(--color-text-muted); margin-top:0.3rem;">Find this in the top-right corner of the Google Ads account. Format: 123-456-7890. Leave blank if not yet available.</div>
                     </div>
                     <div class="form-group" style="flex:1;"><label>Currency</label><input type="text" id="accGoogleCurrency" value="INR" disabled></div>
 
                         <div id="googleAccountCreds" class="platform-fields" style="margin-top:0.5rem;">
-                        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this Google Ads account:</p>
+                        <p style="font-size:0.78rem; color:var(--color-text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this Google Ads account:</p>
                         <div class="form-row">
                             <div class="form-group"><label>Client ID *</label><input type="text" id="accGoogleClientId" placeholder="xxx.apps.googleusercontent.com"></div>
                             <div class="form-group"><label>Client Secret *</label><input type="password" id="accGoogleClientSecret" placeholder="GOCSPX-..."></div>
@@ -572,12 +572,12 @@
                     <div class="form-group">
                         <label>Meta Ad Account ID *</label>
                         <input type="text" id="accMetaExternalId" placeholder="act_123456789" onblur="validateMetaAccountId()">
-                        <div id="metaAccountIdHelp" style="font-size:0.75rem; color:var(--text-light); margin-top:0.3rem;">Format: act_123456789. Find this in Meta Ads Manager.</div>
+                        <div id="metaAccountIdHelp" style="font-size:0.75rem; color:var(--color-text-muted); margin-top:0.3rem;">Format: act_123456789. Find this in Meta Ads Manager.</div>
                     </div>
                     <div class="form-group" style="flex:1;"><label>Currency</label><input type="text" id="accMetaCurrency" value="INR" disabled></div>
 
                         <div id="metaAccountCreds" class="platform-fields" style="margin-top:0.5rem;">
-                        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this Meta Ads account:</p>
+                        <p style="font-size:0.78rem; color:var(--color-text-muted); margin-bottom:0.5rem; font-weight:600;">Enter OAuth app credentials for this Meta Ads account:</p>
                         <div class="form-row">
                             <div class="form-group"><label>App ID *</label><input type="text" id="accMetaAppId" placeholder="1234567890"></div>
                             <div class="form-group"><label>App Secret *</label><input type="password" id="accMetaAppSecret" placeholder="..."></div>
@@ -1099,7 +1099,7 @@
             <div class="account-header">
                 <div>
                     <div class="account-name">${escapeHtml(a.name)}</div>
-                    <div style="font-size:0.75rem;color:var(--text-light);margin-top:0.15rem;">${escapeHtml(a.external_id || '')}</div>
+                    <div style="font-size:0.75rem;color:var(--color-text-muted);margin-top:0.15rem;">${escapeHtml(a.external_id || '')}</div>
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.2rem;">
                     <span class="account-type ${platformLabel}">${platformLabel}</span>
@@ -1228,12 +1228,12 @@
 
     async function loadCampaignTypeTags(accountId) {
         const container = $('campaignTypeTagsContainer');
-        container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">Loading campaigns...</p>';
+        container.innerHTML = '<p style="color:var(--color-text-muted);padding:1rem;">Loading campaigns...</p>';
         try {
             const data = await api('GET', '/accounts/' + accountId + '/campaigns-with-tags');
             const campaigns = data.campaigns || [];
             if (!campaigns.length) {
-                container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">No Google Ads campaigns found. Make sure the account is connected and live.</p>';
+                container.innerHTML = '<p style="color:var(--color-text-muted);padding:1rem;">No Google Ads campaigns found. Make sure the account is connected and live.</p>';
                 return;
             }
             let html = '<div class="table-wrapper"><table><thead><tr><th>Campaign Name</th><th>Auto Detected</th><th>Manual Override</th><th>Final Type</th></tr></thead><tbody>';
@@ -1256,7 +1256,7 @@
             html += '</tbody></table></div>';
             container.innerHTML = html;
         } catch (e) {
-            container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">Failed to load campaigns: ' + escapeHtml(e.message) + '</p>';
+            container.innerHTML = '<p style="color:var(--color-text-muted);padding:1rem;">Failed to load campaigns: ' + escapeHtml(e.message) + '</p>';
         }
     }
 
@@ -1449,7 +1449,7 @@
     function validateGoogleCustomerId() {
         const val = $('accGoogleExternalId').value.trim();
         const help = $('googleCustomerIdHelp');
-        if (!val) { help.textContent = 'Leave blank if Google Ads Customer ID is not yet available. You can add it later.'; help.style.color = 'var(--text-light)'; return true; }
+        if (!val) { help.textContent = 'Leave blank if Google Ads Customer ID is not yet available. You can add it later.'; help.style.color = 'var(--color-text-muted)'; return true; }
         const re = /^\d{3}-\d{3}-\d{4}$/;
         if (!re.test(val)) { help.textContent = 'Invalid format. Use 123-456-7890 (with dashes).'; help.style.color = 'var(--color-danger)'; return false; }
         help.textContent = 'Valid Google Ads Customer ID format.'; help.style.color = 'var(--color-success)'; return true;
@@ -1723,7 +1723,7 @@
     function renderPendingActions() {
         const container = $('pendingActionsContainer');
         const filtered = _filterActions(pendingActions);
-        if (!filtered.length) { container.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">No matching actions.</p>'; return; }
+        if (!filtered.length) { container.innerHTML = '<p style="color:var(--color-text-muted);padding:1rem;">No matching actions.</p>'; return; }
 
         // Group by Client/Brand for summary
         const accountCounts = {};
@@ -1781,7 +1781,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
                     <div>
                         <div style="font-weight:700; font-size:1rem;">${escapeHtml(group.account_name)}</div>
-                        <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;">
+                        <div style="font-size:0.78rem; color:var(--color-text-muted); margin-top:0.25rem;">
                             ${breakdown.join(' | ')} &bull; ${group.actions.length} pending &bull; Audit: ${lastAudit}
                         </div>
                     </div>
