@@ -489,7 +489,8 @@
     </style>
 </head>
 <body>
-    <div class="topbar">
+    <canvas id="heroCanvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;pointer-events:none;"></canvas>
+    <div class="topbar" style="position:relative;z-index:1;">
         <div class="brand"><div class="logo-icon">CS</div>ChlearSakhaaOps AI</div>
         <div class="topbar-right">
             <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark mode"></button>
@@ -503,15 +504,12 @@
         </div>
     </div>
 
-    <div id="heroCanvasContainer" style="position:relative;overflow:hidden;background:var(--color-bg-page);">
-        <canvas id="heroCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none;"></canvas>
-        <div style="position:relative;z-index:2;">
-    <div class="hero">
+    <div class="hero" style="position:relative;z-index:1;">
         <h1>Operations Command Center</h1>
         <p>One platform to track ads, measure client insights, and manage revenue operations.</p>
     </div>
 
-    <div class="modules" id="modules">
+    <div class="modules" id="modules" style="position:relative;z-index:1;">
         <div class="module-card adpulse" id="cardAdPulse" onclick="openModule('/adpulse')">
             <span class="module-status status-active" id="statusAdPulse">Active</span>
             <div class="module-icon">📢</div>
@@ -539,10 +537,8 @@
             </div>
         </div>
     </div>
-        </div>
-    </div>
 
-    <div id="authOverlay" class="overlay hidden" onclick="hideAuth(event)">
+    <div id="authOverlay" class="overlay hidden" onclick="hideAuth(event)" style="z-index:100;">
         <div class="modal" onclick="event.stopPropagation()">
             <h2>Login to ChlearSakhaaOps AI</h2>
             <div class="form-group">
@@ -818,7 +814,7 @@
         </div>
     </div>
 
-    <div class="footer">© 2026 ChlearSakhaaOps AI. Built for Chlear Digital.</div>
+    <div class="footer" style="position:relative;z-index:1;">© 2026 ChlearSakhaaOps AI. Built for Chlear Digital.</div>
 
     <script>
     const API = '/api';
@@ -1771,9 +1767,8 @@
     <!-- Hero Canvas Thread Effect -->
     <script>
     (function() {
-        var container = document.getElementById('heroCanvasContainer');
         var canvas = document.getElementById('heroCanvas');
-        if (!container || !canvas) return;
+        if (!canvas) return;
         var ctx = canvas.getContext('2d');
 
         var isMobile = window.matchMedia('(pointer: coarse)').matches;
@@ -1813,8 +1808,7 @@
 
         function initPoints() {
             points = [];
-            var rect = container.getBoundingClientRect();
-            var w = rect.width, h = rect.height;
+            var w = window.innerWidth, h = window.innerHeight;
             var sx = w / (COLS - 1);
             var sy = h / (ROWS - 1);
             for (var r = 0; r < ROWS; r++) {
@@ -1829,9 +1823,8 @@
         }
 
         function resizeCanvas() {
-            var rect = container.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
             initPoints();
         }
 
@@ -1839,16 +1832,17 @@
         window.addEventListener('resize', resizeCanvas);
 
         if (!isMobile) {
-            container.addEventListener('mousemove', function(e) {
-                var rect = container.getBoundingClientRect();
-                mouseX = e.clientX - rect.left;
-                mouseY = e.clientY - rect.top;
+            window.addEventListener('mousemove', function(e) {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
                 mouseActive = true;
             });
-            container.addEventListener('mouseleave', function() {
-                mouseActive = false;
-                mouseX = -9999;
-                mouseY = -9999;
+            window.addEventListener('mouseout', function(e) {
+                if (!e.relatedTarget) {
+                    mouseActive = false;
+                    mouseX = -9999;
+                    mouseY = -9999;
+                }
             });
         }
 
