@@ -537,7 +537,13 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
     # Default audit date = latest action created_at, else today
     audit_dt = active_only[0].created_at if active_only else datetime.utcnow()
     # Build campaign context: all keywords per campaign_id (flagged + clean)
-    campaign_context = _build_campaign_keyword_context(account, active_only)
+    # Non-blocking: if Google Ads API fails, return empty context (modal still works)
+    campaign_context = {}
+    try:
+        campaign_context = _build_campaign_keyword_context(account, active_only)
+    except Exception as e:
+        logger.warning(f"Failed to build campaign context for account {account_id}: {e}")
+        campaign_context = {}
 
     return {
         "account_id": account_id,
