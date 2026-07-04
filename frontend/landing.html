@@ -682,7 +682,7 @@
                     <div class="form-group"><label>Mobile</label><input type="text" id="umMobile" placeholder="+91 9876543210"></div>
                     <div class="form-group"><label>Role</label>
                         <select id="umRole">
-                            <option value="user">BM</option>
+                            <option value="user">Business Manager (BM)</option>
                             <option value="newuser">User</option>
                             <option value="admin">Admin</option>
                             <option value="superadmin" class="superadmin-option">Super Admin</option>
@@ -780,7 +780,7 @@
                             <div class="form-group full"><label>Address</label><input type="text" id="caAddress" placeholder="Client billing address"></div>
                             <div class="form-group"><label>State</label><input type="text" id="caState" placeholder="e.g. Karnataka"></div>
                             <div class="form-group"><label>State Code</label><input type="text" id="caStateCode" placeholder="e.g. 29"></div>
-                            <div class="form-group"><label>Business Manager</label><select id="caBM"><option value="">Unassigned</option></select></div>
+                            <div class="form-group"><label>Business Manager (BM)</label><select id="caBM"><option value="">Unassigned</option></select></div>
                             <div class="form-group"><label>Status</label><select id="caClientStatus"><option value="Active">Active</option><option value="Paused">Paused</option><option value="Closed">Closed</option><option value="On Hold">On Hold</option></select></div>
                         </div>
                     </div>
@@ -834,7 +834,7 @@
                             <div class="form-group full"><label>Address</label><input type="text" id="caEditAddress"></div>
                             <div class="form-group"><label>State</label><input type="text" id="caEditState"></div>
                             <div class="form-group"><label>State Code</label><input type="text" id="caEditStateCode"></div>
-                            <div class="form-group"><label>Business Manager</label><select id="caEditBM"><option value="">Unassigned</option></select></div>
+                            <div class="form-group"><label>Business Manager (BM)</label><select id="caEditBM"><option value="">Unassigned</option></select></div>
                             <div class="form-group"><label>Status</label><select id="caEditClientStatus"><option value="Active">Active</option><option value="Paused">Paused</option><option value="Closed">Closed</option><option value="On Hold">On Hold</option></select></div>
                         </div>
                     </div>
@@ -1189,8 +1189,8 @@
 
     function roleBadge(role) {
         const cls = role === 'superadmin' ? 'badge-accent' : (role === 'admin' ? 'badge-orange' : (role === 'newuser' ? 'badge-purple' : 'badge-blue'));
-        const text = role === 'user' ? 'BM' : (role === 'newuser' ? 'User' : role);
-        return `<span class="badge ${cls}">${text.toUpperCase()}</span>`;
+        const text = role === 'user' ? 'Business Manager (BM)' : (role === 'newuser' ? 'User' : role);
+        return `<span class="badge ${cls}">${role === 'user' ? text : text.toUpperCase()}</span>`;
     }
 
     function escapeHtml(s) {
