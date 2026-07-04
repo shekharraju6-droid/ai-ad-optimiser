@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routes import config, campaigns, search_terms, negatives, optimizations, logs, chat, auth, reports, accounts, audits, notifications, oauth, crm, revenueops, dsu_report, dsi_report, mantri, voice
+from backend.routes import config, campaigns, search_terms, negatives, optimizations, logs, chat, auth, reports, accounts, audits, notifications, oauth, crm, revenueops, dsu_report, dsi_report, mantri, voice, categories
 
 from backend.db.database import init_db
 from backend.services.scheduler import start_scheduler, stop_scheduler
@@ -29,6 +29,7 @@ app.add_middleware(
 # Register API routes
 app.include_router(config.router)
 app.include_router(accounts.router)
+app.include_router(categories.router)
 app.include_router(campaigns.router)
 app.include_router(search_terms.router)
 app.include_router(negatives.router)

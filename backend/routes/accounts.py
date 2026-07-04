@@ -91,6 +91,7 @@ class AccountCreate(BaseModel):
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     business_manager_id: Optional[int] = None
+    category_id: Optional[int] = None
 
     client_status: Optional[str] = None
     invoice_day: Optional[int] = None
@@ -139,6 +140,7 @@ class AccountUpdate(BaseModel):
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     business_manager_id: Optional[int] = None
+    category_id: Optional[int] = None
 
     client_status: Optional[str] = None
     invoice_day: Optional[int] = None
@@ -249,6 +251,7 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
         account_type=account_type,
         external_id=external_id,
         group_id=req.group_id,
+        category_id=req.category_id,
         has_google=req.has_google,
         has_meta=req.has_meta,
         google_external_id=req.google_external_id,
@@ -318,6 +321,8 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.name = req.name
     if req.group_id is not None:
         account.group_id = req.group_id
+    if req.category_id is not None:
+        account.category_id = req.category_id
     if req.refresh_interval_minutes is not None:
         account.refresh_interval_minutes = req.refresh_interval_minutes
     if req.audit_interval_minutes is not None:

@@ -33,11 +33,22 @@ class AccountGroup(Base):
     accounts = relationship("Account", back_populates="group", lazy="dynamic")
 
 
+class Category(Base):
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    accounts = relationship("Account", back_populates="category", lazy="dynamic")
+
+
 class Account(Base):
     __tablename__ = "accounts"
 
     id = Column(Integer, primary_key=True, index=True)
     group_id = Column(Integer, ForeignKey("account_groups.id"), nullable=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
 
     name = Column(String, nullable=False)  # Client name, e.g. DSU
     account_type = Column(Enum(AccountType), nullable=False)  # legacy single-platform type
@@ -133,6 +144,7 @@ class Account(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     group = relationship("AccountGroup", back_populates="accounts")
+    category = relationship("Category", back_populates="accounts")
     campaign_type_tags = relationship("CampaignTypeTag", back_populates="account", cascade="all, delete-orphan")
 
     def to_dict(self):
@@ -140,6 +152,8 @@ class Account(Base):
             "id": self.id,
             "group_id": self.group_id,
             "group_name": self.group.name if self.group else None,
+            "category_id": self.category_id,
+            "category_name": self.category.name if self.category else None,
             "name": self.name,
             "account_type": self.account_type.value,
             "external_id": self.external_id,

@@ -356,6 +356,111 @@
         }
         .form-group select { cursor: pointer; }
 
+        /* Category manage button + popup */
+        .category-manage-btn {
+            background: transparent;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+            flex-shrink: 0;
+            transition: color 0.15s ease, border-color 0.15s ease;
+        }
+        .category-manage-btn:hover {
+            color: var(--color-accent);
+            border-color: var(--color-accent);
+        }
+        .category-popup-list {
+            max-height: calc(60vh - 140px);
+            overflow-y: auto;
+            border-top: 1px solid var(--color-border);
+            border-bottom: 1px solid var(--color-border);
+        }
+        .category-popup-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--color-border);
+        }
+        .category-popup-row:last-child { border-bottom: none; }
+        .category-popup-row input {
+            flex: 1;
+            padding: 6px 8px;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            background: transparent;
+            color: var(--color-text-primary);
+            font-family: 'Inter', sans-serif;
+        }
+        .category-popup-row input:disabled {
+            opacity: 0.9;
+            background: transparent;
+        }
+        .category-popup-row input:not(:disabled) {
+            border-color: var(--color-border-input);
+            background: var(--color-bg-input);
+        }
+        .category-popup-row .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 4px 8px;
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: color 0.15s ease, border-color 0.15s ease;
+        }
+        .category-popup-row .btn-ghost:hover {
+            color: var(--color-accent);
+            border-color: var(--color-accent);
+        }
+        .category-popup-row .btn-danger-ghost {
+            background: transparent;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 4px 8px;
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: color 0.15s ease, border-color 0.15s ease;
+        }
+        .category-popup-row .btn-danger-ghost:hover {
+            color: var(--color-danger);
+            border-color: var(--color-danger);
+        }
+        .category-add-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .category-add-row input {
+            width: 70%;
+            padding: 8px 12px;
+            border: 1px solid var(--color-border-input);
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            background: var(--color-bg-input);
+            color: var(--color-text-primary);
+        }
+        .category-add-row button {
+            width: 30%;
+        }
+        .category-popup-error {
+            font-size: 12px;
+            color: var(--color-danger);
+            margin-top: 8px;
+            min-height: 18px;
+        }
+
         /* User Management */
         .um-section { margin-bottom: 1.25rem; }
         .um-section-title {
@@ -666,7 +771,7 @@
                         <div class="um-section-title" onclick="toggleCaSection(this)">Basic Information <span class="ca-arrow">▾</span></div>
                         <div class="um-form ca-section-body">
                             <div class="form-group"><label>Client/Brand *</label><input type="text" id="caName" placeholder="Enter client or brand name"></div>
-                            <div class="form-group"><label>Category</label><select id="caGroup"><option value="">None</option></select></div>
+                            <div class="form-group"><label>Category</label><div style="display:flex;align-items:center;gap:6px;"><select id="caGroup"><option value="">None</option></select><button type="button" class="category-manage-btn" onclick="openCategoryManager()" title="Manage categories">⚙️</button></div></div>
                             <div class="form-group"><label>Legal/Billing Entity</label><input type="text" id="caBrand" placeholder="Enter legal or billing entity name"></div>
                             <div class="form-group"><label>Contact Person</label><input type="text" id="caContactPerson" placeholder="SPOC name"></div>
                             <div class="form-group"><label>Email</label><input type="email" id="caContactEmail" placeholder="contact@client.com"></div>
@@ -720,7 +825,7 @@
                         <div class="um-section-title" onclick="toggleCaSection(this)">Basic Info <span class="ca-arrow">▾</span></div>
                         <div class="um-form ca-section-body">
                             <div class="form-group"><label>Client/Brand *</label><input type="text" id="caEditName" placeholder="Enter client or brand name"></div>
-                            <div class="form-group"><label>Category</label><select id="caEditGroup"><option value="">None</option></select></div>
+                            <div class="form-group"><label>Category</label><div style="display:flex;align-items:center;gap:6px;"><select id="caEditGroup"><option value="">None</option></select><button type="button" class="category-manage-btn" onclick="openCategoryManager()" title="Manage categories">⚙️</button></div></div>
                             <div class="form-group"><label>Legal/Billing Entity</label><input type="text" id="caEditBrand" placeholder="Enter legal or billing entity name"></div>
                             <div class="form-group"><label>Contact Person</label><input type="text" id="caEditContactPerson"></div>
                             <div class="form-group"><label>Email</label><input type="email" id="caEditContactEmail"></div>
@@ -1214,7 +1319,7 @@
 
     // ===== Central Account Management =====
     let centralAccounts = [];
-    let centralGroups = [];
+    let centralCategories = [];
     let centralBMs = [];
     let centralDeleteId = null;
     let centralSelectedIds = new Set();
@@ -1249,13 +1354,12 @@
     async function loadCentralAccounts() {
         try {
             centralAccounts = await api('GET', '/accounts');
-            centralGroups = await api('GET', '/account-groups');
             centralSelectedIds.clear();
             centralSearchQuery = '';
             const searchInput = $('centralAccountSearch');
             if (searchInput) searchInput.value = '';
             renderCentralAccountsTable();
-            populateCentralGroupSelects();
+            await populateCentralGroupSelects();
         } catch (e) { console.error(e); }
     }
 
@@ -1417,9 +1521,20 @@
         setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(-10px)'; setTimeout(() => el.remove(), 300); }, 3000);
     }
 
-    function populateCentralGroupSelects() {
-        const sortedGroups = [...centralGroups].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        const opts = '<option value="">None</option>' + sortedGroups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+    async function loadCategories() {
+        try {
+            const res = await api('GET', '/categories');
+            centralCategories = res.categories || [];
+        } catch (e) {
+            console.error('Failed to load categories', e);
+            centralCategories = [];
+        }
+    }
+
+    async function populateCentralGroupSelects() {
+        await loadCategories();
+        const sorted = [...centralCategories].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        const opts = '<option value="">None</option>' + sorted.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
         const sel1 = $('caGroup'); if (sel1) sel1.innerHTML = opts;
         const sel2 = $('caEditGroup'); if (sel2) sel2.innerHTML = opts;
     }
@@ -1443,6 +1558,129 @@
             const sel = $(selectId); if (sel) sel.innerHTML = opts;
         } catch (e) {
             const sel = $(selectId); if (sel) sel.innerHTML = '<option value="">Unassigned</option>';
+        }
+    }
+
+    // ----- Category Manager -----
+    function openCategoryManager() {
+        $('categoryManagerOverlay').classList.remove('hidden');
+        $('categoryNewName').value = '';
+        $('categoryManagerError').textContent = '';
+        loadAndRenderCategories();
+    }
+
+    function closeCategoryManager() {
+        $('categoryManagerOverlay').classList.add('hidden');
+        // Refresh dropdowns in add/edit forms after any changes
+        const currentAdd = $('caGroup') ? $('caGroup').value : '';
+        const currentEdit = $('caEditGroup') ? $('caEditGroup').value : '';
+        populateCentralGroupSelects().then(() => {
+            const add = $('caGroup');
+            const edit = $('caEditGroup');
+            if (add) {
+                const opt = Array.from(add.options).find(o => o.value === currentAdd);
+                add.value = opt ? currentAdd : '';
+            }
+            if (edit) {
+                const opt = Array.from(edit.options).find(o => o.value === currentEdit);
+                edit.value = opt ? currentEdit : '';
+            }
+        });
+    }
+
+    async function loadAndRenderCategories() {
+        await loadCategories();
+        renderCategoryManagerList();
+    }
+
+    function renderCategoryManagerList() {
+        const container = $('categoryManagerList');
+        if (!container) return;
+        const sorted = [...centralCategories].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        if (!sorted.length) {
+            container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--color-text-muted);font-size:13px;">No categories yet. Add one above.</div>';
+            return;
+        }
+        container.innerHTML = sorted.map(c => `
+            <div class="category-popup-row" data-cat-id="${c.id}">
+                <input type="text" id="catName-${c.id}" value="${escapeHtml(c.name)}" disabled onkeydown="if(event.key==='Enter') saveCategoryEdit(${c.id})">
+                <button type="button" class="btn-ghost" id="catEditBtn-${c.id}" onclick="enableCategoryEdit(${c.id})">Edit</button>
+                <div id="catActions-${c.id}" style="display:flex;gap:4px;">
+                    <button type="button" class="btn-danger-ghost" onclick="showCategoryDeleteConfirm(${c.id})">Delete</button>
+                </div>
+                <div id="catConfirm-${c.id}" style="display:none;gap:4px;align-items:center;">
+                    <span style="font-size:11px;color:var(--color-text-muted);white-space:nowrap;">Are you sure?</span>
+                    <button type="button" class="btn-ghost" onclick="deleteCategory(${c.id})">Yes</button>
+                    <button type="button" class="btn-ghost" onclick="hideCategoryDeleteConfirm(${c.id})">No</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function addNewCategory() {
+        const input = $('categoryNewName');
+        const name = input.value.trim();
+        if (!name) { toast('Category name cannot be empty', true); return; }
+        try {
+            await api('POST', '/categories', { name });
+            input.value = '';
+            $('categoryManagerError').textContent = '';
+            await loadAndRenderCategories();
+        } catch (e) {
+            $('categoryManagerError').textContent = e.message || 'Failed to add category';
+        }
+    }
+
+    function enableCategoryEdit(id) {
+        const input = $(`catName-${id}`);
+        const btn = $(`catEditBtn-${id}`);
+        if (!input || !btn) return;
+        input.disabled = false;
+        input.focus();
+        btn.textContent = 'Save';
+        btn.onclick = () => saveCategoryEdit(id);
+    }
+
+    async function saveCategoryEdit(id) {
+        const input = $(`catName-${id}`);
+        const btn = $(`catEditBtn-${id}`);
+        const name = input.value.trim();
+        if (!name) { $('categoryManagerError').textContent = 'Category name cannot be empty'; return; }
+        try {
+            await api('PUT', '/categories/' + id, { name });
+            $('categoryManagerError').textContent = '';
+            input.disabled = true;
+            btn.textContent = 'Edit';
+            btn.onclick = () => enableCategoryEdit(id);
+            await loadCategories();
+            renderCategoryManagerList();
+        } catch (e) {
+            $('categoryManagerError').textContent = e.message || 'Failed to update category';
+        }
+    }
+
+    function showCategoryDeleteConfirm(id) {
+        const actions = $(`catActions-${id}`);
+        const confirm = $(`catConfirm-${id}`);
+        if (actions) actions.style.display = 'none';
+        if (confirm) confirm.style.display = 'flex';
+    }
+
+    function hideCategoryDeleteConfirm(id) {
+        const actions = $(`catActions-${id}`);
+        const confirm = $(`catConfirm-${id}`);
+        if (actions) actions.style.display = 'flex';
+        if (confirm) confirm.style.display = 'none';
+    }
+
+    async function deleteCategory(id) {
+        try {
+            await api('DELETE', '/categories/' + id);
+            $('categoryManagerError').textContent = '';
+            await loadAndRenderCategories();
+        } catch (e) {
+            $('categoryManagerError').textContent = e.message || 'Failed to delete category';
+            hideCategoryDeleteConfirm(id);
         }
     }
 
@@ -1479,7 +1717,7 @@
             const audit = $('caAdpulseAudit')?.value.trim();
             const body = {
                 name,
-                group_id: $('caGroup').value ? parseInt($('caGroup').value) : null,
+                category_id: $('caGroup').value ? parseInt($('caGroup').value) : null,
                 brand_name: $('caBrand').value.trim() || null,
                 brand_keywords: $('caBrandKeywords').value.trim() || null,
                 contact_person: $('caContactPerson').value.trim() || null,
@@ -1529,7 +1767,7 @@
         $('caEditGstNumber').value = a.gst_number || '';
         $('caEditAdpulseRefresh').value = a.adpulse_refresh_interval || '';
         $('caEditAdpulseAudit').value = a.adpulse_audit_interval || '';
-        if ($('caEditGroup')) $('caEditGroup').value = a.group_id || '';
+        if ($('caEditGroup')) $('caEditGroup').value = a.category_id || '';
         $('caEditHasGoogle').checked = a.has_google;
         $('caEditHasMeta').checked = a.has_meta;
         $('caEditGoogleCustId').value = a.google_external_id || '';
@@ -1567,7 +1805,7 @@
             const id = $('caEditId').value;
             const body = {
                 name: $('caEditName').value.trim(),
-                group_id: $('caEditGroup').value ? parseInt($('caEditGroup').value) : null,
+                category_id: $('caEditGroup').value ? parseInt($('caEditGroup').value) : null,
                 brand_name: $('caEditBrand').value.trim() || null,
                 brand_keywords: $('caEditBrandKeywords').value.trim() || null,
                 contact_person: $('caEditContactPerson').value.trim() || null,
@@ -2066,5 +2304,23 @@
         animate();
     })();
     </script>
+
+    <!-- Category Manager Popup -->
+    <div id="categoryManagerOverlay" class="um-overlay hidden" onclick="if(event.target===this) closeCategoryManager()">
+        <div class="um-modal" onclick="event.stopPropagation()" style="max-width:400px;max-height:60vh;display:flex;flex-direction:column;padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h2 style="margin:0;">Manage Categories</h2>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="closeCategoryManager()">✕</button>
+            </div>
+            <div class="category-add-row">
+                <input type="text" id="categoryNewName" placeholder="New category name" onkeydown="if(event.key==='Enter') addNewCategory()">
+                <button class="btn btn-primary" onclick="addNewCategory()">Add</button>
+            </div>
+            <div id="categoryManagerList" class="category-popup-list" style="flex:1;">
+                <!-- categories rendered here -->
+            </div>
+            <div id="categoryManagerError" class="category-popup-error"></div>
+        </div>
+    </div>
 </body>
 </html>

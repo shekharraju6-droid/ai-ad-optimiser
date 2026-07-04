@@ -126,6 +126,12 @@ def init_db():
             run_audit_review_migration()
         except Exception as me:
             logger.warning(f"Additive audit review access migration skipped/failed: {me}")
+        # Run safe additive migration for dynamic category management
+        try:
+            from backend.migrations.add_categories_table import run_migration as run_categories_migration
+            run_categories_migration()
+        except Exception as me:
+            logger.warning(f"Additive categories migration skipped/failed: {me}")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise
