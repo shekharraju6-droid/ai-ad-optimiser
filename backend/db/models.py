@@ -88,7 +88,9 @@ class Account(Base):
     contact_person = Column(String, nullable=True)
     contact_email = Column(String, nullable=True)
     contact_phone = Column(String, nullable=True)
-    business_manager_id = Column(Integer, nullable=True)
+    business_manager_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    business_manager = relationship("User", foreign_keys=[business_manager_id])
 
     # Per-account CRM (LeadSquared) credentials
     lsq_access_key = Column(String, nullable=True)
@@ -212,6 +214,7 @@ class Account(Base):
             "contact_email": self.contact_email,
             "contact_phone": self.contact_phone,
             "business_manager_id": self.business_manager_id,
+            "business_manager_name": self.business_manager.full_name if self.business_manager else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

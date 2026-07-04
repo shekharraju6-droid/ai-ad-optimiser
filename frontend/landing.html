@@ -749,6 +749,7 @@
                             <th>Client/Brand</th>
                             <th>Legal/Billing Entity</th>
                             <th>BM</th>
+                            <th>Contact Person</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr></thead>
@@ -1409,6 +1410,7 @@
                 <td>${idx + 1}</td>
                 <td style="font-family:'DM Sans',sans-serif;font-weight:600;color:var(--color-text-primary);">${escapeHtml(a.name || '-')}</td>
                 <td style="color:var(--color-text-secondary);">${escapeHtml(a.brand_name || '-')}</td>
+                <td style="color:var(--color-text-secondary);">${escapeHtml(a.business_manager_name || a.business_manager_id ? '#' + a.business_manager_id : '-')}</td>
                 <td style="color:var(--color-text-secondary);">${escapeHtml(a.contact_person || '-')}</td>
                 <td><span class="badge ${statusClass}">${escapeHtml(status)}</span></td>
                 <td><button class="btn btn-secondary btn-sm" onclick="openCentralEditAccount(${a.id})">Edit</button></td>
