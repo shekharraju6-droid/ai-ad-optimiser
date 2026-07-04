@@ -2178,15 +2178,27 @@
         }
     }
 
+    function _mergedItemsForTab(tab) {
+        if (!currentReviewData) return [];
+        if (tab === 'keywords') return currentReviewData.keywords_to_pause || [];
+        if (tab === 'negatives') return currentReviewData.negatives_to_add || [];
+        if (tab === 'budget') return currentReviewData.budget_changes || [];
+        if (tab === 'campaigns') return currentReviewData.campaign_actions || [];
+        return [];
+    }
+
+    function _isMergedItemSelected(item) {
+        const ids = item.queue_item_ids || [item.id];
+        return ids.some(id => reviewState.selected.has(id));
+    }
+
     function updateReviewSelectionCount() {
-        let total = 0;
-        if (currentReviewData) {
-            total += (currentReviewData.keywords_to_pause || []).length;
-            total += (currentReviewData.negatives_to_add || []).length;
-            total += (currentReviewData.budget_changes || []).length;
-            total += (currentReviewData.campaign_actions || []).length;
-        }
-        $('reviewSelectionCount').textContent = reviewState.selected.size + ' of ' + total + ' selected';
+        const items = _mergedItemsForTab(currentReviewTab);
+        const filtered = _reviewSort(_reviewFilter(items, currentReviewTab), currentReviewTab);
+        const selectable = filtered.filter(i => !i.campaign_status || i.campaign_status.toUpperCase() === 'ENABLED');
+        const selectedCount = selectable.filter(_isMergedItemSelected).length;
+        const total = selectable.length;
+        $('reviewSelectionCount').textContent = selectedCount + ' of ' + total + ' selected';
     }
 
     function confirmApproveSelected() {
