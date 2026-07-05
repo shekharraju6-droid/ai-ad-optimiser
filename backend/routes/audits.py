@@ -14,6 +14,7 @@ from backend.services.scheduler import run_manual_smart_audit
 from backend.services.audit_settings import get_audit_settings, set_audit_setting
 from backend.services.notifications import dispatch
 from backend.services.connectors import get_connector
+from backend.services.landing_page_service import fetch_campaign_landing_pages, crawl_stale_landing_pages
 from backend.routes.auth import get_current_user_required
 
 logger = logging.getLogger("AdOptima")
@@ -92,6 +93,26 @@ def run_smart_audit_for_account(account_id: int, db: Session = Depends(get_db), 
             db,
         )
     return result
+
+
+@router.post("/accounts/{account_id}/refresh-landing-pages")
+def refresh_landing_pages(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Pull landing page URLs from Google Ads and crawl stale pages. Triggered manually from AdPulse."""
+    _require_audit_review_access(user)
+    result = fetch_campaign_landing_pages(account_id, db=db)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    crawl_result = crawl_stale_landing_pages(account_id, db=db)
+    return {"fetch": result, "crawl": crawl_result}
+
+
+@router.get("/accounts/{account_id}/landing-pages")
+def list_landing_pages(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """List stored landing pages + crawl status for an account."""
+    _require_audit_review_access(user)
+    from backend.db.models import CampaignLandingPage
+    rows = db.query(CampaignLandingPage).filter(CampaignLandingPage.account_id == account_id).all()
+    return [r.to_dict() for r in rows]
 
 
 @router.post("/accounts/{account_id}/audit")
@@ -192,6 +213,35 @@ def _format_match_type(mt):
     return mt
 
 
+def _is_numeric_campaign_name(name: str) -> bool:
+    """Return True when the campaign name looks like a bare Google Ads campaign ID (all digits)."""
+    if not name:
+        return False
+    return name.strip().isdigit()
+
+
+def _display_campaign_name(name: str, campaign_id: str) -> str:
+    """Frontend-friendly fallback: show 'Campaign #ID' when name is missing or numeric."""
+    if name and not _is_numeric_campaign_name(name):
+        return name
+    if campaign_id:
+        return f"Campaign #{campaign_id}"
+    return name or "Unknown"
+
+
+def _fetch_campaign_name_map(account) -> Dict[str, str]:
+    """Fetch campaigns from Google Ads and build campaign_id -> name map. Non-blocking."""
+    try:
+        connector = get_connector(account, platform="google")
+        if not connector or not connector.is_valid:
+            return {}
+        campaigns = connector.fetch_campaigns()
+        return {str(c.get("id") or ""): c.get("name") or "" for c in campaigns if c.get("id")}
+    except Exception as e:
+        logger.warning(f"Failed to fetch campaign name map for account {getattr(account, 'id', '?')}: {e}")
+        return {}
+
+
 def _parse_inr(value: float) -> str:
     try:
         return f"INR {value:,.0f}"
@@ -262,8 +312,9 @@ def _classify_search_term_finding(action: PendingAction) -> Dict[str, Any]:
     return findings
 
 
-def _merge_keyword_actions(actions: List[PendingAction]) -> List[Dict[str, Any]]:
+def _merge_keyword_actions(actions: List[PendingAction], campaign_name_map: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
     """Group pending keyword pause actions by campaign + keyword_text and merge findings."""
+    campaign_name_map = campaign_name_map or {}
     groups: Dict[str, Dict[str, Any]] = {}
     for action in actions:
         if action.action_type not in ("SMART_PAUSE_KEYWORD", "PAUSE_KEYWORD"):
@@ -279,7 +330,15 @@ def _merge_keyword_actions(actions: List[PendingAction]) -> List[Dict[str, Any]]
         clicks = metrics.get("clicks", 0) or 0
         conversions = metrics.get("conversions", 0) or 0
         ctr = metrics.get("ctr", 0) or 0
-        campaign_name = nv.get("campaign_name") or action.campaign_id or "Unknown"
+        raw_name = nv.get("campaign_name") or ""
+        campaign_name = _display_campaign_name(raw_name or campaign_name_map.get(campaign_id, ""), campaign_id)
+        confidence = (getattr(action, "confidence", None) or nv.get("confidence") or "MEDIUM").upper()
+        confidence_score = getattr(action, "confidence_score", None)
+        if confidence_score is None:
+            try:
+                confidence_score = int(nv.get("confidence_score"))
+            except Exception:
+                confidence_score = None
 
         if key not in groups:
             groups[key] = {
@@ -296,6 +355,8 @@ def _merge_keyword_actions(actions: List[PendingAction]) -> List[Dict[str, Any]]
                 "queue_item_ids": [],
                 "findings": [],
                 "campaign_status": action.campaign_status or "ENABLED",
+                "confidence": confidence,
+                "confidence_score": confidence_score,
                 "_seen_categories": set(),
             }
         grp = groups[key]
@@ -309,6 +370,10 @@ def _merge_keyword_actions(actions: List[PendingAction]) -> List[Dict[str, Any]]
             grp["match_type"] = _format_match_type(action.match_type)
             grp["ad_group_name"] = nv.get("ad_group_name") or grp["ad_group_name"]
             grp["ad_group_id"] = nv.get("ad_group_id") or action.adset_id or grp["ad_group_id"]
+        # Keep highest confidence score
+        if confidence_score is not None and (grp.get("confidence_score") is None or confidence_score > (grp.get("confidence_score") or 0)):
+            grp["confidence"] = confidence
+            grp["confidence_score"] = confidence_score
         finding = _classify_keyword_finding(action)
         cat = finding["category"]
         if cat not in grp["_seen_categories"]:
@@ -342,8 +407,9 @@ def _merge_generic_actions(items: List[Dict[str, Any]], key_fields=("campaign_id
     return list(groups.values())
 
 
-def _merge_search_term_actions(actions: List[PendingAction]) -> List[Dict[str, Any]]:
+def _merge_search_term_actions(actions: List[PendingAction], campaign_name_map: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
     """Group pending negative-keyword actions by campaign + search_term and merge findings."""
+    campaign_name_map = campaign_name_map or {}
     groups: Dict[str, Dict[str, Any]] = {}
     for action in actions:
         if action.action_type not in ("SMART_ADD_NEGATIVE_KEYWORD", "ADD_NEGATIVE_KEYWORD"):
@@ -359,7 +425,15 @@ def _merge_search_term_actions(actions: List[PendingAction]) -> List[Dict[str, A
         clicks = metrics.get("clicks", 0) or 0
         conversions = metrics.get("conversions", 0) or 0
         ctr = metrics.get("ctr", 0) or 0
-        campaign_name = nv.get("campaign_name") or action.campaign_id or "Unknown"
+        raw_name = nv.get("campaign_name") or ""
+        campaign_name = _display_campaign_name(raw_name or campaign_name_map.get(campaign_id, ""), campaign_id)
+        confidence = (getattr(action, "confidence", None) or nv.get("confidence") or "MEDIUM").upper()
+        confidence_score = getattr(action, "confidence_score", None)
+        if confidence_score is None:
+            try:
+                confidence_score = int(nv.get("confidence_score"))
+            except Exception:
+                confidence_score = None
 
         if key not in groups:
             groups[key] = {
@@ -375,6 +449,8 @@ def _merge_search_term_actions(actions: List[PendingAction]) -> List[Dict[str, A
                 "queue_item_ids": [],
                 "findings": [],
                 "campaign_status": action.campaign_status or "ENABLED",
+                "confidence": confidence,
+                "confidence_score": confidence_score,
                 "_seen_categories": set(),
             }
         grp = groups[key]
@@ -384,6 +460,10 @@ def _merge_search_term_actions(actions: List[PendingAction]) -> List[Dict[str, A
             grp["clicks"] = clicks
             grp["conversions"] = conversions
             grp["ctr"] = ctr
+        # Keep highest confidence score
+        if confidence_score is not None and (grp.get("confidence_score") is None or confidence_score > (grp.get("confidence_score") or 0)):
+            grp["confidence"] = confidence
+            grp["confidence_score"] = confidence_score
         for finding in _classify_search_term_finding(action):
             cat = finding["category"]
             if cat not in grp["_seen_categories"]:
@@ -405,7 +485,57 @@ def list_audit_runs(limit: int = 30, db: Session = Depends(get_db)):
     return [r.to_dict() for r in runs]
 
 
-def _build_campaign_keyword_context(account, pending_actions) -> Dict[str, Any]:
+SMART_APPROVE_SETTING_KEYS = {
+    "smart_approve_confidence": "high",
+    "smart_approve_max_spend": "500",
+    "smart_approve_conversions": "zero",
+    "smart_approve_auto": "off",
+}
+
+
+@router.get("/smart-approve-settings")
+def get_smart_approve_settings(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Return Smart Approve default settings from app_settings."""
+    from backend.db.models import AppSetting
+    result = dict(SMART_APPROVE_SETTING_KEYS)
+    for key in SMART_APPROVE_SETTING_KEYS:
+        row = db.query(AppSetting).filter(AppSetting.key == key).first()
+        if row and row.value is not None:
+            result[key] = row.value
+    return result
+
+
+class SmartApproveSettingUpdate(BaseModel):
+    smart_approve_confidence: Optional[str] = None
+    smart_approve_max_spend: Optional[str] = None
+    smart_approve_conversions: Optional[str] = None
+    smart_approve_auto: Optional[str] = None
+
+
+@router.put("/smart-approve-settings")
+def update_smart_approve_settings(req: SmartApproveSettingUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Update Smart Approve default settings in app_settings."""
+    from backend.db.models import AppSetting
+    updates = {}
+    if req.smart_approve_confidence is not None:
+        updates["smart_approve_confidence"] = req.smart_approve_confidence
+    if req.smart_approve_max_spend is not None:
+        updates["smart_approve_max_spend"] = req.smart_approve_max_spend
+    if req.smart_approve_conversions is not None:
+        updates["smart_approve_conversions"] = req.smart_approve_conversions
+    if req.smart_approve_auto is not None:
+        updates["smart_approve_auto"] = req.smart_approve_auto
+    for key, value in updates.items():
+        row = db.query(AppSetting).filter(AppSetting.key == key).first()
+        if row:
+            row.value = value
+        else:
+            db.add(AppSetting(key=key, value=value))
+    db.commit()
+    return {"updated": list(updates.keys())}
+
+
+def _build_campaign_keyword_context(account, pending_actions, campaign_name_map: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """Fetch all keywords for campaigns that have flagged items, return context with flagged status.
 
     Returns a dict keyed by campaign_id:
@@ -418,6 +548,7 @@ def _build_campaign_keyword_context(account, pending_actions) -> Dict[str, Any]:
       }
     }
     """
+    campaign_name_map = campaign_name_map or {}
     # Collect unique campaign_ids from pending keyword actions
     flagged_campaign_ids = set()
     flagged_keyword_keys = set()  # (campaign_id, keyword_text)
@@ -447,8 +578,9 @@ def _build_campaign_keyword_context(account, pending_actions) -> Dict[str, Any]:
         if cid not in flagged_campaign_ids:
             continue
         if cid not in context:
+            raw_name = kw.get("campaign_name", "") or campaign_name_map.get(cid, "")
             context[cid] = {
-                "campaign_name": kw.get("campaign_name", ""),
+                "campaign_name": _display_campaign_name(raw_name, cid),
                 "keywords": [],
             }
         kw_text = (kw.get("text") or "").lower()
@@ -487,16 +619,20 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
     # Filter out items from campaigns that were paused at audit time
     active_only = [a for a in pending if (a.campaign_status or "ENABLED").upper() == "ENABLED"]
 
-    keywords_to_pause = _merge_keyword_actions(active_only)
-    negatives_to_add = _merge_search_term_actions(active_only)
+    # Build campaign_id -> campaign_name map from Google Ads to fix legacy numeric campaign names
+    campaign_name_map = _fetch_campaign_name_map(account)
+
+    keywords_to_pause = _merge_keyword_actions(active_only, campaign_name_map)
+    negatives_to_add = _merge_search_term_actions(active_only, campaign_name_map)
     budget_changes = []
     campaign_actions = []
 
     for action in active_only:
         nv = action.new_value or {}
         metrics = nv.get("metrics", {}) if isinstance(nv, dict) else {}
-        campaign_name = (nv.get("campaign_name") if isinstance(nv, dict) else None) or action.campaign_id or "Unknown"
+        raw_campaign_name = (nv.get("campaign_name") if isinstance(nv, dict) else None) or ""
         campaign_id = action.campaign_id or ""
+        campaign_name = _display_campaign_name(raw_campaign_name or campaign_name_map.get(campaign_id, ""), campaign_id)
         conversions = metrics.get("conversions", 0) or 0
 
         if action.action_type in ("PAUSE_OR_REDUCE_BUDGET",):
@@ -516,7 +652,7 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
                 "campaign_status": action.campaign_status or "ENABLED",
             })
 
-        elif action.action_type in ("PAUSE_CAMPAIGN", "ENABLE_CAMPAIGN", "ALERT_PERFORMANCE_ISSUE", "ALERT_SETUP_ISSUE"):
+        elif action.action_type in ("PAUSE_CAMPAIGN", "ENABLE_CAMPAIGN", "ALERT_PERFORMANCE_ISSUE", "ALERT_SETUP_ISSUE", "ALERT_MISSING_LANDING_PAGE"):
             campaign_actions.append({
                 "id": action.id,
                 "campaign_name": campaign_name,
@@ -541,7 +677,7 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
     # Non-blocking: if Google Ads API fails, return empty context (modal still works)
     campaign_context = {}
     try:
-        campaign_context = _build_campaign_keyword_context(account, active_only)
+        campaign_context = _build_campaign_keyword_context(account, active_only, campaign_name_map)
     except Exception as e:
         logger.warning(f"Failed to build campaign context for account {account_id}: {e}")
         campaign_context = {}

@@ -126,6 +126,13 @@ def init_db():
             run_audit_review_migration()
         except Exception as me:
             logger.warning(f"Additive audit review access migration skipped/failed: {me}")
+        # Run safe additive migration for campaign knowledge (landing pages, business context, confidence)
+        # MUST run before categories migration since Account model now references business_context
+        try:
+            from backend.migrations.add_campaign_knowledge_schema import run_migration as run_campaign_knowledge_migration
+            run_campaign_knowledge_migration()
+        except Exception as me:
+            logger.warning(f"Additive campaign knowledge migration skipped/failed: {me}")
         # Run safe additive migration for dynamic category management
         try:
             from backend.migrations.add_categories_table import run_migration as run_categories_migration

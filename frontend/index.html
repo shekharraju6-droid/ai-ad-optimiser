@@ -294,6 +294,10 @@
         .review-finding.performance { border-left-color: var(--color-purple); }
         .review-finding.relevance { border-left-color: var(--color-success); }
         .review-finding.campaign { border-left-color: var(--color-text-muted); }
+        .conf-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; letter-spacing: 0.3px; }
+        .conf-high { background: var(--color-success-light); color: var(--color-success-text); }
+        .conf-medium { background: var(--color-warning-light); color: var(--color-warning-text); }
+        .conf-low { background: var(--color-danger-light); color: var(--color-danger-text); }
         .review-campaign-header { font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13px; padding: 10px 8px; background: var(--color-bg-card-hover); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; gap: 8px; color: var(--color-text-primary); }
         .review-campaign-header .paused-badge { font-size: 10px; color: var(--color-warning-text); background: var(--color-warning-light); padding: 2px 6px; border-radius: 4px; margin-left: auto; }
         .review-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px; background: var(--color-bg-card); }
@@ -481,8 +485,46 @@
                 <div id="reviewSelectionCount" style="font-size:0.85rem; font-weight:600;color:var(--color-text-primary);">0 of 0 selected</div>
                 <div style="display:flex; gap:0.5rem;">
                     <button class="btn btn-sm btn-secondary" onclick="closeReviewModal()">Cancel</button>
+                    <button class="btn btn-sm" style="background:var(--color-info);color:#fff;" onclick="openSmartApprovePopup()">Smart Approve</button>
                     <button class="btn btn-sm btn-danger" onclick="confirmRejectSelected()">Reject Selected</button>
                     <button class="btn btn-sm btn-success" onclick="confirmApproveSelected()">Approve Selected</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Smart Approve Popup -->
+    <div id="smartApproveModal" class="modal-overlay hidden" style="z-index:300;">
+        <div class="modal" style="max-width:520px;">
+            <div style="padding:1.5rem;">
+                <h3 style="font-family:'DM Sans',sans-serif; margin:0 0 0.5rem 0;">Smart Approve</h3>
+                <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0 0 1rem 0;">Smart Approve will automatically approve items matching ALL of these criteria:</p>
+                <div style="display:flex; flex-direction:column; gap:1rem;">
+                    <div>
+                        <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:0.3rem;">Confidence</label>
+                        <select id="smartApproveConfidence" class="filter-input" style="width:100%;" onchange="updateSmartApprovePreview()">
+                            <option value="high">HIGH only</option>
+                            <option value="high,medium">HIGH + MEDIUM</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:0.3rem;">Maximum spend (INR)</label>
+                        <input type="number" id="smartApproveMaxSpend" class="filter-input" style="width:100%;" value="500" oninput="updateSmartApprovePreview()">
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:0.3rem;">Conversions</label>
+                        <select id="smartApproveConversions" class="filter-input" style="width:100%;" onchange="updateSmartApprovePreview()">
+                            <option value="zero">Zero only (0 conversions)</option>
+                            <option value="any">Any</option>
+                        </select>
+                    </div>
+                    <div style="background:var(--color-bg-card-hover); padding:0.75rem; border-radius:var(--radius-sm); font-size:0.85rem; font-weight:600;">
+                        <span id="smartApprovePreview">This will approve 0 of 0 items</span>
+                    </div>
+                </div>
+                <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1.5rem;">
+                    <button class="btn btn-sm btn-secondary" onclick="closeSmartApprovePopup()">Cancel</button>
+                    <button class="btn btn-sm btn-success" onclick="applySmartApprove()">Apply Smart Approve</button>
                 </div>
             </div>
         </div>
@@ -818,6 +860,7 @@
             currentUser = await api('GET', '/auth/me');
             showAuth(false);
             initApp();
+            loadSmartApproveDefaults();
         } catch (e) {
             showAuth(true);
         }
@@ -1313,6 +1356,7 @@
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="openAccountDetail(${a.id}, '${a.has_google ? 'google' : 'meta'}')">View</button>
                     ${a.has_google && a.google_is_live && (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin' || currentUser.access_audit_review)) ? `<button class="btn btn-sm btn-success" onclick="runSmartAudit(${a.id})" title="Run keyword + search term audit">Smart Audit</button>` : ''}
+                    ${a.has_google && a.google_is_live && (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin' || currentUser.access_audit_review)) ? `<button class="btn btn-sm btn-secondary" onclick="refreshLandingPages(${a.id})" title="Pull landing page URLs from Google Ads and crawl content">Refresh LP</button>` : ''}
                     <button class="btn btn-secondary btn-sm" onclick="window.location.href='/'">Edit</button>
                 </td>
             `;
@@ -1795,12 +1839,12 @@
     let currentReviewAccountId = null;
     let currentReviewData = null;
     let currentReviewTab = 'keywords';
-    let reviewState = { selected: new Set(), customBudgets: {}, search: {}, sort: {} };
+    let reviewState = { selected: new Set(), customBudgets: {}, search: {}, sort: {}, confidenceFilter: {} };
 
     async function openReviewModal(accountId) {
         currentReviewAccountId = accountId;
         currentReviewTab = 'keywords';
-        reviewState = { selected: new Set(), customBudgets: {}, search: {}, sort: {} };
+        reviewState = { selected: new Set(), customBudgets: {}, search: {}, sort: {}, confidenceFilter: {} };
         try {
             const data = await api('GET', '/adpulse/approval-queue/' + accountId + '/review');
             currentReviewData = data;
@@ -1816,7 +1860,7 @@
         $('reviewModal').classList.add('hidden');
         currentReviewAccountId = null;
         currentReviewData = null;
-        reviewState = { selected: new Set(), customBudgets: {}, search: {}, sort: {} };
+        reviewState = { selected: new Set(), customBudgets: {}, search: {}, sort: {}, confidenceFilter: {} };
     }
 
     function updateReviewTabCounts(data) {
@@ -1845,10 +1889,16 @@
         updateReviewSelectionCount();
     }
 
+    function _displayCampaignName(name, campaignId) {
+        if (name && !/^\d+$/.test(String(name).trim())) return name;
+        if (campaignId) return 'Campaign #' + campaignId;
+        return name || 'Unknown';
+    }
+
     function _groupByCampaign(items) {
         const groups = {};
         items.forEach(item => {
-            const cname = item.campaign_name || 'Unknown';
+            const cname = _displayCampaignName(item.campaign_name, item.campaign_id);
             if (!groups[cname]) groups[cname] = { campaign_name: cname, campaign_id: item.campaign_id, items: [] };
             groups[cname].items.push(item);
         });
@@ -1857,19 +1907,31 @@
 
     function _reviewFilter(items, tab) {
         const q = (reviewState.search[tab] || '').toLowerCase();
-        if (!q) return items;
+        const cf = reviewState.confidenceFilter[tab] || 'all';
         return items.filter(i => {
             const text = (i.keyword_text || i.search_term || i.campaign_name || '').toLowerCase();
-            return text.includes(q);
+            if (q && !text.includes(q)) return false;
+            if (cf !== 'all') {
+                const conf = (i.confidence || 'MEDIUM').toLowerCase();
+                if (cf === 'high' && conf !== 'high') return false;
+                if (cf === 'medium' && conf !== 'medium') return false;
+                if (cf === 'low' && conf !== 'low') return false;
+            }
+            return true;
         });
     }
 
+    function _confidenceScore(item) {
+        return item.confidence_score || 0;
+    }
+
     function _reviewSort(items, tab) {
-        const sort = reviewState.sort[tab] || 'spend';
+        const sort = reviewState.sort[tab] || 'confidence';
         const sorted = [...items];
         if (sort === 'spend') return sorted.sort((a, b) => (b.spend_30d || b.spend || 0) - (a.spend_30d || a.spend || 0));
         if (sort === 'clicks') return sorted.sort((a, b) => (b.clicks_30d || b.clicks || 0) - (a.clicks_30d || a.clicks || 0));
         if (sort === 'campaign') return sorted.sort((a, b) => (a.campaign_name || '').localeCompare(b.campaign_name || ''));
+        if (sort === 'confidence') return sorted.sort((a, b) => _confidenceScore(b) - _confidenceScore(a));
         return sorted;
     }
 
@@ -1904,6 +1966,29 @@
         }).join('') + '</div>';
     }
 
+    function _confidenceBadge(item) {
+        const conf = (item.confidence || 'MEDIUM').toUpperCase();
+        const score = item.confidence_score;
+        const scoreText = (score !== null && score !== undefined) ? ' ' + score + '%' : '';
+        if (conf === 'HIGH') {
+            return `<span class="conf-badge conf-high" title="High confidence">HIGH${scoreText}</span>`;
+        }
+        if (conf === 'MEDIUM') {
+            return `<span class="conf-badge conf-medium" title="Medium confidence">MEDIUM${scoreText}</span>`;
+        }
+        if (conf === 'LOW') {
+            return `<span class="conf-badge conf-low" title="Low confidence">LOW${scoreText}</span>`;
+        }
+        return '';
+    }
+
+    function _confidenceSummary(items) {
+        const high = items.filter(i => (i.confidence || 'MEDIUM').toUpperCase() === 'HIGH').length;
+        const medium = items.filter(i => (i.confidence || 'MEDIUM').toUpperCase() === 'MEDIUM').length;
+        const low = items.filter(i => (i.confidence || 'MEDIUM').toUpperCase() === 'LOW').length;
+        return `${items.length} items: ${high} High | ${medium} Medium | ${low} Low`;
+    }
+
     function formatMoneyINR(n) {
         if (n === null || n === undefined || isNaN(n)) return '—';
         return 'INR ' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1926,16 +2011,28 @@
                 <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.8rem;font-weight:600;">
                     <input type="checkbox" id="reviewSelectAll_${tab}" onchange="toggleReviewSelectAll('${tab}')"> Select All
                 </label>
-                <select class="filter-input" style="width:150px;" onchange="setReviewSort('${tab}', this.value)">
+                <select class="filter-input" style="width:160px;" onchange="setReviewSort('${tab}', this.value)">
+                    <option value="confidence" ${reviewState.sort[tab] === 'confidence' || !reviewState.sort[tab] ? 'selected' : ''}>Sort by Confidence</option>
                     <option value="spend" ${reviewState.sort[tab] === 'spend' ? 'selected' : ''}>Sort by Spend</option>
                     <option value="clicks" ${reviewState.sort[tab] === 'clicks' ? 'selected' : ''}>Sort by Clicks</option>
                     <option value="campaign" ${reviewState.sort[tab] === 'campaign' ? 'selected' : ''}>Sort by Campaign</option>
                 </select>
+                <select class="filter-input" style="width:130px;" onchange="setReviewConfidenceFilter('${tab}', this.value)">
+                    <option value="all" ${(reviewState.confidenceFilter[tab] || 'all') === 'all' ? 'selected' : ''}>Filter: All</option>
+                    <option value="high" ${reviewState.confidenceFilter[tab] === 'high' ? 'selected' : ''}>Filter: High</option>
+                    <option value="medium" ${reviewState.confidenceFilter[tab] === 'medium' ? 'selected' : ''}>Filter: Medium</option>
+                    <option value="low" ${reviewState.confidenceFilter[tab] === 'low' ? 'selected' : ''}>Filter: Low</option>
+                </select>
                 <input type="text" class="review-search" placeholder="Search..." value="${escapeHtml(reviewState.search[tab] || '')}" oninput="setReviewSearch('${tab}', this.value)">
             </div>
+            <div style="padding:0.4rem 0.75rem; font-size:0.78rem; font-weight:600; color:var(--color-text-muted);" id="reviewConfSummary_${tab}">${_confidenceSummary(items)}</div>
         `;
 
         const filtered = _reviewSort(_reviewFilter(items, tab), tab);
+
+        // Update confidence summary with filtered items
+        const summaryEl = $('reviewConfSummary_' + tab);
+        if (summaryEl) summaryEl.textContent = _confidenceSummary(filtered);
 
         if (tab === 'keywords' || tab === 'negatives') {
             html += '<div style="border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden;" id="reviewTableWrapper">';
@@ -1959,6 +2056,7 @@
                                 <div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
                                     <input type="checkbox" data-review-id="${repId}" ${disabled ? 'disabled' : ''} onchange="toggleReviewMergedItem('${tab}', '${i.campaign_id || ''}', '${escapeHtml(i.keyword_text || i.search_term || '')}', this.checked)">
                                     <div style="font-weight:600; font-size:0.85rem;">${escapeHtml(i.keyword_text)}</div>
+                                    ${_confidenceBadge(i)}
                                     <div style="margin-left:auto; font-size:0.75rem; color:var(--color-text-muted);">${escapeHtml(i.match_type || '')} | ${formatMoneyINR(i.spend_30d)} | ${i.clicks_30d || 0} clicks | ${i.conversions_30d || 0} conv | ${formatPct(i.ctr)} CTR</div>
                                 </div>
                                 <div style="font-size:0.72rem; color:var(--color-text-muted); margin-left:1.9rem; margin-top:0.1rem;">Campaign: ${escapeHtml(i.campaign_name)} · Ad group: ${escapeHtml(i.ad_group_name || '-')}</div>
@@ -2013,6 +2111,7 @@
                                 <div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
                                     <input type="checkbox" data-review-id="${repId}" ${disabled ? 'disabled' : ''} onchange="toggleReviewMergedItem('${tab}', '${i.campaign_id || ''}', '${escapeHtml(i.search_term || '')}', this.checked)">
                                     <div style="font-weight:600; font-size:0.85rem;">${escapeHtml(i.search_term)}</div>
+                                    ${_confidenceBadge(i)}
                                     <div style="margin-left:auto; font-size:0.75rem; color:var(--color-text-muted);">${formatMoneyINR(i.spend)} | ${i.clicks || 0} clicks | ${i.conversions || 0} conv | ${formatPct(i.ctr)} CTR</div>
                                 </div>
                                 <div style="font-size:0.72rem; color:var(--color-text-muted); margin-left:1.9rem; margin-top:0.1rem;">Campaign: ${escapeHtml(i.campaign_name)} · Level: ${escapeHtml(i.level || 'campaign')}</div>
@@ -2087,6 +2186,11 @@
 
     function setReviewSort(tab, value) {
         reviewState.sort[tab] = value;
+        renderReviewTab(tab);
+    }
+
+    function setReviewConfidenceFilter(tab, value) {
+        reviewState.confidenceFilter[tab] = value;
         renderReviewTab(tab);
     }
 
@@ -2199,6 +2303,89 @@
         const selectedCount = selectable.filter(_isMergedItemSelected).length;
         const total = selectable.length;
         $('reviewSelectionCount').textContent = selectedCount + ' of ' + total + ' selected';
+    }
+
+    // ---- Smart Approve ----
+    let smartApproveDefaults = { confidence: 'high', max_spend: 500, conversions: 'zero', auto: 'off' };
+
+    async function loadSmartApproveDefaults() {
+        try {
+            const settings = await api('GET', '/smart-approve-settings');
+            smartApproveDefaults = {
+                confidence: settings.smart_approve_confidence || 'high',
+                max_spend: parseFloat(settings.smart_approve_max_spend) || 500,
+                conversions: settings.smart_approve_conversions || 'zero',
+                auto: settings.smart_approve_auto || 'off',
+            };
+        } catch (e) {
+            // use built-in defaults
+        }
+    }
+
+    function openSmartApprovePopup() {
+        $('smartApproveConfidence').value = smartApproveDefaults.confidence || 'high';
+        $('smartApproveMaxSpend').value = smartApproveDefaults.max_spend || 500;
+        $('smartApproveConversions').value = smartApproveDefaults.conversions || 'zero';
+        updateSmartApprovePreview();
+        $('smartApproveModal').classList.remove('hidden');
+    }
+
+    function closeSmartApprovePopup() {
+        $('smartApproveModal').classList.add('hidden');
+    }
+
+    function _smartApproveMatchingItems() {
+        if (!currentReviewData) return { matching: [], total: 0 };
+        const confSetting = $('smartApproveConfidence').value;
+        const maxSpend = parseFloat($('smartApproveMaxSpend').value) || 0;
+        const convSetting = $('smartApproveConversions').value;
+        const confLevels = confSetting === 'high,medium' ? ['HIGH', 'MEDIUM'] : ['HIGH'];
+
+        const allTabs = ['keywords', 'negatives', 'budget', 'campaigns'];
+        const allItems = [];
+        allTabs.forEach(tab => {
+            const items = _mergedItemsForTab(tab);
+            items.forEach(i => {
+                if (i.campaign_status && i.campaign_status.toUpperCase() !== 'ENABLED') return;
+                allItems.push({ tab, item: i });
+            });
+        });
+
+        const matching = allItems.filter(({ item: i }) => {
+            const conf = (i.confidence || 'MEDIUM').toUpperCase();
+            if (!confLevels.includes(conf)) return false;
+            const spend = i.spend_30d || i.spend || 0;
+            if (spend > maxSpend) return false;
+            const conv = i.conversions_30d !== undefined ? i.conversions_30d : (i.conversions || 0);
+            if (convSetting === 'zero' && conv !== 0) return false;
+            return true;
+        });
+        return { matching, total: allItems.length };
+    }
+
+    function updateSmartApprovePreview() {
+        const { matching, total } = _smartApproveMatchingItems();
+        $('smartApprovePreview').textContent = `This will approve ${matching.length} of ${total} items`;
+    }
+
+    function applySmartApprove() {
+        const { matching } = _smartApproveMatchingItems();
+        if (!matching.length) { toast('No items match the criteria', true); return; }
+        // Clear current selection
+        reviewState.selected = new Set();
+        // Select all matching items
+        matching.forEach(({ item: i }) => {
+            const ids = i.queue_item_ids || [i.id];
+            ids.forEach(id => reviewState.selected.add(id));
+        });
+        // Sync checkboxes across all tabs
+        ['keywords', 'negatives', 'budget', 'campaigns'].forEach(tab => {
+            try { syncReviewCheckboxes(tab); } catch (e) {}
+        });
+        updateReviewSelectionCount();
+        closeSmartApprovePopup();
+        // Trigger normal approval confirmation
+        confirmApproveSelected();
     }
 
     function confirmApproveSelected() {
@@ -2390,9 +2577,20 @@
         } catch (e) { toast(e.message, true); }
     }
 
+    async function refreshLandingPages(id) {
+        try {
+            toast('Fetching landing pages from Google Ads...');
+            const result = await api('POST', '/accounts/' + id + '/refresh-landing-pages');
+            const f = result.fetch || {};
+            const c = result.crawl || {};
+            toast(`Landing pages: ${f.campaigns_found || 0} campaigns, ${f.missing_alerts || 0} missing alerts, ${c.crawled || 0} crawled`);
+        } catch (e) { toast(e.message, true); }
+    }
+
     async function openAuditSettings() {
         try {
             const settings = await api('GET', '/audit-settings');
+            const saSettings = await api('GET', '/smart-approve-settings');
             const fields = [
                 { key: 'smart_audit_keyword_min_spend_inr', label: 'Non-performing keyword min spend (INR)', type: 'number' },
                 { key: 'smart_audit_search_term_min_clicks', label: 'Search term min clicks to flag', type: 'number' },
@@ -2403,7 +2601,7 @@
             ];
             let html = `
                 <div id="auditSettingsModal" class="modal-overlay" onclick="if(event.target===this) closeAuditSettings()" style="display:flex;">
-                    <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
+                    <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;max-height:90vh;overflow-y:auto;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
                             <h2>Audit Settings</h2>
                             <button class="btn btn-sm btn-secondary" onclick="closeAuditSettings()">Close</button>
@@ -2415,6 +2613,33 @@
                                     <input type="${f.type}" id="auditSetting_${f.key}" value="${escapeHtml(String(settings[f.key] || ''))}" class="filter-input">
                                 </div>
                             `).join('')}
+                            <hr style="border:none;border-top:1px solid var(--color-border);margin:0.5rem 0;">
+                            <h3 style="font-family:'DM Sans',sans-serif;font-size:0.95rem;margin:0;">Smart Approve Defaults</h3>
+                            <div class="form-group">
+                                <label>Default confidence threshold</label>
+                                <select id="saSetting_confidence" class="filter-input">
+                                    <option value="high" ${saSettings.smart_approve_confidence === 'high' ? 'selected' : ''}>HIGH only</option>
+                                    <option value="high,medium" ${saSettings.smart_approve_confidence === 'high,medium' ? 'selected' : ''}>HIGH + MEDIUM</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Default max spend (INR)</label>
+                                <input type="number" id="saSetting_max_spend" value="${escapeHtml(String(saSettings.smart_approve_max_spend || '500'))}" class="filter-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Default conversion filter</label>
+                                <select id="saSetting_conversions" class="filter-input">
+                                    <option value="zero" ${saSettings.smart_approve_conversions === 'zero' ? 'selected' : ''}>Zero only</option>
+                                    <option value="any" ${saSettings.smart_approve_conversions === 'any' ? 'selected' : ''}>Any</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Auto Smart Approve (run automatically after daily audit)</label>
+                                <select id="saSetting_auto" class="filter-input">
+                                    <option value="off" ${saSettings.smart_approve_auto !== 'on' ? 'selected' : ''}>OFF</option>
+                                    <option value="on" ${saSettings.smart_approve_auto === 'on' ? 'selected' : ''}>ON</option>
+                                </select>
+                            </div>
                         </div>
                         <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;">
                             <button class="btn btn-primary" onclick="saveAuditSettings()">Save</button>
@@ -2448,6 +2673,24 @@
                 if (!input) continue;
                 await api('PUT', '/audit-settings/' + key, { value: input.value });
             }
+            // Save Smart Approve defaults
+            const saConf = $('saSetting_confidence') ? $('saSetting_confidence').value : 'high';
+            const saMaxSpend = $('saSetting_max_spend') ? $('saSetting_max_spend').value : '500';
+            const saConv = $('saSetting_conversions') ? $('saSetting_conversions').value : 'zero';
+            const saAuto = $('saSetting_auto') ? $('saSetting_auto').value : 'off';
+            await api('PUT', '/smart-approve-settings', {
+                smart_approve_confidence: saConf,
+                smart_approve_max_spend: saMaxSpend,
+                smart_approve_conversions: saConv,
+                smart_approve_auto: saAuto,
+            });
+            // Update in-memory defaults
+            smartApproveDefaults = {
+                confidence: saConf,
+                max_spend: parseFloat(saMaxSpend) || 500,
+                conversions: saConv,
+                auto: saAuto,
+            };
             toast('Audit settings saved');
             closeAuditSettings();
         } catch (e) { toast(e.message, true); }

@@ -4,11 +4,17 @@ Smart Search Term Auditor for Google Ads.
 Uses Gemini to classify search terms as RELEVANT or IRRELEVANT per campaign,
 then creates PendingAction recommendations to add EXACT negative keywords
 at the campaign level. No auto-application.
+
+Enhanced with:
+  - Landing page context (crawled summary per campaign)
+  - Business context + negative rules per account
+  - Past approved/rejected patterns for feedback loop
+  - Confidence scoring (HIGH/MEDIUM/LOW + 0-100)
 """
 import json
 import logging
 import time
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Dict, Any, List, Optional
 
 from sqlalchemy.orm import Session
@@ -18,6 +24,7 @@ from backend.db.models import Account, CampaignTypeTag, PendingAction, Suppresse
 from backend.services.ai_client import get_gemini_client
 from backend.services.connectors import get_connector
 from backend.services.audit_settings import get_int_setting
+from backend.services.landing_page_service import get_landing_page_summary
 from google.genai import types
 
 logger = logging.getLogger("AdOptima")
@@ -60,6 +67,28 @@ def _is_suppressed(db: Session, account_id: int, campaign_id: str, term: str) ->
     return row is not None
 
 
+def _build_campaign_name_map(campaigns: List[Dict[str, Any]]) -> Dict[str, str]:
+    """Build a campaign_id -> campaign_name lookup from the campaigns list."""
+    name_map: Dict[str, str] = {}
+    for camp in campaigns:
+        cid = str(camp.get("id") or "")
+        name = camp.get("name") or ""
+        if cid and name:
+            name_map[cid] = name
+    return name_map
+
+
+def _resolve_campaign_name(campaign_id: str, fallback_name: str, name_map: Dict[str, str]) -> str:
+    """Return a readable campaign name, falling back to name_map when fallback_name is empty/numeric."""
+    if fallback_name and not fallback_name.strip().isdigit():
+        return fallback_name
+    if campaign_id and str(campaign_id) in name_map:
+        return name_map[str(campaign_id)]
+    if fallback_name:
+        return fallback_name
+    return campaign_id or "Unknown"
+
+
 def _already_pending(db: Session, account_id: int, campaign_id: str, term: str) -> bool:
     existing = db.query(PendingAction).filter(
         PendingAction.account_id == account_id,
@@ -71,45 +100,128 @@ def _already_pending(db: Session, account_id: int, campaign_id: str, term: str) 
     return existing is not None
 
 
-def _classify_search_terms_batch(client, account: Account, campaign_name: str, terms_with_metrics: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Send up to 100 search terms to Gemini and return classifications."""
+def _past_patterns(db: Session, account_id: int, campaign_id: str) -> Dict[str, List[str]]:
+    """Return past approved (confirmed irrelevant) and rejected (actually relevant) search terms.
+
+    Looks back 90 days. Limits each list to 50 items.
+    """
+    cutoff = datetime.utcnow() - timedelta(days=90)
+    rows = db.query(PendingAction).filter(
+        PendingAction.account_id == account_id,
+        PendingAction.campaign_id == campaign_id,
+        PendingAction.action_type.in_(("SMART_ADD_NEGATIVE_KEYWORD", "ADD_NEGATIVE_KEYWORD")),
+        PendingAction.status.in_(("applied", "rejected")),
+        PendingAction.created_at >= cutoff,
+    ).all()
+    approved = []
+    rejected = []
+    for r in rows:
+        term = r.keyword or ""
+        if not term:
+            continue
+        if r.status == "applied" and len(approved) < 50:
+            approved.append(term)
+        elif r.status == "rejected" and len(rejected) < 50:
+            rejected.append(term)
+    return {"approved": approved, "rejected": rejected}
+
+
+def _classify_search_terms_batch(
+    client,
+    account: Account,
+    campaign_name: str,
+    campaign_id: str,
+    terms_with_metrics: List[Dict[str, Any]],
+    db: Session,
+) -> List[Dict[str, Any]]:
+    """Send up to 100 search terms to Gemini and return classifications with confidence."""
     if not terms_with_metrics:
         return []
 
     brand_terms = _brand_terms_for_account(account)
     client_name = account.name or "the client"
-    category = account.group.name if account.group else "general"
+    category = account.category.name if account.category else (account.group.name if account.group else "general")
+    business_context = (account.business_context or "").strip() or "Not provided"
+    negative_rules = (account.negative_rules or "").strip() or "Not provided"
+
+    # Landing page summary
+    lp_summary_text = "Not available — landing page was not crawled"
+    try:
+        lp = get_landing_page_summary(db, account.id, campaign_id)
+        if lp and lp.get("summary"):
+            lp_summary_text = json.dumps(lp["summary"], ensure_ascii=False, indent=2)
+        elif lp and lp.get("url"):
+            lp_summary_text = f"Landing page URL: {lp['url']} (not yet crawled)"
+    except Exception:
+        pass
+
+    # Past patterns
+    past = _past_patterns(db, account.id, campaign_id)
+    past_approved = ", ".join(past["approved"]) if past["approved"] else "None"
+    past_rejected = ", ".join(past["rejected"]) if past["rejected"] else "None"
 
     lines = []
     for t in terms_with_metrics:
         lines.append(f"- '{t['term']}' | clicks={t['clicks']} | spend=Rs {t['spend']:.0f} | impressions={t['impressions']} | conversions={t['conversions']}")
     terms_block = "\n".join(lines)
 
-    prompt = f"""You are a Google Ads search term auditor for the company: {client_name}
-Industry/Category: {category}
-Brand terms: {brand_terms}
-Campaign name: {campaign_name}
+    prompt = f"""You are a Google Ads search term auditor.
 
-Below is a list of search terms that triggered ads for this campaign in the last 30 days. For each search term, classify it as either RELEVANT or IRRELEVANT.
+CLIENT INFORMATION:
+Name: {client_name}
+Category: {category}
+Brand terms: {brand_terms}
+
+BUSINESS CONTEXT (provided by the account manager):
+{business_context}
+
+ALWAYS IRRELEVANT RULES:
+{negative_rules}
+
+CAMPAIGN: {campaign_name}
+
+LANDING PAGE SUMMARY:
+{lp_summary_text}
+
+PAST PATTERNS:
+The following search terms were previously REJECTED by the human reviewer (meaning the AI incorrectly flagged them as irrelevant — they are actually RELEVANT):
+{past_rejected}
+
+The following search terms were previously APPROVED by the human reviewer (confirmed irrelevant):
+{past_approved}
+
+Learn from these past decisions. Do not repeat mistakes the human already corrected.
+
+TASK:
+For each search term below, classify as RELEVANT or IRRELEVANT and assign a confidence score.
 
 A search term is IRRELEVANT if:
-- It has no logical connection to the client's business or the campaign's intent
-- It contains "free", "salary", "jobs", "career", "recruitment" (unless the client is in recruitment)
-- It is about a competitor by name
+- It has no connection to what the landing page offers
+- It matches any "always irrelevant" rule
+- It shows intent for something the client does NOT offer (e.g. "free" for a paid service)
+- It is about a competitor
 - It is geographically irrelevant
-- It is seeking information that the client does not offer
-- It is clearly a different intent (e.g., someone searching for downloads, torrents, reviews of something unrelated)
+- Past approved negatives confirm similar terms are bad
 
 A search term is RELEVANT if:
-- It relates to the client's products, services, or industry
-- It shows purchase/enquiry intent aligned with the campaign
+- It relates to the landing page product/service
+- It shows purchase/enquiry intent matching the campaign
+- Past rejections confirm similar terms are actually good
+- When in doubt, lean toward RELEVANT
 
-Return ONLY a valid JSON array with this format:
+CONFIDENCE SCORING:
+- HIGH (90-100%): Very clear. The term is obviously irrelevant or obviously relevant. Landing page context and past patterns strongly support the classification.
+- MEDIUM (60-89%): Likely correct but some ambiguity. The term could be interpreted differently.
+- LOW (below 60%): Uncertain. The term is borderline. Human review strongly recommended.
+
+Return ONLY a valid JSON array:
 [
   {{
-    "search_term": "the exact search term",
+    "search_term": "exact search term",
     "classification": "RELEVANT" or "IRRELEVANT",
-    "reason": "brief reason for classification"
+    "confidence": "HIGH" or "MEDIUM" or "LOW",
+    "confidence_score": 85,
+    "reason": "brief explanation referencing the landing page content or business context"
   }}
 ]
 
@@ -155,6 +267,9 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
         if not connector or not connector.is_valid:
             return {"error": "Google Ads connector not valid", "actions_generated": 0}
 
+        campaigns = connector.fetch_campaigns()
+        campaign_name_map = _build_campaign_name_map(campaigns)
+
         tags = db.query(CampaignTypeTag).filter(CampaignTypeTag.account_id == account_id).all()
         tags_map = {t.campaign_id: t.campaign_type for t in tags}
 
@@ -171,8 +286,9 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
             if not cid:
                 continue
             if cid not in by_campaign:
+                resolved_name = _resolve_campaign_name(cid, term.get("campaign_name", ""), campaign_name_map)
                 by_campaign[cid] = {
-                    "campaign_name": term.get("campaign_name", ""),
+                    "campaign_name": resolved_name,
                     "campaign_status": str(term.get("campaign_status") or "ENABLED").upper(),
                     "terms": [],
                 }
@@ -216,7 +332,7 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
             # Batch in chunks of 100
             for i in range(0, len(candidates), 100):
                 batch = candidates[i:i+100]
-                classifications = _classify_search_terms_batch(client, account, campaign_name, batch)
+                classifications = _classify_search_terms_batch(client, account, campaign_name, cid, batch, db)
                 total_classified += len(batch)
                 time.sleep(2)  # small delay between Gemini calls
 
@@ -229,6 +345,13 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
                         continue
                     if classification.get("classification", "").upper() != "IRRELEVANT":
                         continue
+
+                    confidence = (classification.get("confidence") or "MEDIUM").upper()
+                    confidence_score = None
+                    try:
+                        confidence_score = int(classification.get("confidence_score"))
+                    except Exception:
+                        pass
 
                     actions.append(PendingAction(
                         account_id=account_id,
@@ -252,9 +375,13 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
                                 "ctr": term.get("ctr", 0),
                             },
                             "gemini_reason": classification.get("reason", ""),
+                            "confidence": confidence,
+                            "confidence_score": confidence_score,
                         },
                         status="pending",
                         campaign_status="ENABLED",
+                        confidence=confidence,
+                        confidence_score=confidence_score,
                     ))
 
         for action in actions:

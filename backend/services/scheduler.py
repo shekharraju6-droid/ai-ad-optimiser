@@ -61,6 +61,13 @@ def _run_daily_smart_audit():
         for account in accounts:
             try:
                 logger.info(f"Smart auditing account: {account.name} (id={account.id})")
+                # Pull landing page URLs and crawl stale pages BEFORE keyword/search term audits
+                try:
+                    from backend.services.landing_page_service import fetch_campaign_landing_pages, crawl_stale_landing_pages
+                    fetch_campaign_landing_pages(account.id, db=db)
+                    crawl_stale_landing_pages(account.id, db=db)
+                except Exception as lpe:
+                    logger.warning(f"Landing page fetch/crawl failed for {account.name}: {lpe}")
                 kw_result = run_keyword_audit(account.id, db=db)
                 time.sleep(5)
                 st_result = run_search_term_audit(account.id, db=db)
@@ -117,6 +124,14 @@ def run_manual_smart_audit(account_id: int) -> Dict[str, Any]:
         db.add(run)
         db.commit()
         db.refresh(run)
+
+        # Pull landing page URLs and crawl stale pages before audit
+        try:
+            from backend.services.landing_page_service import fetch_campaign_landing_pages, crawl_stale_landing_pages
+            fetch_campaign_landing_pages(account_id, db=db)
+            crawl_stale_landing_pages(account_id, db=db)
+        except Exception as lpe:
+            logger.warning(f"Landing page fetch/crawl failed for account {account_id}: {lpe}")
 
         kw_result = run_keyword_audit(account_id, db=db)
         st_result = run_search_term_audit(account_id, db=db)

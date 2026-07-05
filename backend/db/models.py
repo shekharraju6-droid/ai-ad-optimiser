@@ -142,6 +142,10 @@ class Account(Base):
     # Keyword / search term audit brand settings
     brand_keywords = Column(Text, nullable=True)  # comma-separated brand terms
 
+    # AI Knowledge (optional business context for smarter audits)
+    business_context = Column(Text, nullable=True)
+    negative_rules = Column(Text, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -210,6 +214,8 @@ class Account(Base):
             "rev_client_id": self.rev_client_id,
             "brand_name": self.brand_name,
             "brand_keywords": self.brand_keywords,
+            "business_context": self.business_context,
+            "negative_rules": self.negative_rules,
             "contact_person": self.contact_person,
             "contact_email": self.contact_email,
             "contact_phone": self.contact_phone,
@@ -316,6 +322,8 @@ class PendingAction(Base):
     estimated_savings = Column(Float, nullable=True)
     status = Column(String, default="pending")  # pending, approved, rejected, applied, failed, dismissed
     campaign_status = Column(String, default="ENABLED")  # ENABLED/PAUSED/REMOVED at audit time
+    confidence = Column(String, nullable=True)  # HIGH / MEDIUM / LOW
+    confidence_score = Column(Integer, nullable=True)  # 0 to 100
     requested_by = Column(String, nullable=True)
     reviewed_by = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -347,6 +355,8 @@ class PendingAction(Base):
             "applied_at": self.applied_at.isoformat() if self.applied_at else None,
             "error_message": self.error_message,
             "campaign_status": self.campaign_status,
+            "confidence": self.confidence,
+            "confidence_score": self.confidence_score,
         }
 
 
@@ -718,3 +728,33 @@ class AppSetting(Base):
 
     def to_dict(self):
         return {"id": self.id, "key": self.key, "value": self.value}
+
+
+class CampaignLandingPage(Base):
+    """Landing page URL + crawled content per campaign, used for smarter search term audits."""
+    __tablename__ = "campaign_landing_pages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False, index=True)
+    campaign_id = Column(String, nullable=False)
+    campaign_name = Column(String, nullable=True)
+    landing_page_url = Column(String, nullable=True)
+    landing_page_content = Column(Text, nullable=True)  # JSON summary from Gemini
+    last_crawled_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    account = relationship("Account")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "account_id": self.account_id,
+            "campaign_id": self.campaign_id,
+            "campaign_name": self.campaign_name,
+            "landing_page_url": self.landing_page_url,
+            "landing_page_content": self.landing_page_content,
+            "last_crawled_at": self.last_crawled_at.isoformat() if self.last_crawled_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }

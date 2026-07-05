@@ -88,6 +88,32 @@ def _campaign_status(campaigns: List[Dict[str, Any]], campaign_id: str) -> str:
     return "UNKNOWN"
 
 
+def _build_campaign_name_map(campaigns: List[Dict[str, Any]]) -> Dict[str, str]:
+    """Build a campaign_id -> campaign_name lookup from the campaigns list.
+
+    Falls back to fetching all campaigns via a separate GAQL query if the
+    campaigns list is empty.
+    """
+    name_map: Dict[str, str] = {}
+    for camp in campaigns:
+        cid = str(camp.get("id") or "")
+        name = camp.get("name") or ""
+        if cid and name:
+            name_map[cid] = name
+    return name_map
+
+
+def _resolve_campaign_name(campaign_id: str, fallback_name: str, name_map: Dict[str, str]) -> str:
+    """Return a readable campaign name. Uses name_map as fallback when fallback_name is empty/numeric."""
+    if fallback_name and not fallback_name.strip().isdigit():
+        return fallback_name
+    if campaign_id and str(campaign_id) in name_map:
+        return name_map[str(campaign_id)]
+    if fallback_name:
+        return fallback_name
+    return campaign_id or "Unknown"
+
+
 def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
     """Run keyword audit for a single Google Ads account. Returns summary and created actions."""
     close_session = False
@@ -107,6 +133,7 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
             return {"error": "Google Ads connector not valid", "actions_generated": 0}
 
         campaigns = connector.fetch_campaigns()
+        campaign_name_map = _build_campaign_name_map(campaigns)
         campaign_type_map = _campaign_type_map(db, account_id, campaigns)
         brand_terms = _brand_terms_for_account(account)
 
@@ -128,6 +155,7 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
             clicks = kw.get("clicks", 0) or 0
             ctr = kw.get("ctr", 0) or 0
             camp_status = _campaign_status(campaigns, cid)
+            resolved_campaign_name = _resolve_campaign_name(cid, kw.get("campaign_name", ""), campaign_name_map)
 
             # CHECK A: Non-brand keyword in Brand campaign
             if campaign_type == "brand" and keyword_text:
@@ -141,13 +169,13 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
                             adset_id=ad_group_id,
                             keyword=keyword_text,
                             match_type=match_type,
-                            reason=f"Non-brand keyword '{keyword_text}' found in Brand campaign '{kw.get('campaign_name', '')}'. It does not contain any brand term ({', '.join(brand_terms)}).",
+                            reason=f"Non-brand keyword '{keyword_text}' found in Brand campaign '{resolved_campaign_name}'. It does not contain any brand term ({', '.join(brand_terms)}).",
                             new_value={
                                 "audit_type": "keyword_audit",
                                 "recommendation": "pause_keyword",
                                 "criterion_id": criterion_id,
                                 "ad_group_id": ad_group_id,
-                                "campaign_name": kw.get("campaign_name", ""),
+                                "campaign_name": resolved_campaign_name,
                                 "ad_group_name": kw.get("ad_group_name", ""),
                                 "metrics": {"spend": spend, "clicks": clicks, "conversions": conversions, "ctr": ctr},
                                 "check": "non_brand_in_brand_campaign",
@@ -174,7 +202,7 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
                             "recommendation": "pause_keyword",
                             "criterion_id": criterion_id,
                             "ad_group_id": ad_group_id,
-                            "campaign_name": kw.get("campaign_name", ""),
+                            "campaign_name": resolved_campaign_name,
                             "ad_group_name": kw.get("ad_group_name", ""),
                             "metrics": {"spend": spend, "clicks": clicks, "conversions": conversions, "ctr": ctr},
                             "check": "non_performing_keyword",

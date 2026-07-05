@@ -104,6 +104,8 @@ class AccountCreate(BaseModel):
     adpulse_refresh_interval: Optional[int] = None
     adpulse_audit_interval: Optional[int] = None
     brand_keywords: Optional[str] = None
+    business_context: Optional[str] = None
+    negative_rules: Optional[str] = None
 
 
 class AccountUpdate(BaseModel):
@@ -136,6 +138,8 @@ class AccountUpdate(BaseModel):
 
     brand_name: Optional[str] = None
     brand_keywords: Optional[str] = None
+    business_context: Optional[str] = None
+    negative_rules: Optional[str] = None
     contact_person: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -270,6 +274,8 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
         target_cpa=req.target_cpa,
         brand_name=req.brand_name,
         brand_keywords=req.brand_keywords,
+        business_context=req.business_context,
+        negative_rules=req.negative_rules,
         contact_person=req.contact_person,
         contact_email=req.contact_email,
         contact_phone=req.contact_phone,
@@ -397,6 +403,10 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.brand_name = req.brand_name or None
     if req.brand_keywords is not None:
         account.brand_keywords = req.brand_keywords or None
+    if req.business_context is not None:
+        account.business_context = req.business_context or None
+    if req.negative_rules is not None:
+        account.negative_rules = req.negative_rules or None
     if req.contact_person is not None:
         account.contact_person = req.contact_person or None
     if req.contact_email is not None:

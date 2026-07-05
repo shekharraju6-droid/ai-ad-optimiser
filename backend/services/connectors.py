@@ -408,6 +408,53 @@ class GoogleAdsConnector(AdsConnector):
             logger.error(f"Google fetch campaign negatives failed for account {self.account.id}: {e}")
             return []
 
+    def fetch_landing_pages(self) -> List[Dict[str, Any]]:
+        """Fetch landing page URLs per campaign from active ad_group_ad rows.
+
+        Picks the ad with the highest impressions per campaign as the primary landing page.
+
+        Returns list of dicts: {campaign_id, campaign_name, landing_page_url}
+        Campaigns with no final_url return landing_page_url=None.
+        """
+        if not self.is_valid:
+            return []
+        customer_id = (self.account.google_external_id or self.account.external_id or "").replace("-", "")
+        if not customer_id:
+            return []
+        query = """
+            SELECT
+              campaign.id,
+              campaign.name,
+              ad_group_ad.ad.final_urls,
+              metrics.impressions
+            FROM ad_group_ad
+            WHERE campaign.status = 'ENABLED'
+              AND ad_group_ad.status = 'ENABLED'
+              AND ad_group.status = 'ENABLED'
+        """
+        try:
+            service = self.client.get_service("GoogleAdsService")
+            response = service.search(customer_id=customer_id, query=query)
+            best: Dict[str, Dict[str, Any]] = {}
+            for row in response:
+                cid = str(row.campaign.id)
+                cname = row.campaign.name
+                impressions = row.metrics.impressions or 0
+                final_urls_field = row.ad_group_ad.ad.final_urls
+                urls = list(final_urls_field) if final_urls_field else []
+                url = urls[0] if urls else None
+                if cid not in best or impressions > best[cid].get("impressions", -1):
+                    best[cid] = {
+                        "campaign_id": cid,
+                        "campaign_name": cname,
+                        "landing_page_url": url,
+                        "impressions": impressions,
+                    }
+            return list(best.values())
+        except Exception as e:
+            logger.error(f"Google fetch landing pages failed for account {self.account.id}: {e}")
+            return []
+
     def apply_negative_keyword(self, campaign_id: str, keyword: str, match_type: str) -> Dict[str, Any]:
         """Add a campaign-level negative keyword."""
         if not self.is_valid:

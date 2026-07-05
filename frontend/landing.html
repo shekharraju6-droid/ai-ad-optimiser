@@ -801,6 +801,14 @@
                         </div>
                     </div>
                     <div class="um-section ca-section">
+                        <div class="um-section-title" onclick="toggleCaSection(this)">AI Knowledge <span class="ca-arrow">▾</span></div>
+                        <div class="um-form ca-section-body">
+                            <div class="form-group full"><label>Business Context</label><textarea id="caBusinessContext" rows="4" placeholder="Describe what this client does, their target audience, pricing, and anything the AI should know. Example: DSU is a private university in Bangalore. They offer UG and PG programs. Fees range from 2-8 lakhs per year."></textarea></div>
+                            <div class="form-group full"><label>Always Irrelevant / Negative Rules</label><textarea id="caNegativeRules" rows="4" placeholder="List things this client does NOT offer or terms that are always irrelevant. One per line. Example:&#10;Does NOT offer free courses&#10;Does NOT offer distance learning&#10;Competitors: Christ University, PES University"></textarea></div>
+                            <p style="font-size:0.72rem;color:var(--text-light);margin:0;">Optional. The AI uses these as additional context during audits if filled.</p>
+                        </div>
+                    </div>
+                    <div class="um-section ca-section">
                         <div class="um-section-title" onclick="toggleCaSection(this)">Billing &amp; RevenueOps <span class="ca-arrow">▾</span></div>
                         <div class="um-form ca-section-body">
                             <div class="form-group"><label>Invoice Day</label><input type="number" id="caInvoiceDay" min="1" max="31" placeholder="1-31"></div>
@@ -894,6 +902,14 @@
                         <div class="um-form ca-section-body">
                             <div class="form-group full"><label>Brand Keywords</label><input type="text" id="caEditBrandKeywords" placeholder="DSU, Dayananda Sagar, Dayananda Sagar University, dsu.edu.in"></div>
                             <p style="font-size:0.72rem;color:var(--text-light);margin:0;">Comma-separated terms used to detect brand vs non-brand keywords and irrelevant search terms. If empty, Client/Brand and Legal/Billing Entity names are used.</p>
+                        </div>
+                    </div>
+                    <div class="um-section ca-section">
+                        <div class="um-section-title" onclick="toggleCaSection(this)">AI Knowledge <span class="ca-arrow">▾</span></div>
+                        <div class="um-form ca-section-body">
+                            <div class="form-group full"><label>Business Context</label><textarea id="caEditBusinessContext" rows="4" placeholder="Describe what this client does, their target audience, pricing, and anything the AI should know. Example: DSU is a private university in Bangalore. They offer UG and PG programs. Fees range from 2-8 lakhs per year."></textarea></div>
+                            <div class="form-group full"><label>Always Irrelevant / Negative Rules</label><textarea id="caEditNegativeRules" rows="4" placeholder="List things this client does NOT offer or terms that are always irrelevant. One per line. Example:&#10;Does NOT offer free courses&#10;Does NOT offer distance learning&#10;Competitors: Christ University, PES University"></textarea></div>
+                            <p style="font-size:0.72rem;color:var(--text-light);margin:0;">Optional. The AI uses these as additional context during audits if filled.</p>
                         </div>
                     </div>
                     <div class="um-section ca-section">
@@ -1695,6 +1711,7 @@
 
     function resetCentralAccountForm() {
         $('caName').value = ''; $('caBrand').value = ''; $('caBrandKeywords').value = '';
+        $('caBusinessContext').value = ''; $('caNegativeRules').value = '';
         $('caContactPerson').value = ''; $('caContactEmail').value = ''; $('caContactPhone').value = '';
         $('caAddress').value = ''; $('caState').value = ''; $('caStateCode').value = '';
         $('caInvoiceDay').value = ''; $('caPaymentDueDays').value = ''; $('caBillingAmount').value = ''; $('caGstNumber').value = '';
@@ -1722,6 +1739,8 @@
                 category_id: $('caGroup').value ? parseInt($('caGroup').value) : null,
                 brand_name: $('caBrand').value.trim() || null,
                 brand_keywords: $('caBrandKeywords').value.trim() || null,
+                business_context: $('caBusinessContext').value.trim() || null,
+                negative_rules: $('caNegativeRules').value.trim() || null,
                 contact_person: $('caContactPerson').value.trim() || null,
                 contact_email: $('caContactEmail').value.trim() || null,
                 contact_phone: $('caContactPhone').value.trim() || null,
@@ -1756,6 +1775,8 @@
         $('caEditName').value = a.name || '';
         $('caEditBrand').value = a.brand_name || '';
         $('caEditBrandKeywords').value = a.brand_keywords || '';
+        $('caEditBusinessContext').value = a.business_context || '';
+        $('caEditNegativeRules').value = a.negative_rules || '';
         $('caEditContactPerson').value = a.contact_person || '';
         $('caEditContactEmail').value = a.contact_email || '';
         $('caEditContactPhone').value = a.contact_phone || '';
@@ -1810,6 +1831,8 @@
                 category_id: $('caEditGroup').value ? parseInt($('caEditGroup').value) : null,
                 brand_name: $('caEditBrand').value.trim() || null,
                 brand_keywords: $('caEditBrandKeywords').value.trim() || null,
+                business_context: $('caEditBusinessContext').value.trim() || null,
+                negative_rules: $('caEditNegativeRules').value.trim() || null,
                 contact_person: $('caEditContactPerson').value.trim() || null,
                 contact_email: $('caEditContactEmail').value.trim() || null,
                 contact_phone: $('caEditContactPhone').value.trim() || null,
