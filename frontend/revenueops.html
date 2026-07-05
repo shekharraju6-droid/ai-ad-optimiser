@@ -377,6 +377,7 @@
                                 <option value="">All Status</option><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option><option value="on_hold">On Hold</option>
                             </select>
                             <a class="btn btn-secondary btn-sm" href="/" onclick="localStorage.setItem('open_manage_accounts','1')">Manage Client/Brand</a>
+                            <button class="btn btn-secondary btn-sm hidden" id="revActivityHistoryBtn" onclick="window.location.href='/adpulse?open_activity_history=1'">Activity History</button>
                         </div>
                     </div>
                     <div class="table-wrap"><table id="clientsTable"><thead><tr><th>Client/Brand</th><th>Legal/Billing Entity</th><th>BM</th><th>Status</th><th>Invoice Day</th><th>Due Days</th><th>Contact Person</th><th>Email</th><th>Mobile</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
@@ -638,6 +639,7 @@ async function checkAuth(){
     $('userBadge').textContent=(currentUser.full_name||currentUser.email)+(currentUser.rev_role?' ('+currentUser.rev_role+')':'');
     if(currentUser && (currentUser.role==='admin' || currentUser.role==='superadmin')){
         const wrap=$('dashAccountFilterWrap');if(wrap){wrap.classList.remove('hidden');}
+        const ahBtn=$('revActivityHistoryBtn');if(ahBtn){ahBtn.classList.remove('hidden');}
     }
     // close dropdown on panel switch
     closeDashAccountFilter();

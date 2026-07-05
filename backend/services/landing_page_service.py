@@ -197,6 +197,71 @@ Page content:
         return {"success": False, "error": f"Gemini parse failed: {e}", "content": html_text[:2000]}
 
 
+def fetch_single_landing_page(account_id: int, campaign_id: str, db: Session = None) -> Dict[str, Any]:
+    """Fetch and store/crawl landing page URL for a single campaign."""
+    close_session = False
+    if db is None:
+        db = SessionLocal()
+        close_session = True
+    try:
+        account = db.query(Account).filter(Account.id == account_id).first()
+        if not account:
+            return {"error": "Account not found"}
+        if not (account.has_google and account.google_is_live):
+            return {"error": "Account has no live Google Ads connection"}
+        connector = get_connector(account, platform="google")
+        if not connector or not connector.is_valid:
+            return {"error": "Google Ads connector not valid"}
+        pages = connector.fetch_landing_pages()
+        matched = [p for p in pages if str(p.get("campaign_id")) == str(campaign_id)]
+        if not matched:
+            return {"error": f"No landing page found for campaign {campaign_id}", "campaigns_found": len(pages)}
+        p = matched[0]
+        url = p.get("landing_page_url")
+        cname = p.get("campaign_name") or ""
+        existing = db.query(CampaignLandingPage).filter(
+            CampaignLandingPage.account_id == account_id,
+            CampaignLandingPage.campaign_id == campaign_id,
+        ).first()
+        if existing:
+            if url and existing.landing_page_url != url:
+                existing.landing_page_url = url
+                existing.campaign_name = cname or existing.campaign_name
+                existing.last_crawled_at = None
+                existing.landing_page_content = None
+            elif cname and not existing.campaign_name:
+                existing.campaign_name = cname
+        else:
+            existing = CampaignLandingPage(
+                account_id=account_id,
+                campaign_id=campaign_id,
+                campaign_name=cname,
+                landing_page_url=url,
+            )
+            db.add(existing)
+        db.commit()
+        db.refresh(existing)
+        if url:
+            result = crawl_landing_page(url)
+            if result.get("success") and result.get("content"):
+                existing.landing_page_content = json.dumps(result["content"], ensure_ascii=False)
+            elif result.get("content"):
+                existing.landing_page_content = json.dumps({"raw": str(result["content"])[:2000]}, ensure_ascii=False)
+            else:
+                existing.landing_page_content = None
+            existing.last_crawled_at = datetime.utcnow()
+            existing.updated_at = datetime.utcnow()
+            db.commit()
+            return {"account_id": account_id, "campaign_id": campaign_id, "url": url, "crawled": True, "error": result.get("error")}
+        return {"account_id": account_id, "campaign_id": campaign_id, "url": None, "crawled": False}
+    except Exception as e:
+        logger.error(f"fetch_single_landing_page failed for account {account_id} campaign {campaign_id}: {e}", exc_info=True)
+        return {"error": str(e)}
+    finally:
+        if close_session:
+            db.close()
+
+
 def crawl_stale_landing_pages(account_id: int, db: Session = None) -> Dict[str, Any]:
     """Re-crawl landing pages where last_crawled_at is older than 7 days or URL changed.
 

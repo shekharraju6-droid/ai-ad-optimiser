@@ -20,6 +20,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+from backend.services.activity_log import log_activity
 from backend.db.database import get_db
 from backend.db.models import User, UserAccountAssignment, Account, AppSetting
 from backend.services.onboarding_email import send_onboarding_email
@@ -181,6 +182,14 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
     access_token = create_access_token(data={"sub": user.email, "role": user.role})
+    log_activity(
+        module="System",
+        action="Login",
+        description=f"User {user.full_name or user.email} logged in",
+        user_id=user.id,
+        user_name=user.full_name or user.email,
+        db=db,
+    )
     return {"access_token": access_token, "token_type": "bearer", "user": user.to_dict()}
 
 
@@ -239,10 +248,20 @@ def create_user(req: UserCreateRequest, request: Request, db: Session = Depends(
         _sync_account_assignments(user, req.assigned_account_ids, db)
 
     db.refresh(user)
-    # Prefer explicit env var, otherwise derive from the incoming request so
-    # invite links work on Railway/localhost without manual configuration.
     base_url = os.getenv("ADOPTIMA_PUBLIC_BASE_URL", "") or str(request.base_url).rstrip("/")
     setup_link = f"{base_url}/onboard.html?token={token}"
+
+    log_activity(
+        module="System",
+        action="User Created",
+        description=f"Created user {user.full_name or user.email} with role {user.role}",
+        user_id=current_user.id,
+        user_name=current_user.full_name or current_user.email,
+        entity_type="user",
+        entity_id=str(user.id),
+        details={"role": user.role, "email": user.email, "setup_link": setup_link},
+        db=db,
+    )
 
     # Load Gmail refresh token from DB if available
     refresh_token_setting = db.query(AppSetting).filter(AppSetting.key == "gmail_refresh_token").first()
@@ -335,6 +354,17 @@ def update_user(user_id: int, req: UserUpdateRequest, db: Session = Depends(get_
             user.access_audit_review = req.access_audit_review
 
     db.refresh(user)
+    log_activity(
+        module="System",
+        action="User Updated",
+        description=f"Updated user {user.full_name or user.email}",
+        user_id=current_user.id,
+        user_name=current_user.full_name or current_user.email,
+        entity_type="user",
+        entity_id=str(user.id),
+        details={"role": user.role, "email": user.email, "changes": req.model_dump(exclude_unset=True)},
+        db=db,
+    )
     return user.to_dict()
 
 

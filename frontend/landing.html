@@ -610,6 +610,7 @@
             <button class="btn btn-secondary hidden" id="umBtn" onclick="openUserManagement()">User Management</button>
             <button class="btn btn-secondary hidden" id="maBtn" onclick="openManageAccounts()">Manage Client/Brand</button>
             <a class="btn btn-secondary" id="integrationsBtn" href="/integrations" style="display:none">Integrations</a>
+            <button class="btn btn-secondary hidden" id="activityHistoryBtn" onclick="window.location.href='/adpulse?open_activity_history=1'">Activity History</button>
             <button class="btn btn-secondary" id="loginBtn" onclick="showAuth()">Login</button>
             <button class="btn btn-secondary hidden" id="logoutBtn" onclick="logout()">Logout</button>
         </div>
@@ -1093,10 +1094,12 @@
                     $('umBtn').classList.remove('hidden');
                     $('maBtn').classList.remove('hidden');
                     $('integrationsBtn').style.display = 'inline-flex';
+                    const ahBtn = $('activityHistoryBtn'); if (ahBtn) ahBtn.classList.remove('hidden');
                 } else {
                     $('umBtn').classList.add('hidden');
                     $('maBtn').classList.add('hidden');
                     $('integrationsBtn').style.display = 'none';
+                    const ahBtn = $('activityHistoryBtn'); if (ahBtn) ahBtn.classList.add('hidden');
                 }
                 // Only Super Admin can create another superadmin
                 if (user.role !== 'superadmin') {
@@ -1112,6 +1115,7 @@
                 $('userBadge').classList.add('hidden');
                 $('umBtn').classList.add('hidden');
                 $('integrationsBtn').style.display = 'none';
+                const ahBtn2 = $('activityHistoryBtn'); if (ahBtn2) ahBtn2.classList.add('hidden');
                 $('addAccountBtn').style.display = 'none';
                 setCardAccess('AdPulse', false);
                 setCardAccess('InsightDesk', false);

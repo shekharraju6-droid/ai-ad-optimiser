@@ -14,7 +14,8 @@ from backend.services.scheduler import run_manual_smart_audit
 from backend.services.audit_settings import get_audit_settings, set_audit_setting
 from backend.services.notifications import dispatch
 from backend.services.connectors import get_connector
-from backend.services.landing_page_service import fetch_campaign_landing_pages, crawl_stale_landing_pages
+from backend.services.landing_page_service import fetch_campaign_landing_pages, crawl_stale_landing_pages, fetch_single_landing_page
+from backend.services.activity_log import log_activity
 from backend.routes.auth import get_current_user_required
 
 logger = logging.getLogger("AdOptima")
@@ -51,6 +52,10 @@ class BulkApplyRequest(BaseModel):
     dismissed: List[int] = Field(default_factory=list)
     merged_dismissed: List[MergedApplyItem] = Field(default_factory=list)
     reviewer: str = "admin"
+
+
+class RunCampaignAuditRequest(BaseModel):
+    campaign_id: Optional[str] = None
 
 
 @router.get("/audit-settings")
@@ -95,9 +100,10 @@ def run_smart_audit_for_account(account_id: int, db: Session = Depends(get_db), 
     return result
 
 
+
 @router.post("/adpulse/accounts/{account_id}/run-audit")
-def run_adpulse_audit(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
-    """Run a fresh AI audit for a single account from the AdPulse review UI.
+def run_adpulse_audit(account_id: int, req: RunCampaignAuditRequest = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Run a fresh AI audit for a single account or single campaign from the AdPulse review UI.
 
     Returns keyword + search term audit results. If Gemini quota is exhausted,
     keyword results are still returned and search term audit contains a clear
@@ -110,7 +116,17 @@ def run_adpulse_audit(account_id: int, db: Session = Depends(get_db), user: User
     if user.role in ("user", "newuser") and account_id not in (user.assigned_account_ids() or []):
         raise HTTPException(status_code=403, detail="Access denied to this account")
 
-    result = run_manual_smart_audit(account_id)
+    campaign_id = (req and req.campaign_id) or None
+    campaign_name = None
+    if campaign_id:
+        # Try to fetch campaign name for the log
+        try:
+            cname_map = _fetch_campaign_name_map(account)
+            campaign_name = cname_map.get(str(campaign_id))
+        except Exception:
+            pass
+
+    result = run_manual_smart_audit(account_id, campaign_id=campaign_id)
 
     # Normalize result so frontend always gets the expected shape
     keyword_audit = result.get("keyword_audit") or {"actions_generated": 0}
@@ -132,6 +148,31 @@ def run_adpulse_audit(account_id: int, db: Session = Depends(get_db), user: User
         search_term_audit["warning"] = "⚠️ Search term analysis skipped — Gemini API quota exhausted. Try again tomorrow or upgrade to paid API."
         search_term_audit["actions_generated"] = search_term_audit.get("actions_generated", 0)
 
+    # Log activity: audit run
+    kw_count = keyword_audit.get("actions_generated", 0)
+    st_count = search_term_audit.get("actions_generated", 0)
+    log_description = f"Ran audit for campaign {campaign_name or campaign_id or 'all campaigns'} on {account.name}"
+    if campaign_id and not campaign_name:
+        log_description = f"Ran audit for campaign {campaign_id} on {account.name}"
+    log_activity(
+        module="AdPulse",
+        action="Audit Run",
+        description=log_description,
+        user_id=user.id,
+        user_name=user.full_name or user.email,
+        account_id=account.id,
+        account_name=account.name,
+        entity_type="campaign",
+        entity_id=campaign_id or "",
+        details={
+            "keyword_actions": kw_count,
+            "search_term_actions": st_count,
+            "search_term_warning": search_term_audit.get("warning"),
+            "search_term_error": search_term_audit.get("error"),
+        },
+        db=db,
+    )
+
     # Compute legacy budget/campaign action counts from existing pending actions
     budget_actions = db.query(PendingAction).filter(
         PendingAction.account_id == account_id,
@@ -149,6 +190,8 @@ def run_adpulse_audit(account_id: int, db: Session = Depends(get_db), user: User
     response = {
         "account_id": account_id,
         "account_name": account.name,
+        "campaign_id": campaign_id,
+        "campaign_name": campaign_name,
         "keyword_audit": keyword_audit,
         "search_term_audit": search_term_audit,
         "budget_actions_generated": budget_actions,
@@ -159,10 +202,7 @@ def run_adpulse_audit(account_id: int, db: Session = Depends(get_db), user: User
     if keyword_audit.get("error") and keyword_audit.get("actions_generated", 0) == 0:
         raise HTTPException(status_code=400, detail=keyword_audit["error"])
 
-    total_actions = (
-        keyword_audit.get("actions_generated", 0)
-        + search_term_audit.get("actions_generated", 0)
-    )
+    total_actions = kw_count + st_count
     if total_actions > 0:
         dispatch(
             "audit_complete",
@@ -698,9 +738,70 @@ def _build_campaign_keyword_context(account, pending_actions, campaign_name_map:
     return context
 
 
+def _pending_actions_for_campaign(account_id: int, campaign_id: str, db: Session) -> List[PendingAction]:
+    return db.query(PendingAction).filter(
+        PendingAction.account_id == account_id,
+        PendingAction.campaign_id == campaign_id,
+    ).order_by(PendingAction.created_at.desc()).all()
+
+
+@router.get("/accounts/{account_id}/campaign-audit-summary")
+def get_campaign_audit_summary(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Return the list of enabled campaigns with last-audited dates for an account."""
+    _require_audit_review_access(user)
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if user.role in ("user", "newuser") and account_id not in (user.assigned_account_ids() or []):
+        raise HTTPException(status_code=403, detail="Access denied to this account")
+
+    campaigns = []
+    if account.has_google and account.google_is_live:
+        try:
+            connector = get_connector(account, platform="google")
+            if connector and connector.is_valid:
+                campaigns = connector.fetch_campaigns()
+        except Exception as e:
+            logger.warning(f"Failed to fetch campaigns for account {account_id}: {e}")
+
+    # Fetch stored campaign landing pages for names fallback
+    lp_rows = db.query(CampaignLandingPage).filter(CampaignLandingPage.account_id == account_id).all()
+    lp_map = {r.campaign_id: r for r in lp_rows}
+
+    enabled_campaigns = []
+    for c in campaigns:
+        status = _normalize_campaign_status(c.get("status"))
+        if status != "ENABLED":
+            continue
+        cid = str(c.get("id"))
+        name = c.get("name") or (lp_map.get(cid).campaign_name if lp_map.get(cid) else None) or f"Campaign #{cid}"
+        # Last audited = latest pending_action created_at for this campaign
+        last_action = db.query(PendingAction).filter(
+            PendingAction.account_id == account_id,
+            PendingAction.campaign_id == cid,
+        ).order_by(PendingAction.created_at.desc()).first()
+        enabled_campaigns.append({
+            "campaign_id": cid,
+            "campaign_name": name,
+            "status": status,
+            "last_audited_at": last_action.created_at.isoformat() if last_action else None,
+        })
+
+    enabled_campaigns.sort(key=lambda x: x["campaign_name"])
+    return {
+        "account_id": account_id,
+        "account_name": account.name,
+        "campaigns": enabled_campaigns,
+    }
+
+
 @router.get("/adpulse/approval-queue/{account_id}/review")
-def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
-    """Return all pending recommendations for a single account grouped by type."""
+def get_approval_queue_review(account_id: int, campaign_id: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Return all pending recommendations for a single account grouped by type.
+
+    Optionally filter to a single campaign via ?campaign_id=... for the
+    campaign-level review panel.
+    """
     _require_audit_review_access(user)
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
@@ -712,6 +813,8 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
         PendingAction.account_id == account_id,
         PendingAction.status == "pending",
     ).order_by(PendingAction.created_at.desc()).all()
+    if campaign_id:
+        pending = [a for a in pending if str(a.campaign_id) == str(campaign_id)]
 
     # Build campaign_id -> campaign_name map from Google Ads to fix legacy numeric campaign names
     campaign_name_map = _fetch_campaign_name_map(account)
@@ -918,6 +1021,74 @@ def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(ge
         applied_mutations[mutation_key] = result
         return result
 
+    def _log_action_event(action: PendingAction, outcome: str, message: str):
+        if outcome not in ("applied", "failed"):
+            return
+        account = db.query(Account).filter(Account.id == action.account_id).first()
+        account_name = account.name if account else None
+        campaign_name = None
+        if action.new_value and isinstance(action.new_value, dict):
+            campaign_name = action.new_value.get("campaign_name")
+        if not campaign_name:
+            campaign_name = action.campaign_id or ""
+        user_name = user.full_name or user.email
+        if outcome == "failed":
+            log_activity(
+                module="AdPulse", action="Recommendation Apply Failed",
+                description=f"Failed to apply {action.action_type} for '{action.keyword or action.campaign_id}' in campaign {campaign_name}: {message}",
+                user_id=user.id, user_name=user_name,
+                account_id=action.account_id, account_name=account_name,
+                entity_type="keyword" if action.keyword else "campaign",
+                entity_id=action.keyword or action.campaign_id or "",
+                details={"action_type": action.action_type, "campaign_id": action.campaign_id, "error": message},
+                db=db,
+            )
+            return
+        if action.action_type in ("SMART_PAUSE_KEYWORD", "PAUSE_KEYWORD"):
+            log_activity(
+                module="AdPulse", action="Keyword Paused",
+                description=f"Paused keyword '{action.keyword}' in campaign {campaign_name}",
+                user_id=user.id, user_name=user_name,
+                account_id=action.account_id, account_name=account_name,
+                entity_type="keyword", entity_id=action.keyword or "",
+                details={"campaign_id": action.campaign_id, "campaign_name": campaign_name, "ad_group_id": action.adset_id},
+                db=db,
+            )
+        elif action.action_type in ("SMART_ADD_NEGATIVE_KEYWORD", "ADD_NEGATIVE_KEYWORD"):
+            log_activity(
+                module="AdPulse", action="Negative Added",
+                description=f"Added negative keyword '{action.keyword}' to campaign {campaign_name}",
+                user_id=user.id, user_name=user_name,
+                account_id=action.account_id, account_name=account_name,
+                entity_type="keyword", entity_id=action.keyword or "",
+                details={"campaign_id": action.campaign_id, "campaign_name": campaign_name, "match_type": action.match_type},
+                db=db,
+            )
+        elif action.action_type == "PAUSE_OR_REDUCE_BUDGET":
+            old_budget = action.new_value.get("current_budget") if isinstance(action.new_value, dict) else None
+            new_budget = custom_by_id.get(action.id) if action.new_value and isinstance(action.new_value, dict) else None
+            if new_budget is None and isinstance(action.new_value, dict):
+                new_budget = action.new_value.get("suggested_budget")
+            log_activity(
+                module="AdPulse", action="Budget Changed",
+                description=f"Changed budget for {campaign_name} from INR {old_budget or 'unknown'} to INR {new_budget or 'unknown'}",
+                user_id=user.id, user_name=user_name,
+                account_id=action.account_id, account_name=account_name,
+                entity_type="campaign", entity_id=action.campaign_id or "",
+                details={"campaign_id": action.campaign_id, "campaign_name": campaign_name, "old_budget": old_budget, "new_budget": new_budget},
+                db=db,
+            )
+        elif action.action_type in ("PAUSE_CAMPAIGN", "ENABLE_CAMPAIGN"):
+            log_activity(
+                module="AdPulse", action="Campaign Paused" if action.action_type == "PAUSE_CAMPAIGN" else "Campaign Enabled",
+                description=f"{('Paused' if action.action_type == 'PAUSE_CAMPAIGN' else 'Enabled')} campaign {campaign_name}",
+                user_id=user.id, user_name=user_name,
+                account_id=action.account_id, account_name=account_name,
+                entity_type="campaign", entity_id=action.campaign_id or "",
+                details={"campaign_id": action.campaign_id, "campaign_name": campaign_name},
+                db=db,
+            )
+
     def _mark_action(action: PendingAction, outcome: str, message: str):
         now = datetime.utcnow()
         if outcome == "applied":
@@ -930,6 +1101,7 @@ def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(ge
         action.reviewed_by = reviewer
         action.reviewed_at = now
         results.append({"id": action.id, "status": outcome, "message": message})
+        _log_action_event(action, outcome, message)
 
     # Process all approved DB ids (legacy + flattened merged)
     for db_id in approved_ids:
@@ -948,12 +1120,14 @@ def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(ge
             _mark_action(action, "failed", result.get("error", "Unknown error"))
 
     # Rejected items: set rejected + suppress search terms for 30 days
+    rejected_actions = []
     for db_id in rejected_ids:
         action = db.query(PendingAction).filter(PendingAction.id == db_id).first()
         if action and action.status == "pending":
             action.status = "rejected"
             action.reviewed_by = reviewer
             action.reviewed_at = now
+            rejected_actions.append(action)
             if action.action_type in ("SMART_ADD_NEGATIVE_KEYWORD", "ADD_NEGATIVE_KEYWORD"):
                 suppressed_until = date.today() + timedelta(days=suppression_days)
                 existing = db.query(SuppressedSearchTerm).filter(
@@ -972,6 +1146,48 @@ def apply_approval_queue_actions(req: BulkApplyRequest, db: Session = Depends(ge
                         suppressed_until=suppressed_until,
                         rejected_by=reviewer,
                     ))
+
+    # Log rejections
+    for action in rejected_actions:
+        account = db.query(Account).filter(Account.id == action.account_id).first()
+        campaign_name = action.new_value.get("campaign_name") if isinstance(action.new_value, dict) else None
+        if not campaign_name:
+            campaign_name = action.campaign_id or ""
+        entity_label = action.keyword or action.campaign_id or ""
+        log_activity(
+            module="AdPulse",
+            action="Recommendation Rejected",
+            description=f"Rejected recommendation: {entity_label} in campaign {campaign_name}",
+            user_id=user.id,
+            user_name=user.full_name or user.email,
+            account_id=action.account_id,
+            account_name=account.name if account else None,
+            entity_type="keyword" if action.keyword else "campaign",
+            entity_id=entity_label,
+            details={"action_type": action.action_type, "campaign_id": action.campaign_id, "campaign_name": campaign_name},
+            db=db,
+        )
+
+    # Log smart approve if multiple items approved at once
+    if len(approved_ids) > 1:
+        # Determine account and campaign context from first approved action
+        first_action = db.query(PendingAction).filter(PendingAction.id.in_(list(approved_ids))).first()
+        account = None
+        if first_action:
+            account = db.query(Account).filter(Account.id == first_action.account_id).first()
+        log_activity(
+            module="AdPulse",
+            action="Smart Approve",
+            description=f"Smart Approved {len(approved_ids)} items for {account.name if account else 'account'}",
+            user_id=user.id,
+            user_name=user.full_name or user.email,
+            account_id=account.id if account else None,
+            account_name=account.name if account else None,
+            entity_type="campaign",
+            entity_id=first_action.campaign_id if first_action else "",
+            details={"approved_count": len(approved_ids)},
+            db=db,
+        )
 
     # Dismissed items: mark as dismissed (will be re-evaluated next audit)
     for db_id in dismissed_ids:

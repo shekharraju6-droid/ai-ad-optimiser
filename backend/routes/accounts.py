@@ -11,6 +11,7 @@ from backend.db.models import Account, AccountGroup, AccountType, AccountStatus,
 from backend.db.revenueops_models import RevClient, RevClientStatus
 from backend.services.crypto import encrypt, decrypt
 from backend.services.connectors import get_connector
+from backend.services.activity_log import log_activity
 from backend.routes.auth import get_current_user_required
 
 logger = logging.getLogger("AdOptima")
@@ -315,6 +316,18 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(account)
+    log_activity(
+        module="System",
+        action="Account Created",
+        description=f"Created Client/Brand {account.name}",
+        user_id=None,
+        user_name="System",
+        account_id=account.id,
+        account_name=account.name,
+        entity_type="account",
+        entity_id=str(account.id),
+        db=db,
+    )
     return account.to_dict()
 
 
@@ -452,6 +465,18 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
 
     db.commit()
     db.refresh(account)
+    log_activity(
+        module="System",
+        action="Account Updated",
+        description=f"Updated Client/Brand {account.name}",
+        user_id=None,
+        user_name="System",
+        account_id=account.id,
+        account_name=account.name,
+        entity_type="account",
+        entity_id=str(account.id),
+        db=db,
+    )
     return account.to_dict()
 
 
@@ -461,12 +486,26 @@ def delete_account(account_id: int, delete_revops: bool = False, db: Session = D
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     rev_client_id = account.rev_client_id
+    account_name = account.name
+    account_id_val = account.id
     db.delete(account)
     if delete_revops and rev_client_id:
         rev_client = db.query(RevClient).filter(RevClient.id == rev_client_id).first()
         if rev_client:
             db.delete(rev_client)
     db.commit()
+    log_activity(
+        module="System",
+        action="Account Deleted",
+        description=f"Deleted Client/Brand {account_name}",
+        user_id=None,
+        user_name="System",
+        account_id=account_id_val,
+        account_name=account_name,
+        entity_type="account",
+        entity_id=str(account_id_val),
+        db=db,
+    )
     return {"status": "success", "rev_client_deleted": delete_revops and bool(rev_client_id)}
 
 
@@ -597,16 +636,6 @@ def get_account(account_id: int, start_date: Optional[str] = None, end_date: Opt
     return data
 
 
-@router.get("/accounts/{account_id}/campaigns-with-tags")
-def get_campaigns_with_tags(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
-    """Fetch live Google Ads campaigns with their manual/auto campaign type tags."""
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-    if user.role in ("user", "newuser") and account_id not in user.assigned_account_ids():
-        raise HTTPException(status_code=403, detail="Access denied to this account")
-
-    campaigns = []
     if account.has_google and account.google_is_live:
         try:
             connector = get_connector(account, platform="google")
@@ -636,6 +665,29 @@ def get_campaigns_with_tags(account_id: int, db: Session = Depends(get_db), user
             "updated_at": tag.updated_at.isoformat() if tag and tag.updated_at else None,
         })
     return {"account_id": account_id, "campaigns": results}
+
+
+@router.get("/accounts/{account_id}/last-audit-summary")
+def get_last_audit_summary(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Return last audited timestamp and count of unique campaigns audited for an account."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if user.role in ("user", "newuser") and account_id not in user.assigned_account_ids():
+        raise HTTPException(status_code=403, detail="Access denied to this account")
+    from backend.db.models import PendingAction
+    last_action = db.query(PendingAction).filter(
+        PendingAction.account_id == account_id,
+    ).order_by(PendingAction.created_at.desc()).first()
+    campaigns_audited = db.query(PendingAction.campaign_id).filter(
+        PendingAction.account_id == account_id,
+    ).distinct().count()
+    return {
+        "account_id": account_id,
+        "account_name": account.name,
+        "last_audited_at": last_action.created_at.isoformat() if last_action else None,
+        "campaigns_audited": campaigns_audited,
+    }
 
 
 @router.put("/accounts/{account_id}/campaign-type-tags/{campaign_id}")

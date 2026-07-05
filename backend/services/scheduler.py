@@ -5,7 +5,7 @@ Reads global and per-account audit intervals.
 import logging
 import time
 from datetime import datetime, timedelta, date
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 from backend.services.auditor import audit_account, audit_all_accounts
 from backend.services.keyword_auditor import run_keyword_audit
@@ -30,9 +30,10 @@ def start_scheduler():
     # Incremental LeadSquared lead mirror sync every 3 hours (and once at startup)
     _scheduler.add_job(_sync_lsq_leads, 'interval', hours=3, id='lsq_lead_mirror_sync', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(minutes=2))
     # Daily smart keyword + search term audit at 8:00 AM IST = 2:30 AM UTC
-    _scheduler.add_job(_run_daily_smart_audit, 'cron', hour=2, minute=30, id='daily_smart_audit', replace_existing=True)
+    # DISABLED: campaign-level manual audits are now used instead. Re-enable after AI is retrained.
+    # _scheduler.add_job(_run_daily_smart_audit, 'cron', hour=2, minute=30, id='daily_smart_audit', replace_existing=True)
     _scheduler.start()
-    logger.info("Background scheduler started")
+    logger.info("Background scheduler started (daily smart audit disabled)")
 
 
 def _run_daily_smart_audit():
@@ -110,8 +111,8 @@ def _run_daily_smart_audit():
         db.close()
 
 
-def run_manual_smart_audit(account_id: int) -> Dict[str, Any]:
-    """Manual on-demand smart audit for a single account."""
+def run_manual_smart_audit(account_id: int, campaign_id: Optional[str] = None) -> Dict[str, Any]:
+    """Manual on-demand smart audit for a single account, optionally a single campaign."""
     from datetime import date
     db = SessionLocal()
     try:
@@ -125,16 +126,23 @@ def run_manual_smart_audit(account_id: int) -> Dict[str, Any]:
         db.commit()
         db.refresh(run)
 
-        # Pull landing page URLs and crawl stale pages before audit
-        try:
-            from backend.services.landing_page_service import fetch_campaign_landing_pages, crawl_stale_landing_pages
-            fetch_campaign_landing_pages(account_id, db=db)
-            crawl_stale_landing_pages(account_id, db=db)
-        except Exception as lpe:
-            logger.warning(f"Landing page fetch/crawl failed for account {account_id}: {lpe}")
+        account = db.query(Account).filter(Account.id == account_id).first()
+        account_name = account.name if account else None
 
-        kw_result = run_keyword_audit(account_id, db=db)
-        st_result = run_search_term_audit(account_id, db=db)
+        # Pull landing page URLs and crawl stale pages before audit
+        # When a single campaign is requested, refresh only that landing page
+        try:
+            from backend.services.landing_page_service import fetch_campaign_landing_pages, crawl_stale_landing_pages, fetch_single_landing_page
+            if campaign_id:
+                fetch_single_landing_page(account_id, campaign_id, db=db)
+            else:
+                fetch_campaign_landing_pages(account_id, db=db)
+                crawl_stale_landing_pages(account_id, db=db)
+        except Exception as lpe:
+            logger.warning(f"Landing page fetch/crawl failed for account {account_id} campaign {campaign_id}: {lpe}")
+
+        kw_result = run_keyword_audit(account_id, db=db, campaign_id=campaign_id)
+        st_result = run_search_term_audit(account_id, db=db, campaign_id=campaign_id)
 
         run.end_time = datetime.utcnow()
         run.accounts_audited = 1
@@ -145,11 +153,17 @@ def run_manual_smart_audit(account_id: int) -> Dict[str, Any]:
             run.error_log = "\n".join([kw_result.get("error", ""), st_result.get("error", "")]).strip()
         db.commit()
 
-        return {
+        result = {
             "audit_run_id": run.id,
             "keyword_audit": kw_result,
             "search_term_audit": st_result,
         }
+        if account:
+            result["account_id"] = account.id
+            result["account_name"] = account.name
+        if campaign_id:
+            result["campaign_id"] = campaign_id
+        return result
     except Exception as e:
         logger.error(f"Manual smart audit failed for account {account_id}: {e}", exc_info=True)
         if run:

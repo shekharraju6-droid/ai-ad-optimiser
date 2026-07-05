@@ -730,6 +730,40 @@ class AppSetting(Base):
         return {"id": self.id, "key": self.key, "value": self.value}
 
 
+class ActivityLog(Base):
+    """Central activity history log across all modules."""
+    __tablename__ = "activity_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    module = Column(String, nullable=False)  # AdPulse, InsightDesk, RevenueOps, System
+    action = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_name = Column(String, nullable=True)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
+    account_name = Column(String, nullable=True)
+    entity_type = Column(String, nullable=True)  # campaign, keyword, invoice, payment, user, account
+    entity_id = Column(String, nullable=True)
+    details_json = Column(Text, nullable=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "module": self.module,
+            "action": self.action,
+            "description": self.description,
+            "user_id": self.user_id,
+            "user_name": self.user_name,
+            "account_id": self.account_id,
+            "account_name": self.account_name,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "details": self.details_json,
+        }
+
+
 class CampaignLandingPage(Base):
     """Landing page URL + crawled content per campaign, used for smarter search term audits."""
     __tablename__ = "campaign_landing_pages"

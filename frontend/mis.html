@@ -288,6 +288,7 @@
                         ↻ Sync Leads Now
                     </button>
                     <a href="/" class="btn btn-secondary">Back to Dashboard</a>
+                    <button class="btn btn-secondary hidden" id="misActivityHistoryBtn" onclick="window.location.href='/adpulse?open_activity_history=1'">Activity History</button>
                 </div>
             </div>
             <div class="content">
@@ -2229,6 +2230,14 @@
     window.addEventListener('DOMContentLoaded', () => {
         computeDateRange('last30');
         loadAccounts();
+        if (token) {
+            api('GET', '/auth/me').then(u => {
+                if (u && (u.role === 'admin' || u.role === 'superadmin')) {
+                    const ahBtn = document.getElementById('misActivityHistoryBtn');
+                    if (ahBtn) ahBtn.classList.remove('hidden');
+                }
+            }).catch(() => {});
+        }
     });
 
     // Swallow browser-extension message-channel errors that leak into our page

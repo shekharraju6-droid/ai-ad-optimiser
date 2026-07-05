@@ -261,8 +261,8 @@ Search terms to classify:
             return []
 
 
-def run_search_term_audit(account_id: int, db: Session = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
-    """Run search term audit for a single Google Ads account."""
+def run_search_term_audit(account_id: int, db: Session = None, start_date: Optional[str] = None, end_date: Optional[str] = None, campaign_id: Optional[str] = None) -> Dict[str, Any]:
+    """Run search term audit for a single Google Ads account, optionally filtered to one campaign."""
     close_session = False
     if db is None:
         db = SessionLocal()
@@ -280,6 +280,11 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
             return {"error": "Google Ads connector not valid", "actions_generated": 0}
 
         campaigns = connector.fetch_campaigns()
+        # If a single campaign is requested, only audit that campaign
+        if campaign_id:
+            campaigns = [c for c in campaigns if str(c.get("id")) == str(campaign_id)]
+            if not campaigns:
+                return {"error": f"Campaign {campaign_id} not found or not enabled", "actions_generated": 0}
         campaign_name_map = _build_campaign_name_map(campaigns)
 
         tags = db.query(CampaignTypeTag).filter(CampaignTypeTag.account_id == account_id).all()
@@ -296,6 +301,9 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
         for term in search_terms:
             cid = term.get("campaign_id")
             if not cid:
+                continue
+            # If filtering to a single campaign, skip other campaigns
+            if campaign_id and str(cid) != str(campaign_id):
                 continue
             if cid not in by_campaign:
                 resolved_name = _resolve_campaign_name(cid, term.get("campaign_name", ""), campaign_name_map)

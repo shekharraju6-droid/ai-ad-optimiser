@@ -9,6 +9,7 @@ from backend.db.models import Account
 from backend.services.crm_connectors import fetch_all_crm_data, get_crm_connector
 from backend.services.config import load_config
 from backend.routes.auth import get_current_user
+from backend.services.activity_log import log_activity
 
 router = APIRouter(prefix="/api", tags=["crm"])
 
@@ -42,6 +43,9 @@ def crm_summary(
     }
     data["start_date"] = start_date
     data["end_date"] = end_date
+    log_activity(db, module="InsightDesk", action="Report Viewed", description=f"CRM summary viewed for {account.name}",
+                 user_id=getattr(current_user, "id", None), user_name=getattr(current_user, "full_name", None) or getattr(current_user, "email", None),
+                 account_id=account.id, account_name=account.name)
     return data
 
 

@@ -21,6 +21,7 @@ from backend.db.revenueops_models import (
     RevReminder, ReminderType, ReminderPriority, ReminderStatus,
     FollowupNote, AuditLog, RevSetting, RevRole,
 )
+from backend.services.activity_log import log_activity
 from backend.routes.auth import get_current_user_required
 from backend.routes.accounts import _filter_accounts_for_user as _filter_accounts_for_user_helper
 
@@ -31,6 +32,17 @@ def _audit(db: Session, user_id: int, action: str, entity_type: str, entity_id: 
     log = AuditLog(user_id=user_id, action=action, entity_type=entity_type, entity_id=entity_id, old_value=old_val, new_value=new_val)
     db.add(log)
     db.commit()
+
+
+def _client_name_for_log(db: Session, client_id: int) -> tuple:
+    """Return (client_name, account_id, account_name) for a RevClient."""
+    c = db.query(RevClient).filter(RevClient.id == client_id).first()
+    if not c:
+        return None, None, None
+    account = db.query(Account).filter(
+        or_(Account.rev_client_id == c.id, Account.id == c.account_id)
+    ).first()
+    return c.client_name, account.id if account else None, account.name if account else c.client_name
 
 
 def _check_rev_role(user: User, allowed_roles: list):
@@ -308,9 +320,29 @@ def update_client_billing(
 
     db.commit()
     db.refresh(c)
-    if account:
-        db.refresh(account)
     _audit(db, user.id, "update_client_billing", "client", c.id, old_val=old, new_val=json.dumps(c.to_dict()))
+    # Central activity log
+    client_name, acc_id, acc_name = _client_name_for_log(db, c.id)
+    changes = []
+    if req.client_status is not None:
+        changes.append(f"status → {req.client_status}")
+    if req.invoice_day is not None:
+        changes.append(f"invoice_day → {req.invoice_day}")
+    if req.default_due_days is not None:
+        changes.append(f"due_days → {req.default_due_days}")
+    log_activity(
+        module="RevenueOps",
+        action="Client Updated",
+        description=f"Updated client {client_name} — {', '.join(changes) or 'billing details'}",
+        user_id=user.id,
+        user_name=user.full_name or user.email,
+        account_id=acc_id,
+        account_name=acc_name,
+        entity_type="account",
+        entity_id=str(c.id),
+        details={"client_id": c.id, "changes": changes},
+        db=db,
+    )
     return _client_view_dict(c, account)
 
 
@@ -654,6 +686,21 @@ def create_invoice(req: InvoiceCreate, db: Session = Depends(get_db), user: User
     _recalc_invoice(inv, db)
     _generate_invoice_reminders(inv, db)
     _audit(db, user.id, "create_invoice", "invoice", inv.id, new_val=json.dumps(inv.to_dict()))
+    # Central activity log
+    client_name, acc_id, acc_name = _client_name_for_log(db, inv.client_id)
+    log_activity(
+        module="RevenueOps",
+        action="Invoice Created",
+        description=f"Created invoice {inv.invoice_number} for {client_name} — INR {inv.invoice_amount:,.2f}",
+        user_id=user.id,
+        user_name=user.full_name or user.email,
+        account_id=acc_id,
+        account_name=acc_name,
+        entity_type="invoice",
+        entity_id=str(inv.id),
+        details={"invoice_number": inv.invoice_number, "amount": inv.invoice_amount, "source": req.source},
+        db=db,
+    )
     # Step 6: auto-link uploaded file to Documents section
     if req.source == "ai_upload" and req.document_file_path:
         try:
@@ -910,6 +957,22 @@ def update_invoice(invoice_id: int, req: InvoiceUpdate, db: Session = Depends(ge
     _recalc_invoice(inv, db)
     _generate_invoice_reminders(inv, db)
     _audit(db, user.id, "update_invoice", "invoice", inv.id, old_val=old, new_val=json.dumps(inv.to_dict()))
+    # Central activity log
+    client_name, acc_id, acc_name = _client_name_for_log(db, inv.client_id)
+    status_change = req.invoice_status or req.payment_status
+    log_activity(
+        module="RevenueOps",
+        action="Invoice Updated",
+        description=f"Updated invoice {inv.invoice_number} status to {status_change or 'updated'}",
+        user_id=user.id,
+        user_name=user.full_name or user.email,
+        account_id=acc_id,
+        account_name=acc_name,
+        entity_type="invoice",
+        entity_id=str(inv.id),
+        details={"invoice_number": inv.invoice_number, "status_change": status_change, "changes": req.model_dump(exclude_unset=True)},
+        db=db,
+    )
     return inv.to_dict()
 
 
@@ -999,6 +1062,21 @@ def create_payment(req: PaymentCreate, db: Session = Depends(get_db), user: User
     db.refresh(p)
     _recalc_invoice(inv, db)
     _audit(db, user.id, "create_payment", "payment", p.id, new_val=json.dumps(p.to_dict()))
+    # Central activity log
+    client_name, acc_id, acc_name = _client_name_for_log(db, p.client_id)
+    log_activity(
+        module="RevenueOps",
+        action="Payment Recorded",
+        description=f"Recorded payment of INR {p.amount:,.2f} for {client_name}",
+        user_id=user.id,
+        user_name=user.full_name or user.email,
+        account_id=acc_id,
+        account_name=acc_name,
+        entity_type="payment",
+        entity_id=str(p.id),
+        details={"invoice_id": p.invoice_id, "amount": p.amount, "payment_mode": p.payment_mode},
+        db=db,
+    )
     return p.to_dict()
 
 

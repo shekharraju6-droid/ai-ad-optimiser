@@ -127,8 +127,11 @@ def _resolve_campaign_name(campaign_id: str, fallback_name: str, name_map: Dict[
     return campaign_id or "Unknown"
 
 
-def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
-    """Run keyword audit for a single Google Ads account. Returns summary and created actions."""
+def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[str] = None, end_date: Optional[str] = None, campaign_id: Optional[str] = None) -> Dict[str, Any]:
+    """Run keyword audit for a single Google Ads account, optionally filtered to one campaign.
+
+    Returns summary and created actions.
+    """
     close_session = False
     if db is None:
         db = SessionLocal()
@@ -146,6 +149,11 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
             return {"error": "Google Ads connector not valid", "actions_generated": 0}
 
         campaigns = connector.fetch_campaigns()
+        # If a single campaign is requested, only audit that campaign
+        if campaign_id:
+            campaigns = [c for c in campaigns if str(c.get("id")) == str(campaign_id)]
+            if not campaigns:
+                return {"error": f"Campaign {campaign_id} not found or not enabled", "actions_generated": 0}
         campaign_name_map = _build_campaign_name_map(campaigns)
         campaign_type_map = _campaign_type_map(db, account_id, campaigns)
         brand_terms = _brand_terms_for_account(account)
@@ -158,6 +166,9 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
 
         for kw in keywords:
             cid = kw.get("campaign_id")
+            # If filtering to a single campaign, skip other campaigns
+            if campaign_id and str(cid) != str(campaign_id):
+                continue
             campaign_type = campaign_type_map.get(cid, "non_brand")
             keyword_text = kw.get("text", "")
             match_type = kw.get("match_type", "")
