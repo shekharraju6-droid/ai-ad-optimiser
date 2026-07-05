@@ -7,6 +7,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+import traceback
 
 from backend.routes import config, campaigns, search_terms, negatives, optimizations, logs, chat, auth, reports, accounts, audits, notifications, oauth, crm, revenueops, dsu_report, dsi_report, mantri, voice, categories
 
@@ -17,6 +18,17 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("AdOptima")
 
 app = FastAPI(title="AdOptima AI - Google Ads Optimization")
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"UNHANDLED ERROR: {request.url}")
+    logger.error(traceback.format_exc())
+    print(f"UNHANDLED ERROR: {request.url}")
+    print(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)}
+    )
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,12 +1,27 @@
 """
 Platform connector factory for Google Ads and Meta Marketing API.
 """
+from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from backend.db.models import Account, AccountType
 from backend.services.crypto import decrypt
 import logging
 
 logger = logging.getLogger("AdOptima")
+
+
+def _today_ist() -> str:
+    """Return today's date in IST (YYYY-MM-DD)."""
+    return (datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d")
+
+
+def _resolve_end_date(end_date: Optional[str], start_date: Optional[str]) -> str:
+    """Return a real YYYY-MM-DD end date; never the literal 'today'."""
+    if end_date and str(end_date).strip().lower() != "today":
+        return str(end_date).strip()
+    if start_date and str(start_date).strip().lower() != "today":
+        return str(start_date).strip()
+    return _today_ist()
 
 
 class AdsConnector:
@@ -230,7 +245,7 @@ class GoogleAdsConnector(AdsConnector):
                 SELECT
                   metrics.cost_micros
                 FROM customer
-                WHERE segments.date BETWEEN '{spend_start}' AND '{self.end_date or self.start_date or 'today'}'
+                WHERE segments.date BETWEEN '{spend_start}' AND '{_resolve_end_date(self.end_date, self.start_date)}'
             """
             try:
                 response_spend = service.search(customer_id=customer_id, query=query_spend)
