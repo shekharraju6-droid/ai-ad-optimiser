@@ -95,6 +95,84 @@ def run_smart_audit_for_account(account_id: int, db: Session = Depends(get_db), 
     return result
 
 
+@router.post("/adpulse/accounts/{account_id}/run-audit")
+def run_adpulse_audit(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Run a fresh AI audit for a single account from the AdPulse review UI.
+
+    Returns keyword + search term audit results. If Gemini quota is exhausted,
+    keyword results are still returned and search term audit contains a clear
+    warning so the frontend can show partial results.
+    """
+    _require_audit_review_access(user)
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if user.role in ("user", "newuser") and account_id not in (user.assigned_account_ids() or []):
+        raise HTTPException(status_code=403, detail="Access denied to this account")
+
+    result = run_manual_smart_audit(account_id)
+
+    # Normalize result so frontend always gets the expected shape
+    keyword_audit = result.get("keyword_audit") or {"actions_generated": 0}
+    search_term_audit = result.get("search_term_audit") or {"actions_generated": 0}
+
+    # If the orchestration itself failed, surface keyword/search term errors separately
+    if result.get("error"):
+        err = result["error"]
+        # Try to keep keyword results if they were produced before the failure
+        if not keyword_audit.get("error") and keyword_audit.get("actions_generated", 0) == 0:
+            keyword_audit["error"] = err
+        if not search_term_audit.get("error") and search_term_audit.get("actions_generated", 0) == 0:
+            search_term_audit["error"] = err
+
+    # Detect quota/rate-limit errors and reword them as a user-friendly warning
+    quota_phrases = ("quota", "rate limit", "rate_limit", "429", "exhausted", "resource exhausted")
+    st_error = search_term_audit.get("error") or ""
+    if any(p in st_error.lower() for p in quota_phrases):
+        search_term_audit["warning"] = "⚠️ Search term analysis skipped — Gemini API quota exhausted. Try again tomorrow or upgrade to paid API."
+        search_term_audit["actions_generated"] = search_term_audit.get("actions_generated", 0)
+
+    # Compute legacy budget/campaign action counts from existing pending actions
+    budget_actions = db.query(PendingAction).filter(
+        PendingAction.account_id == account_id,
+        PendingAction.status == "pending",
+        PendingAction.action_type == "PAUSE_OR_REDUCE_BUDGET",
+        PendingAction.campaign_status == "ENABLED",
+    ).count()
+    campaign_actions = db.query(PendingAction).filter(
+        PendingAction.account_id == account_id,
+        PendingAction.status == "pending",
+        PendingAction.action_type.in_(("PAUSE_CAMPAIGN", "ENABLE_CAMPAIGN", "ALERT_SETUP_ISSUE", "ALERT_PERFORMANCE_ISSUE", "ALERT_MISSING_LANDING_PAGE")),
+        PendingAction.campaign_status == "ENABLED",
+    ).count()
+
+    response = {
+        "account_id": account_id,
+        "account_name": account.name,
+        "keyword_audit": keyword_audit,
+        "search_term_audit": search_term_audit,
+        "budget_actions_generated": budget_actions,
+        "campaign_actions_generated": campaign_actions,
+    }
+
+    # Only raise a hard error if keyword audit completely failed and we have nothing to show
+    if keyword_audit.get("error") and keyword_audit.get("actions_generated", 0) == 0:
+        raise HTTPException(status_code=400, detail=keyword_audit["error"])
+
+    total_actions = (
+        keyword_audit.get("actions_generated", 0)
+        + search_term_audit.get("actions_generated", 0)
+    )
+    if total_actions > 0:
+        dispatch(
+            "audit_complete",
+            f"AI audit complete for {account.name}",
+            f"{total_actions} keyword/search-term actions generated.",
+            db,
+        )
+    return response
+
+
 @router.post("/accounts/{account_id}/refresh-landing-pages")
 def refresh_landing_pages(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     """Pull landing page URLs from Google Ads and crawl stale pages. Triggered manually from AdPulse."""
@@ -312,6 +390,25 @@ def _classify_search_term_finding(action: PendingAction) -> Dict[str, Any]:
     return findings
 
 
+def _normalize_campaign_status(st):
+    """Map legacy numeric campaign statuses to readable strings.
+
+    Google Ads CampaignStatus proto enum:
+      UNSPECIFIED=0, UNKNOWN=1, ENABLED=2, PAUSED=3, REMOVED=4
+    """
+    if st is None:
+        return "ENABLED"
+    raw = str(st).upper().strip()
+    status_map = {
+        "0": "UNKNOWN",
+        "1": "UNKNOWN",
+        "2": "ENABLED",
+        "3": "PAUSED",
+        "4": "REMOVED",
+    }
+    return status_map.get(raw, raw)
+
+
 def _merge_keyword_actions(actions: List[PendingAction], campaign_name_map: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
     """Group pending keyword pause actions by campaign + keyword_text and merge findings."""
     campaign_name_map = campaign_name_map or {}
@@ -354,7 +451,7 @@ def _merge_keyword_actions(actions: List[PendingAction], campaign_name_map: Opti
                 "ctr": ctr,
                 "queue_item_ids": [],
                 "findings": [],
-                "campaign_status": action.campaign_status or "ENABLED",
+                "campaign_status": _normalize_campaign_status(action.campaign_status),
                 "confidence": confidence,
                 "confidence_score": confidence_score,
                 "_seen_categories": set(),
@@ -448,7 +545,7 @@ def _merge_search_term_actions(actions: List[PendingAction], campaign_name_map: 
                 "ctr": ctr,
                 "queue_item_ids": [],
                 "findings": [],
-                "campaign_status": action.campaign_status or "ENABLED",
+                "campaign_status": _normalize_campaign_status(action.campaign_status),
                 "confidence": confidence,
                 "confidence_score": confidence_score,
                 "_seen_categories": set(),
@@ -616,11 +713,10 @@ def get_approval_queue_review(account_id: int, db: Session = Depends(get_db), us
         PendingAction.status == "pending",
     ).order_by(PendingAction.created_at.desc()).all()
 
-    # Filter out items from campaigns that were paused at audit time
-    active_only = [a for a in pending if (a.campaign_status or "ENABLED").upper() == "ENABLED"]
-
     # Build campaign_id -> campaign_name map from Google Ads to fix legacy numeric campaign names
     campaign_name_map = _fetch_campaign_name_map(account)
+
+    active_only = [a for a in pending if _normalize_campaign_status(a.campaign_status) == "ENABLED"]
 
     keywords_to_pause = _merge_keyword_actions(active_only, campaign_name_map)
     negatives_to_add = _merge_search_term_actions(active_only, campaign_name_map)

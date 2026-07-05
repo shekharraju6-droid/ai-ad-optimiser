@@ -79,12 +79,25 @@ def _keyword_already_flagged(db: Session, account_id: int, campaign_id: str, key
 
 
 def _campaign_status(campaigns: List[Dict[str, Any]], campaign_id: str) -> str:
-    """Return campaign status at audit time (ENABLED/PAUSED/REMOVED/UNKNOWN)."""
+    """Return campaign status at audit time (ENABLED/PAUSED/REMOVED/UNKNOWN).
+
+    Google Ads CampaignStatus proto enum:
+      UNSPECIFIED=0, UNKNOWN=1, ENABLED=2, PAUSED=3, REMOVED=4
+    Some proto-plus objects stringify to the numeric value, so we map them.
+    """
+    status_map = {
+        "0": "UNKNOWN",
+        "1": "UNKNOWN",
+        "2": "ENABLED",
+        "3": "PAUSED",
+        "4": "REMOVED",
+    }
     for camp in campaigns:
         if str(camp.get("id")) == str(campaign_id):
             status = camp.get("status")
-            if status:
-                return str(status).upper()
+            if status is not None:
+                raw = str(status).upper().strip()
+                return status_map.get(raw, raw)
     return "UNKNOWN"
 
 
