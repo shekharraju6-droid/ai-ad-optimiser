@@ -1853,6 +1853,8 @@
             updateReviewTabCounts(data);
             $('reviewModal').classList.remove('hidden');
             switchReviewTab('keywords');
+            const searchInput = document.querySelector('#reviewModalBody .review-search');
+            if (searchInput) searchInput.value = '';
         } catch (e) { toast(e.message, true); }
     }
 
@@ -1889,6 +1891,8 @@
         reviewState.search[tab] = '';
         reviewState.confidenceFilter[tab] = 'all';
         renderReviewTab(tab);
+        const searchInput = document.querySelector('#reviewModalBody .review-search');
+        if (searchInput) searchInput.value = '';
         updateReviewSelectionCount();
     }
 
