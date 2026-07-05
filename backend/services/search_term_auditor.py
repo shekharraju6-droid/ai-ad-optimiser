@@ -229,24 +229,36 @@ Search terms to classify:
 {terms_block}
 """
 
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                system_instruction="You are a precise Google Ads search term classifier. Return only valid JSON. Never include explanations outside the JSON array.",
-            ),
-        )
-        text = response.text if hasattr(response, "text") else ""
-        parsed = json.loads(text)
-        if not isinstance(parsed, list):
-            logger.warning(f"Gemini returned non-array for search term classification: {type(parsed)}")
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    system_instruction="You are a precise Google Ads search term classifier. Return only valid JSON. Never include explanations outside the JSON array.",
+                ),
+            )
+            text = response.text if hasattr(response, "text") else ""
+            parsed = json.loads(text)
+            if not isinstance(parsed, list):
+                logger.warning(f"Gemini returned non-array for search term classification: {type(parsed)}")
+                return []
+            return parsed
+        except Exception as e:
+            err_str = str(e).lower()
+            is_rate_limit = any(code in err_str for code in ["429", "503", "quota", "unavailable", "resource_exhausted"])
+            if is_rate_limit and attempt < max_retries - 1:
+                wait_seconds = 3
+                logger.warning(
+                    f"Gemini rate limit/unavailable for campaign '{campaign_name}' (attempt {attempt + 1}/{max_retries}): {e}. "
+                    f"Retrying in {wait_seconds}s..."
+                )
+                time.sleep(wait_seconds)
+                continue
+            logger.error(f"Gemini search term classification failed for campaign '{campaign_name}': {e}", exc_info=True)
             return []
-        return parsed
-    except Exception as e:
-        logger.error(f"Gemini search term classification failed for campaign '{campaign_name}': {e}", exc_info=True)
-        return []
 
 
 def run_search_term_audit(account_id: int, db: Session = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
@@ -399,6 +411,10 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
         }
     except Exception as e:
         logger.error(f"Search term audit failed for account {account_id}: {e}", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
         return {"error": str(e), "account_id": account_id, "actions_generated": 0}
     finally:
         if close_session:
