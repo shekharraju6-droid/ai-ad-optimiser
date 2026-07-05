@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
-from backend.db.models import PendingAction, Account, SuppressedSearchTerm, User
+from backend.db.models import PendingAction, Account, SuppressedSearchTerm, User, CampaignLandingPage
 from backend.services.auditor import audit_account, audit_all_accounts, review_action, list_pending_actions
 from backend.services.scheduler import run_manual_smart_audit
 from backend.services.audit_settings import get_audit_settings, set_audit_setting
