@@ -863,11 +863,12 @@
         try {
             const runs = await api('GET', '/audit-runs?limit=1');
             const el = $('lastAuditRun');
+            if (!el) return;
             if (!runs || !runs.length) { el.textContent = 'No smart audit runs yet'; return; }
             const r = runs[0];
             const istTime = r.start_time ? new Date(new Date(r.start_time).getTime() + (5.5 * 60 * 60 * 1000)).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'unknown';
             el.textContent = `Last smart audit: ${istTime} | ${r.status}`;
-        } catch (e) { $('lastAuditRun').textContent = ''; }
+        } catch (e) { const el = $('lastAuditRun'); if (el) el.textContent = ''; }
     }
 
     // Cache of last-audit-summary per account id
