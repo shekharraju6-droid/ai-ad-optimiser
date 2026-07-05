@@ -1885,6 +1885,9 @@
         document.querySelectorAll('.review-tab').forEach(t => t.classList.remove('active'));
         const activeTab = document.querySelector('.review-tab[data-tab="' + tab + '"]');
         if (activeTab) activeTab.classList.add('active');
+        // Reset filters when switching tabs so autofill/search does not hide items
+        reviewState.search[tab] = '';
+        reviewState.confidenceFilter[tab] = 'all';
         renderReviewTab(tab);
         updateReviewSelectionCount();
     }
@@ -2023,7 +2026,7 @@
                     <option value="medium" ${reviewState.confidenceFilter[tab] === 'medium' ? 'selected' : ''}>Filter: Medium</option>
                     <option value="low" ${reviewState.confidenceFilter[tab] === 'low' ? 'selected' : ''}>Filter: Low</option>
                 </select>
-                <input type="text" class="review-search" placeholder="Search..." value="${escapeHtml(reviewState.search[tab] || '')}" oninput="setReviewSearch('${tab}', this.value)">
+                <input type="text" class="review-search" placeholder="Search..." autocomplete="off" value="${escapeHtml(reviewState.search[tab] || '')}" oninput="setReviewSearch('${tab}', this.value)">
             </div>
             <div style="padding:0.4rem 0.75rem; font-size:0.78rem; font-weight:600; color:var(--color-text-muted);" id="reviewConfSummary_${tab}">${_confidenceSummary(items)}</div>
         `;
@@ -2033,6 +2036,11 @@
         // Update confidence summary with filtered items
         const summaryEl = $('reviewConfSummary_' + tab);
         if (summaryEl) summaryEl.textContent = _confidenceSummary(filtered);
+
+        if (!filtered.length) {
+            container.innerHTML = html + '<p style="color:var(--color-text-muted);padding:1rem;">No items match the current filters. Try clearing the search box or changing the confidence filter.</p>';
+            return;
+        }
 
         if (tab === 'keywords' || tab === 'negatives') {
             html += '<div style="border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden;" id="reviewTableWrapper">';
