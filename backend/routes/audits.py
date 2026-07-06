@@ -747,7 +747,14 @@ def _pending_actions_for_campaign(account_id: int, campaign_id: str, db: Session
 
 @router.get("/accounts/{account_id}/campaign-audit-summary")
 def get_campaign_audit_summary(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
-    """Return the list of enabled campaigns with last-audited dates for an account."""
+    """Return enabled campaigns with last-audited dates for an account.
+
+    Priority:
+      1. DISTINCT campaign_id/campaign_name from pending_actions (instant,
+         already audited/known).
+      2. Live Google Ads API fetch for enabled campaigns (most accurate).
+      3. Stored campaign_landing_pages as final fallback.
+    """
     _require_audit_review_access(user)
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
@@ -755,44 +762,105 @@ def get_campaign_audit_summary(account_id: int, db: Session = Depends(get_db), u
     if user.role in ("user", "newuser") and account_id not in (user.assigned_account_ids() or []):
         raise HTTPException(status_code=403, detail="Access denied to this account")
 
-    campaigns = []
+    enabled_campaigns = []
+    seen_ids = set()
+
+    # ---- Option A: pending_actions (instant, no API call) ----
+    pending_rows = db.query(
+        PendingAction.campaign_id,
+        PendingAction.campaign_status,
+        PendingAction.created_at,
+        PendingAction.new_value,
+    ).filter(
+        PendingAction.account_id == account_id,
+        PendingAction.campaign_id.isnot(None),
+    ).order_by(PendingAction.created_at.desc()).all()
+
+    print(f"[campaign-audit-summary] account={account_id} pending_actions_rows={len(pending_rows)}")
+
+    for row in pending_rows:
+        cid = str(row.campaign_id or "").strip()
+        if not cid or cid in seen_ids:
+            continue
+        status = _normalize_campaign_status(row.campaign_status)
+        if status not in ("ENABLED", "UNKNOWN"):
+            continue
+        seen_ids.add(cid)
+        # Campaign name is stored inside new_value JSON payload
+        nv = row.new_value or {}
+        campaign_name = nv.get("campaign_name") if isinstance(nv, dict) else None
+        enabled_campaigns.append({
+            "campaign_id": cid,
+            "campaign_name": _display_campaign_name(campaign_name or "", cid),
+            "status": "ENABLED",
+            "last_audited_at": row.created_at.isoformat() if row.created_at else None,
+        })
+
+    print(f"[campaign-audit-summary] account={account_id} after pending_actions: {len(enabled_campaigns)} campaigns")
+
+    # ---- Option B: live Google Ads fetch (fills any missing live campaigns) ----
     if account.has_google and account.google_is_live:
         try:
             connector = get_connector(account, platform="google")
             if connector and connector.is_valid:
-                campaigns = connector.fetch_campaigns()
+                live_campaigns = connector.fetch_campaigns()
+                print(f"[campaign-audit-summary] account={account_id} live_fetch_campaigns={len(live_campaigns)}")
+                for c in live_campaigns:
+                    cid = str(c.get("id") or "").strip()
+                    if not cid:
+                        continue
+                    status = _normalize_campaign_status(c.get("status"))
+                    print(f"[campaign-audit-summary] account={account_id} live_campaign cid={cid} status={status}")
+                    if status != "ENABLED":
+                        continue
+                    if cid in seen_ids:
+                        # If already from pending_actions, keep name from live if more accurate
+                        for item in enabled_campaigns:
+                            if item["campaign_id"] == cid and c.get("name"):
+                                item["campaign_name"] = c.get("name")
+                        continue
+                    seen_ids.add(cid)
+                    enabled_campaigns.append({
+                        "campaign_id": cid,
+                        "campaign_name": c.get("name") or f"Campaign #{cid}",
+                        "status": status,
+                        "last_audited_at": None,
+                    })
         except Exception as e:
             logger.warning(f"Failed to fetch campaigns for account {account_id}: {e}")
+            print(f"[campaign-audit-summary] account={account_id} live_fetch_exception: {e}")
 
-    # Fetch stored campaign landing pages for names fallback
+    # ---- Option C: campaign_landing_pages fallback for names ----
     lp_rows = db.query(CampaignLandingPage).filter(CampaignLandingPage.account_id == account_id).all()
     lp_map = {r.campaign_id: r for r in lp_rows}
+    print(f"[campaign-audit-summary] account={account_id} landing_page_rows={len(lp_rows)}")
+    for item in enabled_campaigns:
+        cid = item["campaign_id"]
+        if (not item["campaign_name"] or item["campaign_name"].startswith("Campaign #")) and lp_map.get(cid):
+            item["campaign_name"] = lp_map[cid].campaign_name or item["campaign_name"]
 
-    enabled_campaigns = []
-    for c in campaigns:
-        status = _normalize_campaign_status(c.get("status"))
-        if status != "ENABLED":
-            continue
-        cid = str(c.get("id"))
-        name = c.get("name") or (lp_map.get(cid).campaign_name if lp_map.get(cid) else None) or f"Campaign #{cid}"
-        # Last audited = latest pending_action created_at for this campaign
-        last_action = db.query(PendingAction).filter(
-            PendingAction.account_id == account_id,
-            PendingAction.campaign_id == cid,
-        ).order_by(PendingAction.created_at.desc()).first()
-        enabled_campaigns.append({
-            "campaign_id": cid,
-            "campaign_name": name,
-            "status": status,
-            "last_audited_at": last_action.created_at.isoformat() if last_action else None,
-        })
+    # Ensure any landing-page-only campaigns are included if nothing else found
+    if not enabled_campaigns:
+        for cid, lp in lp_map.items():
+            if cid in seen_ids:
+                continue
+            seen_ids.add(cid)
+            enabled_campaigns.append({
+                "campaign_id": cid,
+                "campaign_name": lp.campaign_name or f"Campaign #{cid}",
+                "status": "ENABLED",
+                "last_audited_at": None,
+            })
 
     enabled_campaigns.sort(key=lambda x: x["campaign_name"])
-    return {
+    result = {
         "account_id": account_id,
         "account_name": account.name,
         "campaigns": enabled_campaigns,
     }
+    print(f"[campaign-audit-summary] account={account_id} final_response_campaigns={len(enabled_campaigns)}")
+    logger.info(f"Campaign audit summary for account {account_id}: {len(enabled_campaigns)} enabled campaigns returned")
+    return result
 
 
 @router.get("/adpulse/approval-queue/{account_id}/review")

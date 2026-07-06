@@ -1940,10 +1940,12 @@
         if (!container) return;
         container.innerHTML = '<p style="color:var(--color-text-muted);padding:0.5rem;">Loading campaigns...</p>';
         try {
-            const campaigns = await api('GET', '/accounts/' + accountId + '/campaign-audit-summary');
-            approvalClientListState.campaignSummaries[accountId] = campaigns || [];
+            const data = await api('GET', '/accounts/' + accountId + '/campaign-audit-summary');
+            console.log('Campaign audit summary:', data);
+            approvalClientListState.campaignSummaries[accountId] = (data && data.campaigns) || [];
             renderCampaignRows(accountId);
         } catch (e) {
+            console.error('Campaign audit summary failed:', e);
             container.innerHTML = '<p style="color:var(--color-danger-text);padding:0.5rem;">Failed to load: ' + escapeHtml(e.message) + '</p>';
         }
     }
