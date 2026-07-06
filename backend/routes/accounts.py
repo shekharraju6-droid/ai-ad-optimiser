@@ -12,6 +12,7 @@ from backend.db.revenueops_models import RevClient, RevClientStatus
 from backend.services.crypto import encrypt, decrypt
 from backend.services.connectors import get_connector
 from backend.services.activity_log import log_activity
+from backend.services.oauth import build_google_credentials, build_meta_credentials
 from backend.routes.auth import get_current_user_required
 
 logger = logging.getLogger("AdOptima")
@@ -129,6 +130,8 @@ class AccountUpdate(BaseModel):
     meta_app_id: Optional[str] = None
     meta_app_secret: Optional[str] = None
     redirect_base_url: Optional[str] = None
+    google_refresh_token: Optional[str] = None
+    meta_access_token: Optional[str] = None
     lsq_access_key: Optional[str] = None
     lsq_secret_key: Optional[str] = None
     lsq_base_url: Optional[str] = None
@@ -368,6 +371,23 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.google_client_secret = req.google_client_secret or None
     if req.google_developer_token is not None:
         account.google_developer_token = req.google_developer_token or None
+    # Encrypt raw tokens supplied from the integrations page (direct entry path)
+    if hasattr(req, "google_refresh_token") and req.google_refresh_token:
+        encrypted = build_google_credentials(
+            {"refresh_token": req.google_refresh_token, "token_type": "Bearer"},
+            account.id,
+        )
+        if encrypted:
+            account.google_credentials = encrypted
+            account.google_is_live = True
+    if hasattr(req, "meta_access_token") and req.meta_access_token:
+        encrypted = build_meta_credentials(
+            {"access_token": req.meta_access_token},
+            account.id,
+        )
+        if encrypted:
+            account.meta_credentials = encrypted
+            account.meta_is_live = True
     if req.meta_app_id is not None:
         account.meta_app_id = req.meta_app_id or None
     if req.meta_app_secret is not None:

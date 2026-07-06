@@ -295,6 +295,18 @@ async function saveIntegration(){
                 // also update global if no account selected, but account is required here
             }
         });
+        // Mark platform as enabled when credentials are saved on this page
+        if(activeIntegration.id==='google-ads') accountPayload.has_google=true;
+        if(activeIntegration.id==='meta-ads') accountPayload.has_meta=true;
+        // Tokens for wired ad platforms should be stored per-account (encrypted)
+        if(activeIntegration.id==='google-ads' && globalPayload.google_refresh_token){
+            accountPayload.google_refresh_token=globalPayload.google_refresh_token;
+            delete globalPayload.google_refresh_token;
+        }
+        if(activeIntegration.id==='meta-ads' && globalPayload.meta_access_token){
+            accountPayload.meta_access_token=globalPayload.meta_access_token;
+            delete globalPayload.meta_access_token;
+        }
         if(selectedAccount && Object.keys(accountPayload).length){
             await api('PUT',`/accounts/${selectedAccount.id}`,accountPayload);
         }
