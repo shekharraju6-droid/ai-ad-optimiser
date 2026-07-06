@@ -1078,7 +1078,7 @@
         const titles = { dashboard: 'Client/Brand Dashboard', accounts: 'Manage Client/Brand', approvals: 'AI Audit Review', 'account-detail': 'Client/Brand Detail' };
         $('pageTitle').textContent = titles[name] || 'AdOptima';
         if (name === 'accounts') loadAccounts();
-        if (name === 'approvals') loadPendingActions();
+        if (name === 'approvals') loadAccountsForApprovalPage();
     }
 
     function initApp() {
@@ -1862,6 +1862,13 @@
 
     let approvalClientListState = { expanded: {}, campaignSummaries: {}, auditing: {} };
 
+    async function loadAccountsForApprovalPage() {
+        try {
+            allAccounts = await api('GET', '/accounts');
+        } catch (e) {}
+        loadPendingActions();
+    }
+
     async function loadPendingActions() {
         try {
             pendingActions = await api('GET', '/pending-actions');
@@ -1871,23 +1878,30 @@
         } catch (e) { toast(e.message, true); }
     }
 
-    function _groupPendingByAccount(actions) {
-        const groups = {};
-        actions.forEach(a => {
-            if (a.campaign_status && a.campaign_status.toUpperCase() !== 'ENABLED') return;
-            const key = a.account_id;
-            if (!groups[key]) groups[key] = { account_id: a.account_id, account_name: a.account_name || ('Client/Brand ' + a.account_id), actions: [] };
-            groups[key].actions.push(a);
+    function _buildApprovalClientList() {
+        // Start from all active Google-enabled accounts so every Client/Brand is visible.
+        // Merge in any pending actions counts per account.
+        const accountMap = {};
+        (allAccounts || []).forEach(a => {
+            if (!a.is_active || (!a.has_google && !a.has_meta)) return;
+            accountMap[a.id] = { account_id: a.id, account_name: a.name || ('Client/Brand ' + a.id), is_live: a.is_live, has_google: a.has_google, has_meta: a.has_meta, google_is_live: a.google_is_live, actions: [] };
         });
-        return Object.values(groups).sort((a, b) => (a.account_name || '').localeCompare(b.account_name || ''));
+        (pendingActions || []).forEach(a => {
+            if (a.campaign_status && a.campaign_status.toUpperCase() !== 'ENABLED') return;
+            if (!accountMap[a.account_id]) {
+                accountMap[a.account_id] = { account_id: a.account_id, account_name: a.account_name || ('Client/Brand ' + a.account_id), is_live: false, has_google: false, has_meta: false, google_is_live: false, actions: [] };
+            }
+            accountMap[a.account_id].actions.push(a);
+        });
+        return Object.values(accountMap).sort((a, b) => (a.account_name || '').localeCompare(b.account_name || ''));
     }
 
     function renderApprovalClientList() {
         const container = $('approvalClientList');
         if (!container) return;
-        const groups = _groupPendingByAccount(pendingActions);
+        const groups = _buildApprovalClientList();
         if (!groups.length) {
-            container.innerHTML = '<p style="color:var(--color-text-muted);padding:1rem;">No pending recommendations. Run an audit on a campaign to generate recommendations.</p>';
+            container.innerHTML = '<p style="color:var(--color-text-muted);padding:1rem;">No Client/Brand accounts available. Add an account first.</p>';
             return;
         }
         let html = '';
@@ -1909,11 +1923,12 @@
             const expanded = approvalClientListState.expanded[g.account_id];
             const chevron = expanded ? '▼' : '▶';
             html += `
-                <div class="card" style="margin-bottom:0.6rem; cursor:pointer;" id="approvalAccountCard-${g.account_id}">
+                <div class="card" style="margin-bottom:0.6rem; cursor:pointer; ${g.google_is_live ? '' : 'opacity:0.85;'}" id="approvalAccountCard-${g.account_id}">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;" onclick="toggleApprovalAccount(${g.account_id})">
                         <div>
                             <span style="font-weight:700; font-size:0.95rem;">${chevron} ${escapeHtml(g.account_name)}</span>
-                            <div style="font-size:0.75rem; color:var(--color-text-muted); margin-top:0.2rem;">${breakdown.join(' | ') || 'No issues'} &bull; ${counts.pending} pending</div>
+                            <span style="font-size:0.7rem; margin-left:0.4rem; padding:0.15rem 0.4rem; border-radius:999px; background:${g.google_is_live ? 'var(--color-success-bg,#dcfce7)' : 'var(--color-warning-bg,#fef3c7)'}; color:${g.google_is_live ? 'var(--color-success,#16a34a)' : 'var(--color-warning,#d97706)'};">${g.google_is_live ? 'Live' : 'Not Connected'}</span>
+                            <div style="font-size:0.75rem; color:var(--color-text-muted); margin-top:0.2rem;">${breakdown.join(' | ') || 'No pending recommendations'} &bull; ${counts.pending} pending</div>
                         </div>
                         <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openReviewModal(${g.account_id})" title="Open full review modal">Full Review</button>
                     </div>
