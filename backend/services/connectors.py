@@ -487,6 +487,7 @@ class GoogleAdsConnector(AdsConnector):
             operation = client.get_type("CampaignCriterionOperation")
             operation.create.campaign = campaign_resource_name
             operation.create.negative = True
+            operation.create.type_ = client.enums.CriterionTypeEnum.KEYWORD
             operation.create.keyword.text = keyword
             # Match type mapping
             mt = (match_type or "EXACT").upper()
@@ -502,6 +503,7 @@ class GoogleAdsConnector(AdsConnector):
                 operations=[operation],
             )
             created = response.results[0].resource_name if response.results else None
+            print(f"[apply-negative-keyword] customer={customer_id} campaign={campaign_id} keyword={keyword} resource={created}")
             return {"success": True, "resource_name": created, "campaign_id": campaign_id, "keyword": keyword, "match_type": match_type}
         except Exception as e:
             logger.error(f"Google apply negative keyword failed: {e}", exc_info=True)
