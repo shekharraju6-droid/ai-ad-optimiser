@@ -82,8 +82,6 @@ class AccountCreate(BaseModel):
     meta_external_id: Optional[str] = None
     google_is_live: bool = False
     meta_is_live: bool = False
-    google_refresh_token: Optional[str] = None
-    meta_access_token: Optional[str] = None
 
     crm_type: str = "none"
     crm_credentials: Optional[str] = None
@@ -125,8 +123,6 @@ class AccountUpdate(BaseModel):
     meta_external_id: Optional[str] = None
     google_is_live: Optional[bool] = None
     meta_is_live: Optional[bool] = None
-    google_refresh_token: Optional[str] = None
-    meta_access_token: Optional[str] = None
     google_client_id: Optional[str] = None
     google_client_secret: Optional[str] = None
     google_developer_token: Optional[str] = None
@@ -320,24 +316,6 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(account)
-
-    # Store encrypted Google credentials if refresh token provided on creation.
-    if req.google_refresh_token and req.google_refresh_token.strip():
-        from backend.services.oauth import build_google_credentials
-        token_data = {"refresh_token": req.google_refresh_token.strip()}
-        encrypted = build_google_credentials(token_data, account.id)
-        if encrypted:
-            account.google_credentials = encrypted
-            db.commit()
-
-    # Store encrypted Meta credentials if access token provided on creation.
-    if req.meta_access_token and req.meta_access_token.strip():
-        from backend.services.oauth import build_meta_credentials
-        encrypted = build_meta_credentials({"access_token": req.meta_access_token.strip()}, account.id)
-        if encrypted:
-            account.meta_credentials = encrypted
-            db.commit()
-
     log_activity(
         module="System",
         action="Account Created",
@@ -383,25 +361,6 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.google_is_live = req.google_is_live
     if req.meta_is_live is not None:
         account.meta_is_live = req.meta_is_live
-
-    # If a Google refresh token is provided directly, encrypt and store it and mark Google live.
-    if req.google_refresh_token is not None and req.google_refresh_token.strip():
-        from backend.services.oauth import build_google_credentials
-        token_data = {"refresh_token": req.google_refresh_token.strip()}
-        encrypted = build_google_credentials(token_data, account_id)
-        if encrypted:
-            account.google_credentials = encrypted
-            account.google_is_live = True
-            account.is_live = True
-
-    # If a Meta access token is provided directly, encrypt and store it and mark Meta live.
-    if req.meta_access_token is not None and req.meta_access_token.strip():
-        from backend.services.oauth import build_meta_credentials
-        encrypted = build_meta_credentials({"access_token": req.meta_access_token.strip()}, account_id)
-        if encrypted:
-            account.meta_credentials = encrypted
-            account.meta_is_live = True
-            account.is_live = True
 
     if req.google_client_id is not None:
         account.google_client_id = req.google_client_id or None
