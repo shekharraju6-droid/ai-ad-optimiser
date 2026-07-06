@@ -529,6 +529,44 @@ def delete_account(account_id: int, delete_revops: bool = False, db: Session = D
     return {"status": "success", "rev_client_deleted": delete_revops and bool(rev_client_id)}
 
 
+@router.post("/accounts/{account_id}/test-pull/{platform}")
+def test_pull(account_id: int, platform: str, db: Session = Depends(get_db)):
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if platform not in ("google", "meta"):
+        raise HTTPException(status_code=400, detail="Platform must be google or meta")
+
+    platform_creds = account.google_credentials if platform == "google" else account.meta_credentials
+    platform_live = account.google_is_live if platform == "google" else account.meta_is_live
+    use_live = platform_live and bool(platform_creds)
+
+    if not use_live:
+        raise HTTPException(status_code=400, detail=f"{platform.title()} is not live or has no credentials")
+
+    connector = get_connector(account, platform=platform)
+    if not connector or not connector.is_valid:
+        raise HTTPException(status_code=400, detail="Invalid credentials or connector not configured")
+
+    try:
+        metrics = connector.fetch_account_metrics()
+        if "error" in metrics:
+            raise HTTPException(status_code=400, detail=metrics["error"])
+        campaigns = connector.fetch_campaigns()
+        return {
+            "status": "success",
+            "platform": platform,
+            "metrics": metrics,
+            "campaigns_count": len(campaigns),
+            "sample_campaigns": campaigns[:5],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"{platform.title()} test pull failed for account {account_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/accounts/{account_id}/refresh")
 def refresh_account(account_id: int, start_date: Optional[str] = None, end_date: Optional[str] = None, platform: Optional[str] = None, db: Session = Depends(get_db)):
     account = db.query(Account).filter(Account.id == account_id).first()

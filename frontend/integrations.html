@@ -90,7 +90,7 @@
                 <div class="form-grid" id="formFields"></div>
                 <div style="margin-top:1.25rem;display:flex;gap:.5rem;align-items:center">
                     <button class="btn btn-primary" id="formSave" onclick="saveIntegration()">Save Credentials</button>
-                    <button class="btn btn-secondary" id="formTest" onclick="testIntegration()">Test Pull</button>
+                    <button class="btn btn-secondary" id="formTest" onclick="testIntegration()">Test Pull / Connect</button>
                     <span id="formWired" style="font-size:.78rem;color:var(--success);margin-left:auto"></span>
                 </div>
             </div>
@@ -328,7 +328,22 @@ async function testIntegration(){
     if(!activeIntegration)return;
     if(!activeIntegration.wired){toast(`${activeIntegration.name} test pull not yet implemented`,'error');return}
     if(activeIntegration.id==='google-ads')toast('Google Ads test pull: uses live connector if credentials are valid','success');
-    else if(activeIntegration.id==='meta-ads')toast('Meta Ads test pull: uses live connector if credentials are valid','success');
+    else if(activeIntegration.id==='meta-ads'){
+        if(!selectedAccount){toast('Select an account first','error');return}
+        const btn=(typeof event!=='undefined'&&event)?event.target:null;
+        if(btn){btn.textContent='Connecting...';btn.disabled=true}
+        try{
+            const data=await api('POST',`/accounts/${selectedAccount.id}/test-pull/meta`);
+            const campText = data.campaigns_count !== undefined ? ` | ${data.campaigns_count} campaigns` : '';
+            if(btn) btn.textContent = 'Connect to Meta';
+            toast(`Meta connected. Spend: ${data.metrics.spend || 0}${campText}`,'success');
+        }catch(e){
+            if(btn)btn.textContent='Connect to Meta';
+            toast(e.message,'error');
+        }
+        finally{if(btn){btn.disabled=false}}
+        return;
+    }
     else if(activeIntegration.id==='leadsquared')toast('LeadSquared test pull: uses live API if keys provided','success');
     else if(activeIntegration.id==='salesforce')toast('Salesforce test pull: uses live API if tokens provided','success');
 }
