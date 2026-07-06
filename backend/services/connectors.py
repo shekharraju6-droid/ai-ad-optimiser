@@ -482,21 +482,20 @@ class GoogleAdsConnector(AdsConnector):
             campaign_service = client.get_service("CampaignCriterionService")
             campaign_resource_name = client.get_service("GoogleAdsService").campaign_path(customer_id, campaign_id)
 
-            criterion = client.get_type("CampaignCriterion")
-            criterion.campaign = campaign_resource_name
-            criterion.negative = True
-            criterion.keyword.text = keyword
+            # Build the operation directly; recent Google Ads API versions do not
+            # support CopyFrom on CampaignCriterionOperation.create.
+            operation = client.get_type("CampaignCriterionOperation")
+            operation.create.campaign = campaign_resource_name
+            operation.create.negative = True
+            operation.create.keyword.text = keyword
             # Match type mapping
             mt = (match_type or "EXACT").upper()
             if mt == "EXACT":
-                criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.EXACT
+                operation.create.keyword.match_type = client.enums.KeywordMatchTypeEnum.EXACT
             elif mt == "PHRASE":
-                criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.PHRASE
+                operation.create.keyword.match_type = client.enums.KeywordMatchTypeEnum.PHRASE
             else:
-                criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.BROAD
-
-            operation = client.get_type("CampaignCriterionOperation")
-            operation.create.CopyFrom(criterion)
+                operation.create.keyword.match_type = client.enums.KeywordMatchTypeEnum.BROAD
 
             response = campaign_service.mutate_campaign_criteria(
                 customer_id=customer_id,

@@ -2382,14 +2382,28 @@
             const applied = result.applied_count || 0;
             const failed = result.failed_count || 0;
             updateReviewProgress(applied + failed, selectedIds.size, `Applied: ${applied} ✓ | Failed: ${failed} ✗`);
+            // Show detailed failures in a non-blocking alert if anything failed
+            if (failed > 0 && Array.isArray(result.results)) {
+                const failureMessages = result.results
+                    .filter(r => r.status === 'failed' && r.message)
+                    .slice(0, 5)
+                    .map(r => `#${r.id}: ${r.message}`)
+                    .join('\n');
+                if (failureMessages) console.error('Review failures:\n' + failureMessages);
+            }
             setTimeout(() => {
                 hideReviewProgress();
                 closeInlineCampaignReview();
                 loadPendingActions();
                 loadPendingActionsCount();
                 if (inlineReviewState.accountId) loadCampaignAuditSummary(inlineReviewState.accountId);
-                toast(`Applied: ${applied} ✓ | Failed: ${failed} ✗`);
-            }, 1200);
+                if (failed > 0) {
+                    const firstError = Array.isArray(result.results) && result.results.find(r => r.status === 'failed' && r.message);
+                    toast(`Applied: ${applied} ✓ | Failed: ${failed} ✗${firstError ? ' — ' + firstError.message : ''}`, true);
+                } else {
+                    toast(`Applied: ${applied} ✓ | Failed: ${failed} ✗`);
+                }
+            }, 1800);
         } catch (e) {
             hideReviewProgress();
             toast(e.message, true);
