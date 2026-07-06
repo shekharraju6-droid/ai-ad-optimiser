@@ -299,6 +299,7 @@ class GoogleAdsConnector(AdsConnector):
               AND campaign.status = 'ENABLED'
               AND ad_group.status = 'ENABLED'
               AND ad_group_criterion.status = 'ENABLED'
+              AND metrics.cost_micros > 0
         """
         try:
             service = self.client.get_service("GoogleAdsService")

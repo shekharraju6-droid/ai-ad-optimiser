@@ -331,20 +331,30 @@ def run_search_term_audit(account_id: int, db: Session = None, start_date: Optio
             campaign_name = camp_data["campaign_name"]
             terms = camp_data["terms"]
 
-            # Filter to candidates meeting threshold before sending to Gemini
+            # Filter to candidates meeting hard activity guard and threshold before sending to Gemini.
+            # Hard guard: (clicks > 0 OR spend > 0) AND conversions = 0.
+            # Terms with conversions or zero activity are never sent to Gemini or flagged.
             candidates = []
             for t in terms:
-                if t.get("clicks", 0) >= min_clicks or t.get("spend", 0) >= min_spend:
-                    term_text = t.get("term", "")
-                    if not term_text:
-                        continue
-                    if term_text.lower() in existing_negative_texts:
-                        continue
-                    if _already_pending(db, account_id, cid, term_text):
-                        continue
-                    if _is_suppressed(db, account_id, cid, term_text):
-                        continue
-                    candidates.append(t)
+                clicks = t.get("clicks", 0) or 0
+                spend = t.get("spend", 0) or 0
+                conversions = t.get("conversions", 0) or 0
+                if conversions > 0:
+                    continue
+                if clicks <= 0 and spend <= 0:
+                    continue
+                if clicks < min_clicks and spend < min_spend:
+                    continue
+                term_text = t.get("term", "")
+                if not term_text:
+                    continue
+                if term_text.lower() in existing_negative_texts:
+                    continue
+                if _already_pending(db, account_id, cid, term_text):
+                    continue
+                if _is_suppressed(db, account_id, cid, term_text):
+                    continue
+                candidates.append(t)
 
             if not candidates:
                 continue

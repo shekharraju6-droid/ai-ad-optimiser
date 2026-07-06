@@ -181,6 +181,11 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
             camp_status = _campaign_status(campaigns, cid)
             resolved_campaign_name = _resolve_campaign_name(cid, kw.get("campaign_name", ""), campaign_name_map)
 
+            # Hard guard: only flag keywords that have spent money with zero conversions.
+            # Keywords with any conversions or zero spend are never flagged.
+            if spend <= 0 or conversions > 0:
+                continue
+
             # CHECK A: Non-brand keyword in Brand campaign
             if campaign_type == "brand" and keyword_text:
                 if not _contains_brand_term(keyword_text, brand_terms):
@@ -193,7 +198,7 @@ def run_keyword_audit(account_id: int, db: Session = None, start_date: Optional[
                             adset_id=ad_group_id,
                             keyword=keyword_text,
                             match_type=match_type,
-                            reason=f"Non-brand keyword '{keyword_text}' found in Brand campaign '{resolved_campaign_name}'. It does not contain any brand term ({', '.join(brand_terms)}).",
+                            reason=f"Non-brand keyword '{keyword_text}' found in Brand campaign '{resolved_campaign_name}'. It does not contain any brand term ({', '.join(brand_terms)}) and has spent Rs {spend:,.0f} with 0 conversions.",
                             new_value={
                                 "audit_type": "keyword_audit",
                                 "recommendation": "pause_keyword",
