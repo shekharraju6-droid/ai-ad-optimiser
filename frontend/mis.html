@@ -207,10 +207,23 @@
         html, body { overflow-x: hidden; }
         .main, .content { overflow-x: hidden; min-width: 0; }
 
-        /* Report content fills viewport width */
+        /* Main content area must subtract the fixed sidebar width */
+        .main {
+            width: calc(100vw - 220px);
+            max-width: calc(100vw - 220px);
+            box-sizing: border-box;
+        }
+        @media (max-width: 768px) {
+            .main {
+                width: calc(100vw - 180px);
+                max-width: calc(100vw - 180px);
+            }
+        }
+
+        /* Report content fills the available main area */
         #reportContent {
             width: 100%;
-            max-width: 100vw;
+            max-width: 100%;
             overflow-x: hidden;
             box-sizing: border-box;
         }
@@ -219,6 +232,7 @@
             max-width: 100%;
             overflow-x: hidden;
             padding: clamp(8px, 1vw, 20px);
+            box-sizing: border-box;
         }
 
         /* Header / topbar responsiveness */
@@ -285,18 +299,23 @@
         /* Side-by-side report tables wrapper (DSU T1/T2 and DSI T1/T2) */
         .report-tables-flex {
             display: flex;
-            gap: 16px;
+            gap: 12px;
             align-items: stretch;
             width: 100%;
             max-width: 100%;
+            overflow: hidden;
+            box-sizing: border-box;
         }
         .report-tables-flex > .report-container,
         .report-tables-flex > div {
             flex: 1;
             min-width: 0;
+            width: 0;
             max-width: 50%;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+            box-sizing: border-box;
         }
         @media (max-width: 900px) {
             .report-tables-flex {
@@ -305,6 +324,7 @@
             .report-tables-flex > .report-container,
             .report-tables-flex > div {
                 max-width: 100%;
+                width: auto;
             }
         }
 
@@ -323,19 +343,22 @@
         .dsu-table, .dsu-table7 {
             width: 100% !important;
             max-width: 100%;
-            table-layout: auto;
+            table-layout: fixed;
+            word-wrap: break-word;
             font-size: clamp(11px, 1.1vw, 14px);
         }
         .dsu-table th, .dsu-table7 th {
             font-size: clamp(10px, 1vw, 13px);
             padding: clamp(4px, 0.5vw, 8px) clamp(6px, 0.8vw, 12px);
             word-break: break-word;
+            overflow-wrap: break-word;
             hyphens: auto;
         }
         .dsu-table td, .dsu-table7 td {
             font-size: clamp(11px, 1.1vw, 14px);
             padding: clamp(4px, 0.5vw, 8px) clamp(6px, 0.8vw, 12px);
             word-break: break-word;
+            overflow-wrap: break-word;
             hyphens: auto;
             vertical-align: top;
         }
@@ -364,13 +387,17 @@
         .dsu-banner,
         .report-notice {
             width: 100%;
+            max-width: 100%;
             font-size: clamp(10px, 0.9vw, 12px);
             padding: clamp(6px, 0.8vw, 12px);
             white-space: normal;
             word-break: break-word;
+            overflow-wrap: break-word;
+            box-sizing: border-box;
         }
         .report-notice {
             width: 100%;
+            max-width: 100%;
         }
 
         /* Section header labels */
@@ -406,6 +433,22 @@
             width: 100%;
             margin: 0 auto;
             overflow-x: hidden;
+            box-sizing: border-box;
+        }
+
+        /* Report date inputs/selectors must not force table width */
+        .dsu-mode-row select,
+        .dsu-mode-row input[type="date"],
+        .report-container select,
+        .report-container input[type="date"] {
+            min-width: 0;
+            max-width: 100%;
+        }
+
+        /* Info notice boxes */
+        .report-notice,
+        .dsu-banner {
+            box-sizing: border-box;
         }
 
         /* Print-friendly output */
@@ -999,7 +1042,7 @@
             return `
                 <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;flex-wrap:wrap;">
                     <span>Table 2:</span>
-                    <select id="dsuT2Preset" onchange="dsuT2Preset(this.value)" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);min-width:120px;"
+                    <select id="dsuT2Preset" onchange="dsuT2Preset(this.value)" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);"
                         onfocus="this.style.background='#fff'">
                         <option value="yesterday" ${dsuT2Range.preset==='yesterday'?'selected':''}>Yesterday</option>
                         <option value="today" ${dsuT2Range.preset==='today'?'selected':''}>Today</option>
@@ -1037,13 +1080,13 @@
                         <option value="custom" ${rangeObj.preset==='custom'?'selected':''}>Custom</option>
                     </select>
                 </div>
-                <div class="form-group" style="min-width:130px;">
+                <div class="form-group" style="min-width:0;flex:1;">
                     <label>Start</label>
-                    <input type="date" id="${onChange}Start" value="${rangeObj.start}" onchange="${onChange}Custom()" class="date-input" style="padding:0.4rem 0.6rem;border:1px solid var(--border-color);border-radius:6px;font-size:0.78rem;">
+                    <input type="date" id="${onChange}Start" value="${rangeObj.start}" onchange="${onChange}Custom()" class="date-input" style="padding:0.4rem 0.6rem;border:1px solid var(--border-color);border-radius:6px;font-size:0.78rem;min-width:0;width:100%;">
                 </div>
-                <div class="form-group" style="min-width:130px;">
+                <div class="form-group" style="min-width:0;flex:1;">
                     <label>End</label>
-                    <input type="date" id="${onChange}End" value="${rangeObj.end}" onchange="${onChange}Custom()" class="date-input" style="padding:0.4rem 0.6rem;border:1px solid var(--border-color);border-radius:6px;font-size:0.78rem;">
+                    <input type="date" id="${onChange}End" value="${rangeObj.end}" onchange="${onChange}Custom()" class="date-input" style="padding:0.4rem 0.6rem;border:1px solid var(--border-color);border-radius:6px;font-size:0.78rem;min-width:0;width:100%;">
                 </div>
             </div>
         `;
