@@ -347,6 +347,9 @@
             word-wrap: break-word;
             font-size: clamp(11px, 1.1vw, 14px);
         }
+        .dsu-table *, .dsu-table7 * {
+            max-width: 100%;
+        }
         .dsu-table th, .dsu-table7 th {
             font-size: clamp(10px, 1vw, 13px);
             padding: clamp(4px, 0.5vw, 8px) clamp(6px, 0.8vw, 12px);
@@ -441,8 +444,40 @@
         .dsu-mode-row input[type="date"],
         .report-container select,
         .report-container input[type="date"] {
-            min-width: 0;
+            min-width: 0 !important;
             max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        /* Prevent any nowrap inside report table headers from blowing out layout */
+        .dsu-banner,
+        .dsu-mis-row,
+        .dsu-mode-row,
+        .dsu-range-label {
+            white-space: normal !important;
+            word-break: break-word !important;
+            overflow-wrap: anywhere !important;
+        }
+        .dsu-banner *,
+        .dsu-mis-row *,
+        .dsu-mode-row *,
+        .dsu-range-label * {
+            white-space: normal !important;
+            word-break: break-word !important;
+            overflow-wrap: anywhere !important;
+        }
+        /* Column width hints for course performance tables */
+        .report-tables-flex .dsu-table th:first-child,
+        .report-tables-flex .dsu-table td:first-child {
+            width: 42%;
+        }
+        .report-tables-flex .dsu-table th:nth-child(2),
+        .report-tables-flex .dsu-table td:nth-child(2),
+        .report-tables-flex .dsu-table th:nth-child(3),
+        .report-tables-flex .dsu-table td:nth-child(3),
+        .report-tables-flex .dsu-table th:nth-child(4),
+        .report-tables-flex .dsu-table td:nth-child(4) {
+            width: 19.33%;
         }
 
         /* Info notice boxes */
