@@ -1863,6 +1863,7 @@
                 gst_number: $('caEditGstNumber').value.trim() || null,
                 adpulse_refresh_interval: $('caEditAdpulseRefresh').value ? parseInt($('caEditAdpulseRefresh').value) : null,
                 adpulse_audit_interval: $('caEditAdpulseAudit').value ? parseInt($('caEditAdpulseAudit').value) : null,
+                redirect_base_url: window.location.origin,
             };
             const googleSecret = $('caEditGoogleClientSecret').value.trim();
             if (googleSecret) { body.google_client_id = $('caEditGoogleClientId').value.trim() || null; body.google_client_secret = googleSecret; body.google_developer_token = $('caEditGoogleDevToken').value.trim() || null; body.google_login_customer_id = $('caEditGoogleLoginCustomerId').value.trim() || null; }
