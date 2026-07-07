@@ -872,8 +872,9 @@
                                     <div class="form-group"><label>Ad Account ID</label><input type="text" id="caEditMetaAdId" placeholder="act_123456789"></div>
                                     <div class="form-group"><label>App ID</label><input type="text" id="caEditMetaAppId"></div>
                                     <div class="form-group"><label>App Secret</label><input type="password" id="caEditMetaAppSecret"></div>
+                                    <div class="form-group full"><label>Access Token (paste token to connect without OAuth)</label><input type="password" id="caEditMetaAccessToken" placeholder="EAA..."></div>
                                     <div class="form-group full" style="display:flex;align-items:flex-end;gap:0.5rem;">
-                                        <button class="btn btn-secondary" id="caEditConnectMetaBtn" onclick="connectMetaOAuth()">Connect Meta</button>
+                                        <button class="btn btn-secondary" id="caEditConnectMetaBtn" onclick="connectMetaOAuth()">Connect Meta via OAuth</button>
                                         <span id="caEditMetaStatus" style="font-size:0.75rem;color:var(--text-muted);"></span>
                                     </div>
                                 </div>
@@ -1875,6 +1876,8 @@
             if (googleSecret) { body.google_client_id = $('caEditGoogleClientId').value.trim() || null; body.google_client_secret = googleSecret; body.google_developer_token = $('caEditGoogleDevToken').value.trim() || null; body.google_login_customer_id = $('caEditGoogleLoginCustomerId').value.trim() || null; }
             const metaSecret = $('caEditMetaAppSecret').value.trim();
             if (metaSecret) { body.meta_app_id = $('caEditMetaAppId').value.trim() || null; body.meta_app_secret = metaSecret; }
+            const metaAccessToken = $('caEditMetaAccessToken').value.trim();
+            if (metaAccessToken) body.meta_access_token = metaAccessToken;
             const lsqSecret = $('caEditLsqSecretKey').value.trim();
             body.crm_type = $('caEditCrmType').value;
             if ($('caEditLsqAccessKey').value.trim()) body.lsq_access_key = $('caEditLsqAccessKey').value.trim();

@@ -133,6 +133,7 @@ class AccountUpdate(BaseModel):
     redirect_base_url: Optional[str] = None
     google_refresh_token: Optional[str] = None
     meta_access_token: Optional[str] = None
+
     lsq_access_key: Optional[str] = None
     lsq_secret_key: Optional[str] = None
     lsq_base_url: Optional[str] = None
@@ -395,6 +396,15 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.meta_app_id = req.meta_app_id or None
     if req.meta_app_secret is not None:
         account.meta_app_secret = req.meta_app_secret or None
+    # Encrypt raw Meta access token if supplied (direct entry path)
+    if hasattr(req, "meta_access_token") and req.meta_access_token:
+        encrypted = build_meta_credentials(
+            {"access_token": req.meta_access_token},
+            account.id,
+        )
+        if encrypted:
+            account.meta_credentials = encrypted
+            account.meta_is_live = True
     if req.redirect_base_url is not None:
         account.redirect_base_url = req.redirect_base_url or None
 
