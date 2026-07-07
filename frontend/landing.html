@@ -892,7 +892,7 @@
                         <div class="um-section-title" onclick="toggleCaSection(this)">CRM Integration <span class="ca-arrow">▾</span></div>
                         <div class="ca-section-body">
                             <div class="form-group"><label>CRM Type</label>
-                                <select id="caEditCrmType">
+                                <select id="caEditCrmType" onchange="onCrmTypeChange(this)">
                                     <option value="none">None</option>
                                     <option value="leadsquared">LeadSquared</option>
                                     <option value="salesforce">Salesforce</option>
@@ -901,11 +901,11 @@
                                     <option value="custom">Custom</option>
                                 </select>
                             </div>
-                            <div class="um-form">
-                                <div class="form-group"><label>LSQ Access Key</label><input type="text" id="caEditLsqAccessKey"></div>
-                                <div class="form-group"><label>LSQ Secret Key</label><input type="password" id="caEditLsqSecretKey"></div>
-                                <div class="form-group"><label>LSQ Base URL</label><input type="text" id="caEditLsqBaseUrl" placeholder="https://api-in21.leadsquared.com/v2/"></div>
-                                <div class="form-group"><label>LSQ Sync Interval (minutes)</label><input type="number" id="caEditLsqSyncInterval" min="1" placeholder="10"></div>
+                            <div class="um-form" id="caCrmFields">
+                                <div class="form-group"><label id="caLabelField1">Access Key</label><input type="text" id="caEditLsqAccessKey"></div>
+                                <div class="form-group" id="caField2Wrap"><label id="caLabelField2">Secret Key</label><input type="password" id="caEditLsqSecretKey"></div>
+                                <div class="form-group"><label id="caLabelField3">Base URL</label><input type="text" id="caEditLsqBaseUrl" placeholder="https://api-in21.leadsquared.com/v2/"></div>
+                                <div class="form-group"><label id="caLabelField4">Sync Interval (minutes)</label><input type="number" id="caEditLsqSyncInterval" min="1" placeholder="10"></div>
                             </div>
                         </div>
                     </div>
@@ -1821,13 +1821,61 @@
         $('caEditMetaStatus').textContent = a.meta_credentials_masked ? 'Connected via OAuth' : 'Not connected via OAuth';
         $('caEditMetaStatus').style.color = a.meta_credentials_masked ? 'var(--color-success)' : 'var(--text-muted)';
         $('caEditCrmType').value = a.crm_type || 'none';
+        $('caEditCrmType').dataset.previousValue = a.crm_type || 'none';
         $('caEditLsqAccessKey').value = a.lsq_access_key || '';
         $('caEditLsqSecretKey').value = '';
         $('caEditLsqBaseUrl').value = a.lsq_base_url || '';
         $('caEditLsqSyncInterval').value = a.lsq_sync_interval_minutes || '';
+        updateCrmFieldLabels();
         // Load BMs for dropdown
         populateCentralBMs('caEditBM', a.business_manager_id);
         expandAllCaSections();
+    }
+
+    const CRM_LABELS = {
+        none: { field1: 'Access Key', field2: 'Secret Key', field3: 'Base URL', placeholder3: '' },
+        leadsquared: { field1: 'Access Key', field2: 'Secret Key', field3: 'Base URL', placeholder3: 'https://api-in21.leadsquared.com/v2/' },
+        salesforce: { field1: 'Client ID', field2: 'Client Secret', field3: 'Instance URL', placeholder3: 'https://yourorg.salesforce.com' },
+        hubspot: { field1: 'API Key', field2: null, field3: 'Portal ID', placeholder3: '' },
+        zoho: { field1: 'Client ID', field2: 'Client Secret', field3: 'Domain', placeholder3: 'https://www.zohoapis.com' },
+        custom: { field1: 'API Key / Token', field2: 'Secret (optional)', field3: 'Base URL', placeholder3: '' }
+    };
+
+    function updateCrmFieldLabels() {
+        const type = ($('caEditCrmType') && $('caEditCrmType').value) || 'none';
+        const cfg = CRM_LABELS[type] || CRM_LABELS.none;
+        const fieldsWrap = $('caCrmFields');
+        const field2Wrap = $('caField2Wrap');
+        const f3 = $('caEditLsqBaseUrl');
+        if (type === 'none') {
+            if (fieldsWrap) fieldsWrap.style.display = 'none';
+            return;
+        }
+        if (fieldsWrap) fieldsWrap.style.display = '';
+        $('caLabelField1').textContent = cfg.field1;
+        $('caLabelField2').textContent = cfg.field2 || '';
+        if (field2Wrap) field2Wrap.style.display = cfg.field2 === null ? 'none' : '';
+        $('caLabelField3').textContent = cfg.field3;
+        if (f3) f3.placeholder = cfg.placeholder3 || '';
+    }
+
+    function onCrmTypeChange(select) {
+        const newType = select.value;
+        const access = $('caEditLsqAccessKey').value.trim();
+        const secret = $('caEditLsqSecretKey').value.trim();
+        const base = $('caEditLsqBaseUrl').value.trim();
+        if (access || secret || base) {
+            const ok = confirm('Changing CRM type will clear current credentials. Continue?');
+            if (!ok) {
+                select.value = select.dataset.previousValue || 'none';
+                return;
+            }
+            $('caEditLsqAccessKey').value = '';
+            $('caEditLsqSecretKey').value = '';
+            $('caEditLsqBaseUrl').value = '';
+        }
+        select.dataset.previousValue = newType;
+        updateCrmFieldLabels();
     }
 
     async function loadBMsForCentralEdit(selectedBmId) {
