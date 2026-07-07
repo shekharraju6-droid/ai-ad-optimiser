@@ -1227,7 +1227,12 @@ async function renderExtractedInvoiceForm(resp){
         visibleClients=visibleClients.filter(c=> assigned.includes(c.account_id));
     }
     const sortedClients=visibleClients.sort((a,b)=>(a.client_name||'').localeCompare(b.client_name||''));
-    const matchWarning = !match.id ? '<div style="font-size:0.78rem;color:#d97706;background:#fffbeb;border:1px solid #fde68a;padding:0.4rem 0.6rem;border-radius:6px;margin:0.3rem 0 0.75rem;">⚠️ Could not auto-match client — please select manually</div>' : '';
+    let matchWarning = '';
+    if (!match.id) {
+        matchWarning = '<div style="font-size:0.78rem;color:#d97706;background:#fffbeb;border:1px solid #fde68a;padding:0.4rem 0.6rem;border-radius:6px;margin:0.3rem 0 0.75rem;">⚠️ Could not auto-match client — please select manually</div>';
+    } else if ((match.score || 0) < 60) {
+        matchWarning = `<div style="font-size:0.78rem;color:#d97706;background:#fffbeb;border:1px solid #fde68a;padding:0.4rem 0.6rem;border-radius:6px;margin:0.3rem 0 0.75rem;">⚠️ Low-confidence client match (score ${match.score || 0}) — please verify</div>`;
+    }
     const selectedClient = match.rev_client_id || '';
     const clientOpts = sortedClients.map(c=>`<option value="${c.id}" ${String(selectedClient)===String(c.id)?'selected':''}>${escapeHtml(c.client_name)}</option>`).join('');
     const bmId = resp.suggested_bm_id || '';

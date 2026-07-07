@@ -3,7 +3,9 @@ RevenueOps API routes: clients, billing models, invoices, payments,
 documents, reminders, followup notes, audit logs, dashboard, reports, settings, RBAC.
 """
 import json
+import logging
 import os
+import re
 from datetime import datetime, date, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
@@ -738,7 +740,7 @@ INVOICE_EXTRACT_PROMPT = (
     "Return ONLY a valid JSON object with these exact keys, no additional text:\n\n"
     "{\n"
     "  \"invoice_number\": \"the invoice/bill number\",\n"
-    "  \"client_name\": \"the buyer/client company name\",\n"
+    "  \"client_name\": \"the buyer/client company name exactly as printed on the invoice. Prefer the organization receiving the services over the trust name; if multiple names appear, use the one receiving the services.\",\n"
     "  \"contact_person\": \"the Kind Attn / attention person name\",\n"
     "  \"invoice_date\": \"date in YYYY-MM-DD format\",\n"
     "  \"base_amount\": numeric value of taxable amount before tax,\n"
@@ -785,35 +787,101 @@ def _clean_gemini_json(text_resp):
     return s
 
 
-def _match_client_account(db, extracted_name):
-    """Try to match the extracted client name to a central Account row.
+def _normalize_match_text(text: str) -> str:
+    """Lowercase, strip, and replace punctuation with spaces for matching."""
+    if not text:
+        return ""
+    return re.sub(r"[^\w\s]", " ", str(text).strip().lower())
 
-    Strategy:
-      1. Exact match on Account.name or Account.brand_name (case-insensitive)
-      2. Partial match: extracted name CONTAINS account name, or account name
-         CONTAINS extracted name (case-insensitive)
-    Returns (account, account_rev_client_id) or (None, None).
+
+def _match_client_account(db, extracted_name):
+    """Match extracted invoice client name to a central Account using ranked scoring.
+
+    Uses Account.name, Account.brand_name, and Account.brand_keywords.
+    Returns (account, account_rev_client_id, score) or (None, None, 0).
     """
-    if not extracted_name:
-        return None, None
-    name_norm = extracted_name.strip().lower()
+    logger = logging.getLogger("AdOptima")
+    if not extracted_name or not str(extracted_name).strip():
+        return None, None, 0
+
+    name_norm = _normalize_match_text(extracted_name)
+    name_tokens = set(t for t in name_norm.split() if t)
+    if not name_tokens:
+        return None, None, 0
+
     accounts = db.query(Account).all()
-    # 1. Exact
+    best = None
+    best_score = 0
+
     for a in accounts:
-        if a.name and a.name.strip().lower() == name_norm:
-            return a, a.rev_client_id
-        if a.brand_name and a.brand_name.strip().lower() == name_norm:
-            return a, a.rev_client_id
-    # 2. Partial / fuzzy (containment both ways)
-    for a in accounts:
-        an = (a.name or "").strip().lower()
-        bn = (a.brand_name or "").strip().lower()
-        if not an and not bn:
-            continue
-        if (an and (an in name_norm or name_norm in an)) or \
-           (bn and (bn in name_norm or name_norm in bn)):
-            return a, a.rev_client_id
-    return None, None
+        an = _normalize_match_text(a.name)
+        bn = _normalize_match_text(a.brand_name)
+        keywords = [k.strip() for k in (a.brand_keywords or "").split(",") if k.strip()]
+
+        score = 0
+
+        # 1. Exact match on name or brand_name
+        if an and an == name_norm:
+            score = max(score, 100)
+        if bn and bn == name_norm:
+            score = max(score, 95)
+
+        # 2. Whole name/brand appears in extracted text (longer names weighted higher)
+        if an:
+            if an in name_norm:
+                base = 70 if len(an) >= 4 else 45
+                score = max(score, base)
+            # All individual tokens of account name present in extracted text
+            an_tokens = set(t for t in an.split() if t)
+            if an_tokens and an_tokens.issubset(name_tokens):
+                score = max(score, 80)
+        if bn:
+            if bn in name_norm:
+                base = 65 if len(bn) >= 4 else 40
+                score = max(score, base)
+            bn_tokens = set(t for t in bn.split() if t)
+            if bn_tokens and bn_tokens.issubset(name_tokens):
+                score = max(score, 75)
+
+        # 3. Brand keywords exact whole-word or substring match
+        for kw in keywords:
+            kn = _normalize_match_text(kw)
+            if not kn:
+                continue
+            if re.search(r"\b" + re.escape(kn) + r"\b", name_norm):
+                score = max(score, 85)
+                break
+            if len(kn) >= 4 and kn in name_norm:
+                score = max(score, 50)
+                break
+
+        # 4. Substring containment both ways (longer strings only)
+        if an and len(an) >= 4 and (an in name_norm or name_norm in an):
+            score = max(score, 25)
+        if bn and len(bn) >= 4 and (bn in name_norm or name_norm in bn):
+            score = max(score, 20)
+
+        # 5. Short name/brand (<=3 chars) only as whole word to avoid false positives
+        if an and len(an) <= 3 and re.search(r"\b" + re.escape(an) + r"\b", name_norm):
+            score = max(score, 35)
+        if bn and len(bn) <= 3 and re.search(r"\b" + re.escape(bn) + r"\b", name_norm):
+            score = max(score, 30)
+
+        if score > best_score:
+            best_score = score
+            best = a
+
+    logger.info(
+        "Invoice client match: extracted=%r best_account=%r score=%s",
+        extracted_name,
+        best.name if best else None,
+        best_score,
+    )
+
+    # Require a minimum threshold before auto-matching
+    if best and best_score >= 25:
+        return best, best.rev_client_id, best_score
+    return None, None, 0
 
 
 def _compute_suggested_due_date(invoice_date, due_days):
@@ -898,7 +966,6 @@ async def upload_invoice_extract(
         parse_error = str(e1)
         # Retry once more after aggressive cleaning
         try:
-            import re
             cleaned = re.sub(r"^```(?:json)?|```$", "", raw_text or "", flags=re.MULTILINE).strip()
             extracted = json.loads(cleaned)
         except Exception as e2:
@@ -912,7 +979,7 @@ async def upload_invoice_extract(
 
     # Match client account
     client_name = extracted.get("client_name")
-    matched_account, matched_rev_client_id = _match_client_account(db, client_name)
+    matched_account, matched_rev_client_id, match_score = _match_client_account(db, client_name)
 
     # Compute suggested due date
     invoice_date = extracted.get("invoice_date")
@@ -935,6 +1002,7 @@ async def upload_invoice_extract(
             "id": matched_account.id if matched_account else None,
             "name": matched_account.name if matched_account else None,
             "rev_client_id": matched_rev_client_id if matched_account else None,
+            "score": match_score,
         },
         "suggested_due_date": suggested_due,
         "suggested_bm": suggested_bm_name,
