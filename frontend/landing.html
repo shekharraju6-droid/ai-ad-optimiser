@@ -872,6 +872,10 @@
                                     <div class="form-group"><label>Ad Account ID</label><input type="text" id="caEditMetaAdId" placeholder="act_123456789"></div>
                                     <div class="form-group"><label>App ID</label><input type="text" id="caEditMetaAppId"></div>
                                     <div class="form-group"><label>App Secret</label><input type="password" id="caEditMetaAppSecret"></div>
+                                    <div class="form-group full" style="display:flex;align-items:flex-end;gap:0.5rem;">
+                                        <button class="btn btn-secondary" id="caEditConnectMetaBtn" onclick="connectMetaOAuth()">Connect Meta</button>
+                                        <span id="caEditMetaStatus" style="font-size:0.75rem;color:var(--text-muted);"></span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="um-section" style="margin-top:0.75rem;">
@@ -1812,6 +1816,8 @@
         $('caEditMetaAdId').value = a.meta_external_id || '';
         $('caEditMetaAppId').value = a.meta_app_id || '';
         $('caEditMetaAppSecret').value = '';
+        $('caEditMetaStatus').textContent = a.meta_credentials_masked ? 'Connected via OAuth' : 'Not connected via OAuth';
+        $('caEditMetaStatus').style.color = a.meta_credentials_masked ? 'var(--color-success)' : 'var(--text-muted)';
         $('caEditCrmType').value = a.crm_type || 'none';
         $('caEditLsqAccessKey').value = a.lsq_access_key || '';
         $('caEditLsqSecretKey').value = '';
@@ -1910,6 +1916,24 @@
             alert(e.message || 'Failed to start Google OAuth');
         }
         finally { if (btn) { btn.textContent = 'Connect Google'; btn.disabled = false; } }
+    }
+
+    async function connectMetaOAuth() {
+        const id = $('caEditId').value;
+        if (!id) { alert('Save the Client/Brand first before connecting Meta'); return; }
+        const btn = $('caEditConnectMetaBtn');
+        if (btn) { btn.textContent = 'Connecting...'; btn.disabled = true; }
+        try {
+            const data = await api('GET', '/oauth/meta/' + id + '/connect');
+            if (data && data.authorization_url) {
+                window.location.href = data.authorization_url;
+            } else {
+                alert('Could not get Meta authorization URL');
+            }
+        } catch (e) {
+            alert(e.message || 'Failed to start Meta OAuth');
+        }
+        finally { if (btn) { btn.textContent = 'Connect Meta'; btn.disabled = false; } }
     }
 
     window.addEventListener('DOMContentLoaded', checkAuth);
