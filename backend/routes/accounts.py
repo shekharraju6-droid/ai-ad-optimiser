@@ -62,10 +62,12 @@ def _badges_for_tile(account, platform: str, db: Session) -> dict:
         pass
 
     # API success is inferred from whether the account has a live platform with
-    # valid credentials and no last_sync_error.
+    # valid credentials and no last_sync_error. Meta can use a global system
+    # user token, so per-account credentials are optional for Meta.
     platform_live = account.google_is_live if platform == "google" else account.meta_is_live
     platform_creds = account.google_credentials if platform == "google" else account.meta_credentials
-    api_success = bool(platform_live and platform_creds and not account.last_sync_error)
+    has_system_meta_token = platform == "meta" and meta_system_token_configured()
+    api_success = bool(platform_live and (platform_creds or has_system_meta_token) and not account.last_sync_error)
 
     return compute_health_badges(
         account, api_success=api_success, platform=platform, leads=leads_today,
