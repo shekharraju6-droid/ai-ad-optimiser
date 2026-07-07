@@ -855,9 +855,14 @@
                                 <label class="um-check"><input type="checkbox" id="caEditHasGoogle"> Google Ads enabled</label>
                                 <div class="um-form" style="margin-top:0.5rem;">
                                     <div class="form-group"><label>Customer ID</label><input type="text" id="caEditGoogleCustId" placeholder="123-456-7890"></div>
+                                    <div class="form-group"><label>Manager (MCC) ID</label><input type="text" id="caEditGoogleLoginCustomerId" placeholder="123-456-7890"></div>
                                     <div class="form-group"><label>Client ID</label><input type="text" id="caEditGoogleClientId"></div>
                                     <div class="form-group"><label>Client Secret</label><input type="password" id="caEditGoogleClientSecret"></div>
                                     <div class="form-group"><label>Developer Token</label><input type="text" id="caEditGoogleDevToken"></div>
+                                    <div class="form-group full" style="display:flex;align-items:flex-end;gap:0.5rem;">
+                                        <button class="btn btn-secondary" id="caEditConnectGoogleBtn" onclick="connectGoogleOAuth()">Connect Google</button>
+                                        <span id="caEditGoogleStatus" style="font-size:0.75rem;color:var(--text-muted);"></span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="um-section" style="margin-top:0.75rem;">
@@ -1798,9 +1803,12 @@
         $('caEditHasGoogle').checked = a.has_google;
         $('caEditHasMeta').checked = a.has_meta;
         $('caEditGoogleCustId').value = a.google_external_id || '';
+        $('caEditGoogleLoginCustomerId').value = a.google_login_customer_id || '';
         $('caEditGoogleClientId').value = a.google_client_id || '';
         $('caEditGoogleClientSecret').value = '';
         $('caEditGoogleDevToken').value = a.google_developer_token || '';
+        $('caEditGoogleStatus').textContent = a.google_credentials_masked ? 'Connected via OAuth' : 'Not connected via OAuth';
+        $('caEditGoogleStatus').style.color = a.google_credentials_masked ? 'var(--color-success)' : 'var(--text-muted)';
         $('caEditMetaAdId').value = a.meta_external_id || '';
         $('caEditMetaAppId').value = a.meta_app_id || '';
         $('caEditMetaAppSecret').value = '';
@@ -1857,7 +1865,7 @@
                 adpulse_audit_interval: $('caEditAdpulseAudit').value ? parseInt($('caEditAdpulseAudit').value) : null,
             };
             const googleSecret = $('caEditGoogleClientSecret').value.trim();
-            if (googleSecret) { body.google_client_id = $('caEditGoogleClientId').value.trim() || null; body.google_client_secret = googleSecret; body.google_developer_token = $('caEditGoogleDevToken').value.trim() || null; }
+            if (googleSecret) { body.google_client_id = $('caEditGoogleClientId').value.trim() || null; body.google_client_secret = googleSecret; body.google_developer_token = $('caEditGoogleDevToken').value.trim() || null; body.google_login_customer_id = $('caEditGoogleLoginCustomerId').value.trim() || null; }
             const metaSecret = $('caEditMetaAppSecret').value.trim();
             if (metaSecret) { body.meta_app_id = $('caEditMetaAppId').value.trim() || null; body.meta_app_secret = metaSecret; }
             const lsqSecret = $('caEditLsqSecretKey').value.trim();
@@ -1883,6 +1891,24 @@
     function closeDeleteConfirm(e) {
         if (e && e.target !== $('deleteAccountOverlay')) return;
         $('deleteAccountOverlay').classList.add('hidden');
+    }
+
+    async function connectGoogleOAuth() {
+        const id = $('caEditId').value;
+        if (!id) { alert('Save the Client/Brand first before connecting Google'); return; }
+        const btn = $('caEditConnectGoogleBtn');
+        if (btn) { btn.textContent = 'Connecting...'; btn.disabled = true; }
+        try {
+            const data = await api('GET', '/oauth/google/' + id + '/connect');
+            if (data && data.authorization_url) {
+                window.location.href = data.authorization_url;
+            } else {
+                alert('Could not get Google authorization URL');
+            }
+        } catch (e) {
+            alert(e.message || 'Failed to start Google OAuth');
+        }
+        finally { if (btn) { btn.textContent = 'Connect Google'; btn.disabled = false; } }
     }
 
     window.addEventListener('DOMContentLoaded', checkAuth);
