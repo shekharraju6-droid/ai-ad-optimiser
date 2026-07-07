@@ -27,8 +27,8 @@ def start_scheduler():
     _scheduler.add_job(_reschedule_all, 'interval', minutes=1, id='schedule_refresher', replace_existing=True)
     # Auto-refresh live account metrics every 15 minutes
     _scheduler.add_job(_auto_refresh_live_metrics, 'interval', minutes=15, id='auto_metrics_refresh', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(seconds=30))
-    # Incremental LeadSquared lead mirror sync every 3 hours (and once at startup)
-    _scheduler.add_job(_sync_lsq_leads, 'interval', hours=3, id='lsq_lead_mirror_sync', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(minutes=2))
+    # Per-account LeadSquared lead mirror sync (default 10 minutes, configurable per account)
+    _schedule_lsq_sync_jobs(_scheduler)
     # Daily smart keyword + search term audit at 8:00 AM IST = 2:30 AM UTC
     # DISABLED: campaign-level manual audits are now used instead. Re-enable after AI is retrained.
     # _scheduler.add_job(_run_daily_smart_audit, 'cron', hour=2, minute=30, id='daily_smart_audit', replace_existing=True)
@@ -361,21 +361,91 @@ def _run_account_audit(account_id: int, platform: str):
         logger.error(f"Account audit failed: {e}")
 
 
-def _sync_lsq_leads():
-    """Daily incremental sync of LeadSquared leads for DSU and DSI accounts."""
-    logger.info("Running scheduled LSQ lead mirror sync")
+def _sync_lsq_leads_for_account(account_id: int):
+    """Incremental sync of LeadSquared leads for a single account."""
+    logger.info(f"Running scheduled LSQ lead mirror sync for account {account_id}")
     from backend.services.lsq_mirror import sync_account_leads
     db = SessionLocal()
     try:
-        for name in ["DSU", "DSI"]:
-            account = db.query(Account).filter(Account.name == name).first()
-            if not account:
-                continue
-            result = sync_account_leads(account.id, db=db)
-            logger.info(f"LSQ sync {name}: {result}")
+        result = sync_account_leads(account_id, db=db)
+        logger.info(f"LSQ sync account {account_id}: {result}")
         db.commit()
     except Exception as e:
-        logger.error(f"Scheduled LSQ sync failed: {e}")
+        logger.error(f"Scheduled LSQ sync failed for account {account_id}: {e}")
+    finally:
+        db.close()
+
+
+def _schedule_lsq_sync_jobs(scheduler):
+    """Schedule per-account LSQ sync jobs based on account settings."""
+    db = SessionLocal()
+    try:
+        accounts = db.query(Account).filter(
+            Account.is_active == True,
+            Account.crm_type == "leadsquared",
+            Account.lsq_access_key.isnot(None),
+            Account.lsq_secret_key.isnot(None),
+            Account.lsq_base_url.isnot(None),
+        ).all()
+        for account in accounts:
+            interval = account.lsq_sync_interval_minutes or 10
+            if interval <= 0:
+                continue
+            job_id = f"lsq_sync_{account.id}"
+            try:
+                scheduler.add_job(
+                    _sync_lsq_leads_for_account,
+                    'interval',
+                    minutes=interval,
+                    args=[account.id],
+                    id=job_id,
+                    replace_existing=True,
+                    next_run_time=datetime.utcnow() + timedelta(seconds=30),
+                )
+                logger.info(f"Scheduled LSQ sync for account {account.name} (id={account.id}) every {interval} minutes")
+            except Exception as e:
+                logger.error(f"Failed to schedule LSQ sync for account {account.id}: {e}")
+    except Exception as e:
+        logger.error(f"Failed to schedule LSQ sync jobs: {e}")
+    finally:
+        db.close()
+
+
+def reschedule_lsq_sync_for_account(account_id: int):
+    """Reschedule LSQ sync job for a single account after settings change."""
+    if not _scheduler:
+        return
+    db = SessionLocal()
+    try:
+        account = db.query(Account).filter(Account.id == account_id).first()
+        if not account:
+            return
+        job_id = f"lsq_sync_{account_id}"
+        try:
+            _scheduler.remove_job(job_id)
+        except Exception:
+            pass
+        if (
+            account.is_active
+            and account.crm_type == "leadsquared"
+            and account.lsq_access_key
+            and account.lsq_secret_key
+            and account.lsq_base_url
+        ):
+            interval = account.lsq_sync_interval_minutes or 10
+            if interval > 0:
+                _scheduler.add_job(
+                    _sync_lsq_leads_for_account,
+                    'interval',
+                    minutes=interval,
+                    args=[account_id],
+                    id=job_id,
+                    replace_existing=True,
+                    next_run_time=datetime.utcnow() + timedelta(seconds=30),
+                )
+                logger.info(f"Rescheduled LSQ sync for account {account_id} every {interval} minutes")
+    except Exception as e:
+        logger.error(f"Failed to reschedule LSQ sync for account {account_id}: {e}")
     finally:
         db.close()
 

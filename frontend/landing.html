@@ -905,6 +905,7 @@
                                 <div class="form-group"><label>LSQ Access Key</label><input type="text" id="caEditLsqAccessKey"></div>
                                 <div class="form-group"><label>LSQ Secret Key</label><input type="password" id="caEditLsqSecretKey"></div>
                                 <div class="form-group"><label>LSQ Base URL</label><input type="text" id="caEditLsqBaseUrl" placeholder="https://api-in21.leadsquared.com/v2/"></div>
+                                <div class="form-group"><label>LSQ Sync Interval (minutes)</label><input type="number" id="caEditLsqSyncInterval" min="1" placeholder="10"></div>
                             </div>
                         </div>
                     </div>
@@ -1823,6 +1824,7 @@
         $('caEditLsqAccessKey').value = a.lsq_access_key || '';
         $('caEditLsqSecretKey').value = '';
         $('caEditLsqBaseUrl').value = a.lsq_base_url || '';
+        $('caEditLsqSyncInterval').value = a.lsq_sync_interval_minutes || '';
         // Load BMs for dropdown
         populateCentralBMs('caEditBM', a.business_manager_id);
         expandAllCaSections();
@@ -1883,6 +1885,7 @@
             if ($('caEditLsqAccessKey').value.trim()) body.lsq_access_key = $('caEditLsqAccessKey').value.trim();
             if (lsqSecret) body.lsq_secret_key = lsqSecret;
             if ($('caEditLsqBaseUrl').value.trim()) body.lsq_base_url = $('caEditLsqBaseUrl').value.trim();
+            if ($('caEditLsqSyncInterval').value.trim()) body.lsq_sync_interval_minutes = parseInt($('caEditLsqSyncInterval').value.trim());
             await api('PUT', '/accounts/' + id, body);
             alert('Client/Brand updated');
             showCentralAccountList();

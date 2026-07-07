@@ -137,6 +137,7 @@ class AccountUpdate(BaseModel):
     lsq_access_key: Optional[str] = None
     lsq_secret_key: Optional[str] = None
     lsq_base_url: Optional[str] = None
+    lsq_sync_interval_minutes: Optional[int] = None
 
     crm_type: Optional[str] = None
     crm_credentials: Optional[str] = None
@@ -396,15 +397,6 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.meta_app_id = req.meta_app_id or None
     if req.meta_app_secret is not None:
         account.meta_app_secret = req.meta_app_secret or None
-    # Encrypt raw Meta access token if supplied (direct entry path)
-    if hasattr(req, "meta_access_token") and req.meta_access_token:
-        encrypted = build_meta_credentials(
-            {"access_token": req.meta_access_token},
-            account.id,
-        )
-        if encrypted:
-            account.meta_credentials = encrypted
-            account.meta_is_live = True
     if req.redirect_base_url is not None:
         account.redirect_base_url = req.redirect_base_url or None
 
@@ -414,6 +406,22 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.lsq_secret_key = req.lsq_secret_key or None
     if req.lsq_base_url is not None:
         account.lsq_base_url = req.lsq_base_url or None
+    if req.lsq_sync_interval_minutes is not None:
+        account.lsq_sync_interval_minutes = req.lsq_sync_interval_minutes
+
+    # Reschedule LSQ sync job for this account if LSQ settings changed
+    if (
+        req.lsq_access_key is not None
+        or req.lsq_secret_key is not None
+        or req.lsq_base_url is not None
+        or req.lsq_sync_interval_minutes is not None
+        or req.crm_type is not None
+    ):
+        try:
+            from backend.services.scheduler import reschedule_lsq_sync_for_account
+            reschedule_lsq_sync_for_account(account.id)
+        except Exception as e:
+            logger.warning(f"Failed to reschedule LSQ sync for account {account.id}: {e}")
 
     if req.crm_type is not None:
         account.crm_type = req.crm_type or "none"
