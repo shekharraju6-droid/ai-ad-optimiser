@@ -199,6 +199,260 @@
         .dsu-table7 .balance-positive { color: var(--color-success-text); font-weight: 600; }
         .dsu-table7 .balance-negative { color: var(--color-danger-text); font-weight: 600; }
         .dsu-table7-grand td { background: var(--color-info-light) !important; color: var(--color-info-text) !important; border: 1px solid var(--color-info) !important; font-weight: 600; }
+
+        /* =========================================================
+           RESPONSIVE REPORT LAYOUT — screenshot & zoom ready
+           ========================================================= */
+        /* Prevent horizontal overflow at app level */
+        html, body { overflow-x: hidden; }
+        .main, .content { overflow-x: hidden; min-width: 0; }
+
+        /* Report content fills viewport width */
+        #reportContent {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+        #reportContent > .card {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            padding: clamp(8px, 1vw, 20px);
+        }
+
+        /* Header / topbar responsiveness */
+        .topbar {
+            flex-wrap: wrap;
+            gap: 8px;
+            height: auto;
+            min-height: 52px;
+            padding: 8px 16px;
+        }
+        .topbar h1, #reportTitle {
+            font-size: clamp(16px, 2vw, 22px) !important;
+            white-space: normal;
+            word-break: break-word;
+        }
+        .topbar > div:last-child {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        .topbar .btn {
+            flex: 0 1 auto;
+            white-space: nowrap;
+            font-size: clamp(11px, 1vw, 13px);
+            padding: clamp(4px, 0.6vw, 8px) clamp(8px, 1.2vw, 14px);
+        }
+
+        /* Tab bars */
+        .report-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 0.75rem;
+        }
+        .report-tabs .btn {
+            font-size: clamp(11px, 1vw, 13px);
+            padding: clamp(4px, 0.5vw, 8px) clamp(8px, 1vw, 16px);
+            flex: 0 1 auto;
+            white-space: nowrap;
+        }
+
+        /* Date / mode selectors */
+        .dsu-mode-row,
+        .dsu-mode-row > div,
+        .dsu-mode-row label {
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+        .dsu-mode-row span,
+        .dsu-mode-row label span {
+            font-size: clamp(11px, 1vw, 13px);
+        }
+        .dsu-range-label {
+            font-size: clamp(12px, 1.2vw, 15px);
+        }
+        .dsu-mis-row {
+            font-size: clamp(10px, 0.9vw, 12px);
+        }
+
+        /* Side-by-side report tables wrapper (DSU T1/T2 and DSI T1/T2) */
+        .report-tables-flex {
+            display: flex;
+            gap: 16px;
+            align-items: stretch;
+            width: 100%;
+            max-width: 100%;
+        }
+        .report-tables-flex > .report-container,
+        .report-tables-flex > div {
+            flex: 1;
+            min-width: 0;
+            max-width: 50%;
+            display: flex;
+            flex-direction: column;
+        }
+        @media (max-width: 900px) {
+            .report-tables-flex {
+                flex-direction: column;
+            }
+            .report-tables-flex > .report-container,
+            .report-tables-flex > div {
+                max-width: 100%;
+            }
+        }
+
+        /* Report container styling for clean screenshot separation */
+        .report-container {
+            width: 100%;
+            max-width: 100%;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            background: var(--color-bg-card);
+            overflow: hidden;
+        }
+
+        /* Generic table responsiveness */
+        .dsu-table, .dsu-table7 {
+            width: 100% !important;
+            max-width: 100%;
+            table-layout: auto;
+            font-size: clamp(11px, 1.1vw, 14px);
+        }
+        .dsu-table th, .dsu-table7 th {
+            font-size: clamp(10px, 1vw, 13px);
+            padding: clamp(4px, 0.5vw, 8px) clamp(6px, 0.8vw, 12px);
+            word-break: break-word;
+            hyphens: auto;
+        }
+        .dsu-table td, .dsu-table7 td {
+            font-size: clamp(11px, 1.1vw, 14px);
+            padding: clamp(4px, 0.5vw, 8px) clamp(6px, 0.8vw, 12px);
+            word-break: break-word;
+            hyphens: auto;
+            vertical-align: top;
+        }
+
+        /* Numeric columns */
+        .dsu-table .text-right,
+        .dsu-table7 .text-right,
+        .dsu-table td.text-right,
+        .dsu-table7 td.text-right {
+            text-align: right !important;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Text columns */
+        .dsu-table td:not(.text-right):not(.text-center),
+        .dsu-table7 td:not(.text-right):not(.text-center),
+        .dsu-table th:not(.text-right):not(.text-center),
+        .dsu-table7 th:not(.text-right):not(.text-center) {
+            text-align: left;
+            white-space: normal;
+        }
+
+        /* Section / banner rows */
+        .dsu-section-row td,
+        .dsu-banner,
+        .report-notice {
+            width: 100%;
+            font-size: clamp(10px, 0.9vw, 12px);
+            padding: clamp(6px, 0.8vw, 12px);
+            white-space: normal;
+            word-break: break-word;
+        }
+        .report-notice {
+            width: 100%;
+        }
+
+        /* Section header labels */
+        .table-label {
+            font-size: clamp(10px, 0.9vw, 12px);
+            padding: clamp(6px, 0.7vw, 10px) clamp(8px, 1vw, 14px);
+        }
+
+        /* Report titles */
+        .report-title {
+            font-size: clamp(14px, 1.6vw, 20px) !important;
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        /* Sticky total row */
+        .dsu-total-row,
+        .dsu-grand-row,
+        .dsu-table7-grand {
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+        }
+        .dsu-total-row td {
+            background: var(--color-accent-light) !important;
+            border: 1px solid var(--color-border-strong) !important;
+            font-weight: 600;
+        }
+
+        /* Centered table wrappers for Table 4 / Table 5 should not overflow */
+        .dsu-table4-wrap, .dsi-table4-wrap {
+            max-width: 100%;
+            width: 100%;
+            margin: 0 auto;
+            overflow-x: hidden;
+        }
+
+        /* Print-friendly output */
+        @media print {
+            @page { margin: 10mm; size: landscape; }
+            .sidebar, .topbar .theme-toggle, #syncLeadsBtn,
+            .topbar a.btn, #misActivityHistoryBtn,
+            .topbar button:not(#reportTitle) { display: none !important; }
+            .topbar { border: none; justify-content: center; }
+            .topbar h1 { font-size: 16px; color: #000; }
+            body { background: #fff; color: #000; overflow: visible; }
+            .main, .content { overflow: visible; background: #fff; }
+            #reportContent, .card, .report-container {
+                background: #fff !important;
+                box-shadow: none !important;
+                border-color: #ccc !important;
+                color: #000 !important;
+                overflow: visible !important;
+            }
+            .dsu-table, .dsu-table7 {
+                border-color: #ccc !important;
+                font-size: 10px !important;
+            }
+            .dsu-table th, .dsu-table7 th,
+            .dsu-table td, .dsu-table7 td {
+                border-color: #ccc !important;
+                color: #000 !important;
+                background: #fff !important;
+            }
+            .dsu-table tbody tr:nth-child(even) td,
+            .dsu-table7 tbody tr:nth-child(even) td { background: #f9f9f9 !important; }
+            .dsu-total-row td, .dsu-grand-row td, .dsu-table7-grand td {
+                background: #fff3cd !important;
+                border-color: #ccc !important;
+                color: #000 !important;
+            }
+            .report-title { color: #000 !important; border-color: #999 !important; }
+            .report-tabs, .dsu-mode-row, .report-notice { page-break-inside: avoid; }
+            /* Force side-by-side tables on landscape print */
+            .report-tables-flex {
+                flex-direction: row !important;
+            }
+            .report-tables-flex > .report-container,
+            .report-tables-flex > div {
+                max-width: 50% !important;
+            }
+        }
         .dsu-budget-form { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; }
         .dsu-budget-form-title { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--color-text-primary); }
         .dsu-budget-form .form-group { min-width: 130px; }
@@ -634,7 +888,7 @@
             { id: 't6', label: 'Table 6: Lead Stages' },
             { id: 't7', label: 'Table 7: Monthly Summary' },
         ];
-        return `<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+        return `<div class="report-tabs">
             ${tabs.map(t => `<button class="btn ${dsuActiveTab===t.id?'btn-primary':'btn-secondary'}" onclick="dsuSwitchTab('${t.id}')">${t.label}</button>`).join('')}
         </div>`;
     }
@@ -811,7 +1065,7 @@
                 <div class="card-header">
                     <div class="report-title">DSU Course Performance Report</div>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+                <div class="report-tables-flex">
                     <div class="report-container" style="padding:0;box-shadow:none">
                         ${renderDSUTable(d.title, d.rows, d.total, t1Header)}
                     </div>
@@ -1282,8 +1536,8 @@
             { id: 't4', label: 'Table 4: Application MIS' },
             { id: 't5', label: 'Table 5: Budget MIS' },
         ];
-        return `<div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.5rem;">
-            ${tabs.map(t => `<button class="btn ${dsiActiveTab===t.id?'btn-primary':'btn-secondary'}" onclick="dsiSwitchTab('${t.id}')" style="padding:0.3rem 0.6rem;font-size:0.75rem;">${t.label}</button>`).join('')}
+        return `<div class="report-tabs">
+            ${tabs.map(t => `<button class="btn ${dsiActiveTab===t.id?'btn-primary':'btn-secondary'}" onclick="dsiSwitchTab('${t.id}')">${t.label}</button>`).join('')}
         </div>`;
     }
 
@@ -1424,7 +1678,7 @@
         $('reportContent').innerHTML = `
             ${dsiTabBar()}
             ${dsiT1DateSelector()}
-            <div class="dsi-t1t2-wrap">
+            <div class="report-tables-flex">
                 <div class="report-container" style="padding:0;box-shadow:none">
                     ${renderDSITable(d.title, d.rows, d.total, t1Header)}
                 </div>
