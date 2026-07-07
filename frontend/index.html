@@ -1247,12 +1247,25 @@
     async function refreshLiveAccountsInBackground() {
         try {
             const accounts = await api('GET', '/accounts');
-            const liveAccounts = accounts.filter(a => a.is_live);
-            // Fire all refresh requests in parallel so the dashboard isn't blocked
-            const refreshTasks = liveAccounts.map(a => {
-                const platform = a.has_google ? 'google' : 'meta';
-                return api('POST', '/accounts/' + a.id + '/refresh' + dateParams() + (dateParams() ? '&' : '?') + 'platform=' + platform).catch(() => null);
+            // Refresh all enabled live platforms for each account (not just the first one)
+            const refreshTasks = [];
+            accounts.forEach(a => {
+                if (!a.is_live) return;
+                if (a.has_google && a.google_is_live) {
+                    refreshTasks.push(api('POST', '/accounts/' + a.id + '/refresh' + dateParams() + (dateParams() ? '&' : '?') + 'platform=google').catch(() => null));
+                }
+                if (a.has_meta && a.meta_is_live) {
+                    refreshTasks.push(api('POST', '/accounts/' + a.id + '/refresh' + dateParams() + (dateParams() ? '&' : '?') + 'platform=meta').catch(() => null));
+                }
             });
+            // If no specific platform is live, fall back to account_type-based platform for backward compatibility
+            if (!refreshTasks.length) {
+                const liveAccounts = accounts.filter(a => a.is_live);
+                liveAccounts.forEach(a => {
+                    const platform = a.has_google ? 'google' : 'meta';
+                    refreshTasks.push(api('POST', '/accounts/' + a.id + '/refresh' + dateParams() + (dateParams() ? '&' : '?') + 'platform=' + platform).catch(() => null));
+                });
+            }
             await Promise.all(refreshTasks);
             // Reload summary with fresh data
             const data = await api('GET', '/accounts/summary' + dateParams());
@@ -1292,8 +1305,13 @@
     function buildAccountTile(a) {
         const el = document.createElement('div');
         el.className = 'account-card status-' + (a.status || 'disconnected');
-        el.onclick = () => openAccountDetail(a.id, a.platform);
+        el.onclick = () => openAccountDetail(a.id, a.platform || (a.has_google ? 'google' : 'meta'));
+        // Show platform pills for accounts that have both platforms enabled
+        const platformPills = [];
+        if (a.has_google) platformPills.push(`<span class="account-type ${a.platform === 'google' ? 'google' : ''}">Google</span>`);
+        if (a.has_meta) platformPills.push(`<span class="account-type ${a.platform === 'meta' ? 'meta' : ''}">Meta</span>`);
         const platformLabel = a.platform === 'google' ? 'Google' : 'Meta';
+        const platformBadges = platformPills.length ? platformPills.join('') : `<span class="account-type ${platformLabel}">${platformLabel}</span>`;
         const isLive = a.is_live;
         el.innerHTML = `
             <div class="account-header">
@@ -1302,7 +1320,7 @@
                     <div style="font-size:0.75rem;color:var(--color-text-muted);margin-top:0.15rem;">${escapeHtml(a.external_id || '')}</div>
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.2rem;">
-                    <span class="account-type ${platformLabel}">${platformLabel}</span>
+                    <div style="display:flex;gap:0.25rem;">${platformBadges}</div>
                     ${billChip(a.billing)}
                 </div>
             </div>

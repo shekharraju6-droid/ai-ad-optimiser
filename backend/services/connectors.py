@@ -1,6 +1,8 @@
 """
 Platform connector factory for Google Ads and Meta Marketing API.
 """
+import json
+import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from backend.db.models import Account, AccountType
@@ -541,6 +543,22 @@ class GoogleAdsConnector(AdsConnector):
         raise NotImplementedError
 
 
+def get_meta_access_token(account: Optional[Account] = None) -> Optional[str]:
+    """Resolve Meta access token: system user token first, then per-account fallback."""
+    system_token = os.environ.get("META_SYSTEM_USER_TOKEN")
+    if system_token:
+        return system_token
+    # Per-account fallback
+    raw = account.meta_credentials if account else None
+    if not raw:
+        return None
+    try:
+        return json.loads(decrypt(raw)).get("access_token")
+    except Exception as e:
+        logger.error(f"Failed to parse Meta credentials: {e}")
+        return None
+
+
 class MetaAdsConnector(AdsConnector):
     def __init__(self, account: Account, start_date: Optional[str] = None, end_date: Optional[str] = None):
         super().__init__(account, start_date=start_date, end_date=end_date)
@@ -550,10 +568,10 @@ class MetaAdsConnector(AdsConnector):
     def validate_credentials(self) -> bool:
         try:
             from facebook_business.api import FacebookAdsApi
-            creds = self._parse_credentials()
-            if not creds:
+            access_token = get_meta_access_token(self.account)
+            if not access_token:
                 return False
-            FacebookAdsApi.init(access_token=creds["access_token"])
+            FacebookAdsApi.init(access_token=access_token)
             self.api = FacebookAdsApi.get_default_api()
             self.is_valid = True
             return True
@@ -563,15 +581,11 @@ class MetaAdsConnector(AdsConnector):
             return False
 
     def _parse_credentials(self) -> Optional[Dict[str, Any]]:
-        raw = self.account.meta_credentials or self.account.credentials
-        if not raw:
+        """Return a credentials dict compatible with older callers."""
+        access_token = get_meta_access_token(self.account)
+        if not access_token:
             return None
-        try:
-            import json
-            return json.loads(decrypt(raw))
-        except Exception as e:
-            logger.error(f"Failed to parse Meta credentials: {e}")
-            return None
+        return {"access_token": access_token}
 
     def _date_params(self) -> Dict[str, Any]:
         if self.start_date and self.end_date:
@@ -583,32 +597,51 @@ class MetaAdsConnector(AdsConnector):
             }
         return {"date_preset": "last_30d"}
 
+    def _fetch_insight_aggregates(self, fields: List[str]) -> Dict[str, Any]:
+        """Fetch aggregated insight metrics for the configured date range."""
+        from facebook_business.adobjects.adaccount import AdAccount
+        account_id = self.account.meta_external_id or self.account.external_id or ""
+        if not account_id:
+            return {"error": "No Meta ad account ID configured"}
+        account = AdAccount(account_id)
+        params = self._date_params()
+        params["level"] = "account"
+        insights = account.get_insights(fields=fields, params=params)
+        totals = {f: 0 for f in fields}
+        for insight in insights:
+            for f in fields:
+                val = insight.get(f, 0)
+                if val is None:
+                    continue
+                if f in ("spend", "cpc", "ctr", "cost_per_result", "frequency"):
+                    totals[f] += float(val or 0)
+                else:
+                    totals[f] += int(val or 0)
+        return totals
+
     def fetch_account_metrics(self) -> Dict[str, Any]:
         if not self.is_valid:
             return {"error": "Meta API not valid"}
         try:
-            from facebook_business.adobjects.adaccount import AdAccount
-            account_id = self.account.meta_external_id or self.account.external_id or ""
-            if not account_id:
-                return {"error": "No Meta ad account ID configured"}
-            account = AdAccount(account_id)
-            fields = ["spend", "clicks", "impressions", "conversions"]
-            params = self._date_params()
-            insights = account.get_insights(fields=fields, params=params)
-            total_spend = 0.0
-            total_clicks = 0
-            total_impressions = 0
-            total_conversions = 0
-            for insight in insights:
-                total_spend += float(insight.get("spend", 0))
-                total_clicks += int(insight.get("clicks", 0) or 0)
-                total_impressions += int(insight.get("impressions", 0) or 0)
-                total_conversions += int(insight.get("conversions", 0) or 0)
+            fields = ["spend", "clicks", "impressions", "conversions", "reach", "frequency", "cpc", "ctr", "cost_per_result"]
+            totals = self._fetch_insight_aggregates(fields)
+            if "error" in totals:
+                return totals
+            # Recompute derived metrics from aggregates
+            impressions = max(int(totals.get("impressions", 0) or 0), 1)
+            clicks_val = int(totals.get("clicks", 0) or 0)
+            conversions_val = int(totals.get("conversions", 0) or 0)
+            spend = float(totals.get("spend", 0) or 0)
             return {
-                "spend": round(total_spend, 2),
-                "clicks": total_clicks,
-                "impressions": total_impressions,
-                "conversions": total_conversions,
+                "spend": round(spend, 2),
+                "clicks": clicks_val,
+                "impressions": int(totals.get("impressions", 0) or 0),
+                "conversions": conversions_val,
+                "reach": int(totals.get("reach", 0) or 0),
+                "frequency": round(float(totals.get("frequency", 0) or 0), 2),
+                "cpc": round(spend / max(clicks_val, 1), 2),
+                "ctr": round((clicks_val / impressions) * 100, 2),
+                "cost_per_result": round(spend / max(conversions_val, 1), 2),
             }
         except Exception as e:
             logger.error(f"Meta fetch metrics failed: {e}")
@@ -625,21 +658,49 @@ class MetaAdsConnector(AdsConnector):
             account = AdAccount(account_id)
             fields = ["id", "name", "status", "daily_budget", "spend_cap"]
             campaigns = account.get_campaigns(fields=fields)
-            return [
-                {
-                    "id": c.get("id"),
+            # Pull campaign-level insights for spend/performance
+            insight_fields = ["spend", "clicks", "impressions", "conversions"]
+            insight_params = self._date_params()
+            insight_params["level"] = "campaign"
+            insight_params["breakdowns"] = []
+            try:
+                insights = account.get_insights(fields=insight_fields, params=insight_params)
+                insight_by_campaign = {}
+                for row in insights:
+                    cid = row.get("campaign_id") or row.get("id")
+                    if cid:
+                        insight_by_campaign[cid] = {
+                            "spend": float(row.get("spend", 0) or 0),
+                            "clicks": int(row.get("clicks", 0) or 0),
+                            "impressions": int(row.get("impressions", 0) or 0),
+                            "conversions": int(row.get("conversions", 0) or 0),
+                        }
+            except Exception as e:
+                logger.warning(f"Meta campaign insights failed for account {self.account.id}: {e}")
+                insight_by_campaign = {}
+            result = []
+            for c in campaigns:
+                cid = c.get("id")
+                ins = insight_by_campaign.get(cid, {})
+                spend = ins.get("spend", 0.0)
+                clicks = ins.get("clicks", 0)
+                impressions = ins.get("impressions", 0)
+                conversions = ins.get("conversions", 0)
+                ctr = round((clicks / max(impressions, 1)) * 100, 2)
+                cpa = round(spend / max(conversions, 1), 2)
+                result.append({
+                    "id": cid,
                     "name": c.get("name"),
                     "status": c.get("status"),
                     "budget": (int(c.get("daily_budget", 0) or 0) / 100.0),
-                    "spend": 0.0,
-                    "clicks": 0,
-                    "impressions": 0,
-                    "conversions": 0,
-                    "ctr": 0.0,
-                    "cpa": 0.0,
-                }
-                for c in campaigns
-            ]
+                    "spend": spend,
+                    "clicks": clicks,
+                    "impressions": impressions,
+                    "conversions": conversions,
+                    "ctr": ctr,
+                    "cpa": cpa,
+                })
+            return result
         except Exception as e:
             logger.error(f"Meta fetch campaigns failed: {e}")
             return []
@@ -679,6 +740,11 @@ class MetaAdsConnector(AdsConnector):
         except Exception as e:
             logger.warning(f"Meta fetch billing failed for account {self.account.id}: {e}")
             return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+
+
+def meta_system_token_configured() -> bool:
+    """Return True when a global system user token is configured."""
+    return bool(os.environ.get("META_SYSTEM_USER_TOKEN"))
 
 
 def get_connector(account: Account, platform: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Optional[AdsConnector]:

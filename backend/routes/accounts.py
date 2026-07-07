@@ -1,7 +1,10 @@
 """
 Account management and dashboard summary APIs.
 """
+import json
 import logging
+import urllib.parse
+import urllib.request
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -10,9 +13,10 @@ from backend.db.database import get_db
 from backend.db.models import Account, AccountGroup, AccountType, AccountStatus, User, UserAccountAssignment, CampaignTypeTag
 from backend.db.revenueops_models import RevClient, RevClientStatus
 from backend.services.crypto import encrypt, decrypt
-from backend.services.connectors import get_connector
+from backend.services.connectors import get_connector, meta_system_token_configured, get_meta_access_token
 from backend.services.activity_log import log_activity
 from backend.services.oauth import build_google_credentials, build_meta_credentials
+from backend.services.config import load_config
 from backend.routes.auth import get_current_user_required
 
 logger = logging.getLogger("AdOptima")
@@ -560,7 +564,9 @@ def test_pull(account_id: int, platform: str, db: Session = Depends(get_db)):
 
     platform_creds = account.google_credentials if platform == "google" else account.meta_credentials
     platform_live = account.google_is_live if platform == "google" else account.meta_is_live
-    use_live = platform_live and bool(platform_creds)
+    # Meta can use a global system user token; in that case per-account credentials are optional.
+    has_system_meta_token = platform == "meta" and meta_system_token_configured()
+    use_live = platform_live and (bool(platform_creds) or has_system_meta_token)
 
     if not use_live:
         raise HTTPException(status_code=400, detail=f"{platform.title()} is not live or has no credentials")
@@ -609,7 +615,8 @@ def refresh_account(account_id: int, start_date: Optional[str] = None, end_date:
 
     platform_creds = account.google_credentials if target_platform == "google" else account.meta_credentials
     platform_live = account.google_is_live if target_platform == "google" else account.meta_is_live
-    use_live = platform_live and bool(platform_creds)
+    has_system_meta_token = target_platform == "meta" and meta_system_token_configured()
+    use_live = platform_live and (bool(platform_creds) or has_system_meta_token)
 
     if use_live:
         connector = get_connector(account, platform=target_platform, start_date=start_date, end_date=end_date)
@@ -691,6 +698,66 @@ def refresh_account(account_id: int, start_date: Optional[str] = None, end_date:
     return data
 
 
+@router.get("/meta/token-status")
+def meta_token_status(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Health/status summary for Meta token and connected accounts."""
+    is_system = meta_system_token_configured()
+    token_type = "system_user" if is_system else "per_account"
+    # Count accounts that are Meta live and have an ad account ID
+    connected = db.query(Account).filter(
+        Account.is_active == True,
+        Account.has_meta == True,
+        Account.meta_is_live == True,
+        Account.meta_external_id != None,
+        Account.meta_external_id != "",
+    ).count()
+    last_success = db.query(Account.last_sync_at).filter(
+        Account.is_active == True,
+        Account.has_meta == True,
+        Account.meta_is_live == True,
+    ).order_by(Account.last_sync_at.desc()).first()
+    # Validate token by calling /me if a system token is configured
+    is_valid = False
+    expires = None
+    if is_system:
+        token = os.environ.get("META_SYSTEM_USER_TOKEN")
+        try:
+            url = f"https://graph.facebook.com/v18.0/me?access_token={urllib.parse.quote(token)}"
+            with urllib.request.urlopen(url, timeout=10) as resp:
+                is_valid = resp.status == 200
+        except Exception as e:
+            logger.warning(f"Meta system user token validation failed: {e}")
+            is_valid = False
+    else:
+        # Check the first per-account token for expiry info (best effort)
+        account_with_token = db.query(Account).filter(
+            Account.meta_credentials != None,
+            Account.meta_credentials != "",
+        ).first()
+        if account_with_token:
+            token = get_meta_access_token(account_with_token)
+            if token:
+                try:
+                    url = f"https://graph.facebook.com/v18.0/debug_token?input_token={urllib.parse.quote(token)}&access_token={urllib.parse.quote(token)}"
+                    with urllib.request.urlopen(url, timeout=10) as resp:
+                        debug = json.loads(resp.read().decode())
+                        data = debug.get("data", {})
+                        is_valid = bool(data.get("is_valid"))
+                        exp = data.get("expires_at")
+                        if exp:
+                            expires = datetime.utcfromtimestamp(exp).isoformat()
+                except Exception as e:
+                    logger.warning(f"Meta per-account token validation failed: {e}")
+                    is_valid = False
+    return {
+        "token_type": token_type,
+        "is_valid": is_valid,
+        "expires": expires,
+        "accounts_connected": connected,
+        "last_successful_pull": last_success[0].isoformat() if last_success and last_success[0] else None,
+    }
+
+
 @router.get("/accounts/{account_id}")
 def get_account(account_id: int, start_date: Optional[str] = None, end_date: Optional[str] = None, platform: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     account = db.query(Account).filter(Account.id == account_id).first()
@@ -715,13 +782,32 @@ def get_account(account_id: int, start_date: Optional[str] = None, end_date: Opt
     return data
 
 
+@router.get("/accounts/{account_id}/campaigns")
+def get_account_campaigns(account_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Return campaigns for an account from its live platform(s)."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if user.role in ("user", "newuser") and account_id not in user.assigned_account_ids():
+        raise HTTPException(status_code=403, detail="Access denied to this account")
+
+    campaigns = []
     if account.has_google and account.google_is_live:
         try:
             connector = get_connector(account, platform="google")
             if connector and connector.is_valid:
-                campaigns = connector.fetch_campaigns()
+                campaigns.extend(connector.fetch_campaigns())
         except Exception as e:
-            logger.warning(f"Failed to fetch campaigns for account {account_id}: {e}")
+            logger.warning(f"Failed to fetch Google campaigns for account {account_id}: {e}")
+
+    has_system_meta = meta_system_token_configured()
+    if account.has_meta and (account.meta_is_live or has_system_meta):
+        try:
+            connector = get_connector(account, platform="meta")
+            if connector and connector.is_valid:
+                campaigns.extend(connector.fetch_campaigns())
+        except Exception as e:
+            logger.warning(f"Failed to fetch Meta campaigns for account {account_id}: {e}")
 
     tags = db.query(CampaignTypeTag).filter(CampaignTypeTag.account_id == account_id).all()
     tag_map = {t.campaign_id: t for t in tags}

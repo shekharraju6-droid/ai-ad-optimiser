@@ -39,6 +39,17 @@ def get_config():
     return get_config_for_client()
 
 
+@router.get("/config/meta-status")
+def get_meta_status():
+    """Return whether the global Meta system user token is configured and shared app credentials."""
+    cfg = load_config()
+    return {
+        "system_user_token_configured": bool(cfg.get("meta_system_user_token")),
+        "meta_app_id": cfg.get("meta_app_id", ""),
+        "meta_app_secret_configured": bool(cfg.get("meta_app_secret")),
+    }
+
+
 @router.post("/config")
 def update_config(new_config: ConfigModel):
     current = load_config()

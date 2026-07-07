@@ -6,6 +6,7 @@ and converts Meta short-lived tokens to long-lived tokens.
 Supports per-account OAuth app overrides for different MCC setups.
 """
 import json
+import os
 import secrets
 import urllib.parse
 import urllib.request
@@ -198,6 +199,10 @@ def extend_meta_token(short_lived_token: str, account_id: int) -> Optional[str]:
 def build_meta_credentials(token_data: Dict[str, Any], account_id: int) -> Optional[str]:
     access_token = token_data.get("access_token")
     if not access_token:
+        return None
+    # When a system user token is configured, don't try to extend it and don't
+    # store it per-account. Per-account storage is kept for backward compatibility.
+    if os.environ.get("META_SYSTEM_USER_TOKEN"):
         return None
     long_token = extend_meta_token(access_token, account_id)
     creds = {"access_token": long_token}

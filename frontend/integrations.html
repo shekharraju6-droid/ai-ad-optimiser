@@ -55,7 +55,8 @@
 <body>
     <div class="topbar">
         <a href="/" class="brand"><div class="logo-icon">CS</div>ChlearSakhaaOps AI</a>
-        <div class="topbar-right">
+        <div class="topbar-right" style="display:flex;align-items:center;gap:1rem">
+            <span id="metaTokenStatus" style="font-size:.78rem;color:var(--text-muted)"></span>
             <span id="userInfo" style="font-size:.85rem;color:var(--text-muted)">Loading...</span>
             <a href="/" class="btn btn-secondary">Home</a>
         </div>
@@ -102,7 +103,7 @@
 <script>
 const API='/api';
 let token=localStorage.getItem('adoptima_token')||'';
-let currentUser=null, accounts=[], globalConfig={}, selectedAccount=null, activeIntegration=null;
+let currentUser=null, accounts=[], globalConfig={}, metaStatus={}, selectedAccount=null, activeIntegration=null;
 
 function $(id){return document.getElementById(id)}
 function _setSaving(btn,text){
@@ -141,11 +142,12 @@ const integrations=[
         {id:'google_is_live',label:'Live Mode',type:'checkbox',global:false,account:true}
      ]},
     {id:'meta-ads',name:'Meta Ads',category:'Advertising',icon:'📢',desc:'Pull Facebook/Instagram campaign spend and lead data.',color:'#ede9fe',iconColor:'#7c3aed',wired:true,
+     metaAware:true,
      fields:[
-        {id:'meta_app_id',label:'App ID',placeholder:'Meta App ID',type:'text',global:false},
-        {id:'meta_app_secret',label:'App Secret',placeholder:'Enter secret',type:'password',global:false},
-        {id:'meta_access_token',label:'Access Token',placeholder:'Business manager access token',type:'password',global:true},
-        {id:'meta_external_id',label:'Ad Account ID',placeholder:'act_123456789',type:'text',global:false,account:true},
+        {id:'meta_external_id',label:'Ad Account ID',placeholder:'act_123456789',type:'text',global:false,account:true,required:true},
+        {id:'meta_app_id',label:'App ID',placeholder:'Meta App ID',type:'text',global:false,system:true},
+        {id:'meta_app_secret',label:'App Secret',placeholder:'Enter secret',type:'password',global:false,system:true},
+        {id:'meta_access_token',label:'Access Token',placeholder:'Business manager access token',type:'password',global:true,hideWhenSystemToken:true},
         {id:'meta_is_live',label:'Live Mode',type:'checkbox',global:false,account:true}
      ]},
     {id:'leadsquared',name:'LeadSquared',category:'CRM',icon:'👥',desc:'Pull client leads directly into MIS reports.',color:'#dcfce7',iconColor:'#16a34a',wired:true,
@@ -215,14 +217,22 @@ const integrations=[
 
 function renderCards(){
     const sorted=[...integrations].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-    $('cardsGrid').innerHTML=sorted.map(i=>`
-        <div class="int-card" onclick="openIntegration('${i.id}')">
+    $('cardsGrid').innerHTML=sorted.map(i=>{
+        let badge='';
+        if(i.id==='meta-ads' && metaStatus.system_user_token_configured){
+            badge=`<div style="font-size:0.7rem;color:#065f46;background:#d1fae5;border-radius:4px;padding:0.2rem 0.4rem;margin-bottom:0.5rem;display:inline-block">✅ System User Token active — no per-client token needed</div>`;
+        }else if(i.id==='meta-ads'){
+            badge=`<div style="font-size:0.7rem;color:#92400e;background:#fef3c7;border-radius:4px;padding:0.2rem 0.4rem;margin-bottom:0.5rem;display:inline-block">⚠️ Using per-client tokens — set up a System User for permanent access</div>`;
+        }
+        return `<div class="int-card" onclick="openIntegration('${i.id}')">
             <div class="int-icon" style="background:${i.color};color:${i.iconColor}">${i.icon}</div>
             <div class="category">${i.category}</div>
             <h3>${i.name}</h3>
+            ${badge}
             <p>${i.desc}</p>
             <span class="status-pill ${getStatusClass(i)}" id="status-${i.id}">${getStatusText(i)}</span>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 function getStatusClass(i){
@@ -250,15 +260,33 @@ function openIntegration(id){
     $('formDesc').textContent=activeIntegration.desc;
     $('formWired').textContent=activeIntegration.wired?'● Live backend connected':'● Planned integration (credentials saved, API coming soon)';
     $('formPanel').classList.remove('hidden');
-    $('formFields').innerHTML=activeIntegration.fields.map(f=>{
+
+    // Meta system-token notice inside the form panel
+    let metaNotice='';
+    if(activeIntegration.id==='meta-ads'){
+        if(metaStatus.system_user_token_configured){
+            metaNotice=`<div style="font-size:0.78rem;color:#065f46;background:#d1fae5;border:1px solid #a7f3d0;padding:0.5rem 0.75rem;border-radius:6px;margin-bottom:0.75rem">
+                ✅ System User Token active — only the Ad Account ID is required per client.
+            </div>`;
+        }else{
+            metaNotice=`<div style="font-size:0.78rem;color:#92400e;background:#fef3c7;border:1px solid #fde68a;padding:0.5rem 0.75rem;border-radius:6px;margin-bottom:0.75rem">
+                ⚠️ Using per-client tokens — these expire every 60 days. Set up a System User for permanent access.
+            </div>`;
+        }
+    }
+
+    const systemTokenMode = activeIntegration.id==='meta-ads' && metaStatus.system_user_token_configured;
+    $('formFields').innerHTML=metaNotice+activeIntegration.fields.map(f=>{
+        if(systemTokenMode && f.hideWhenSystemToken) return '';
         const val=getFieldValue(f);
+        const readonly = (systemTokenMode && f.system && metaStatus.meta_app_id) ? 'readonly style="background:var(--bg-base)"' : '';
         if(f.type==='textarea'){
-            return `<div class="form-group full"><label>${f.label}</label><textarea id="int_${f.id}">${val}</textarea></div>`;
+            return `<div class="form-group ${f.id==='meta_access_token'?'full':''}"><label>${f.label}${f.required?' *':''}</label><textarea id="int_${f.id}" ${readonly}>${val}</textarea></div>`;
         }
         if(f.type==='checkbox'){
             return `<div class="form-group"><label style="display:flex;align-items:center;gap:.5rem;cursor:pointer"><input type="checkbox" id="int_${f.id}" ${val?'checked':''}> ${f.label}</label></div>`;
         }
-        return `<div class="form-group"><label>${f.label}</label><input type="${f.type}" id="int_${f.id}" value="${val||''}" placeholder="${f.placeholder||''}"></div>`;
+        return `<div class="form-group ${f.id==='meta_access_token'?'full':''}"><label>${f.label}${f.required?' *':''}</label><input type="${f.type}" id="int_${f.id}" value="${val||''}" placeholder="${f.placeholder||''}" ${readonly}></div>`;
     }).join('');
     $('formPanel').scrollIntoView({behavior:'smooth'});
 }
@@ -271,6 +299,9 @@ function getFieldValue(f){
         if(f.id==='meta_external_id')return selectedAccount.meta_external_id||'';
         if(f.id==='meta_is_live')return selectedAccount.meta_is_live;
     }
+    // System-level Meta fields: pull from global config/meta-status
+    if(f.system && f.id==='meta_app_id') return globalConfig.meta_app_id || metaStatus.meta_app_id || '';
+    if(f.system && f.id==='meta_app_secret') return globalConfig.meta_app_secret || '';
     const key=f.id.replace(/^(google_|meta_)/,'');
     return selectedAccount? (selectedAccount[f.id]||globalConfig[f.id]||globalConfig[key]||''): (globalConfig[f.id]||globalConfig[key]||'');
 }
@@ -297,7 +328,22 @@ async function saveIntegration(){
         });
         // Mark platform as enabled when credentials are saved on this page
         if(activeIntegration.id==='google-ads') accountPayload.has_google=true;
-        if(activeIntegration.id==='meta-ads') accountPayload.has_meta=true;
+        if(activeIntegration.id==='meta-ads'){
+            accountPayload.has_meta=true;
+            // When a system user token is configured, don't save per-account tokens.
+            if(metaStatus.system_user_token_configured){
+                delete accountPayload.meta_access_token;
+                delete globalPayload.meta_access_token;
+                delete accountPayload.meta_app_id;
+                delete accountPayload.meta_app_secret;
+                // Ensure live flag can be toggled explicitly
+                if(accountPayload.meta_is_live === true || accountPayload.meta_is_live === 'true'){
+                    accountPayload.meta_is_live = true;
+                }else if(accountPayload.meta_is_live === false || accountPayload.meta_is_live === 'false'){
+                    accountPayload.meta_is_live = false;
+                }
+            }
+        }
         // Tokens for wired ad platforms should be stored per-account (encrypted)
         if(activeIntegration.id==='google-ads' && globalPayload.google_refresh_token){
             accountPayload.google_refresh_token=globalPayload.google_refresh_token;
@@ -316,6 +362,7 @@ async function saveIntegration(){
         // refresh state
         accounts=await api('GET','/accounts');
         globalConfig=await api('GET','/config');
+        metaStatus=await api('GET','/config/meta-status');
         selectedAccount=accounts.find(a=>a.id===selectedAccount.id)||null;
         onAccountChange();
         renderCards();
@@ -348,15 +395,33 @@ async function testIntegration(){
     else if(activeIntegration.id==='salesforce')toast('Salesforce test pull: uses live API if tokens provided','success');
 }
 
+async function fetchMetaTokenStatus(){
+    try{
+        const s=await api('GET','/meta/token-status');
+        const el=$('metaTokenStatus');
+        if(!el)return;
+        if(s.token_type==='system_user'){
+            el.innerHTML=`Meta Token: <span style="color:var(--success);font-weight:600">✅ System User (never expires)</span> | ${s.accounts_connected} accounts connected`;
+        }else{
+            el.innerHTML=`Meta Token: <span style="color:var(--warning);font-weight:600">⚠️ Per-account</span> | ${s.accounts_connected} accounts connected`;
+        }
+    }catch(e){
+        const el=$('metaTokenStatus');
+        if(el)el.textContent='Meta Token: unavailable';
+    }
+}
+
 async function init(){
     if(!token){window.location.href='/';return}
     try{currentUser=await api('GET','/auth/me')}catch(e){window.location.href='/';return}
     $('userInfo').textContent=currentUser.full_name||currentUser.email;
     accounts=await api('GET','/accounts');
     globalConfig=await api('GET','/config');
+    try{metaStatus=await api('GET','/config/meta-status');}catch(e){metaStatus={system_user_token_configured:false};}
     accounts.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
     $('accountSelect').innerHTML='<option value="">— Choose account —</option>'+accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
     renderCards();
+    fetchMetaTokenStatus();
 }
 
 function onAccountChange(){

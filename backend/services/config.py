@@ -97,6 +97,7 @@ def load_config() -> Dict[str, Any]:
         ("google_developer_token", "GOOGLE_DEVELOPER_TOKEN"),
         ("meta_app_id", "META_APP_ID"),
         ("meta_app_secret", "META_APP_SECRET"),
+        ("meta_system_user_token", "META_SYSTEM_USER_TOKEN"),
         ("redirect_base_url", "REDIRECT_BASE_URL"),
         ("salesforce_url", "SALESFORCE_URL"),
         ("salesforce_client_id", "SALESFORCE_CLIENT_ID"),
@@ -135,6 +136,7 @@ def get_config_for_client() -> Dict[str, Any]:
     masked = config.copy()
     for key in ["client_secret", "refresh_token", "gemini_api_key", "developer_token",
                 "google_client_secret", "google_developer_token", "meta_app_secret",
+                "meta_system_user_token",
                 "salesforce_client_secret", "salesforce_refresh_token", "leadsquared_secret_key",
                 "mantri_salesforce_client_secret", "mantri_salesforce_refresh_token"]:
         val = masked.get(key, "")
@@ -142,4 +144,6 @@ def get_config_for_client() -> Dict[str, Any]:
             masked[key] = "●●●●●●●●" + val[-4:]
         elif val:
             masked[key] = "●●●●●●●●"
+    # Expose whether a system token is configured (not the value)
+    masked["meta_system_user_token_configured"] = bool(masked.get("meta_system_user_token"))
     return masked

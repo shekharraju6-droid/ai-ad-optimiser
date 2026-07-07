@@ -868,11 +868,12 @@
                             <div class="um-section" style="margin-top:0.75rem;">
                                 <div class="um-section-title" style="font-size:0.75rem;text-transform:none;letter-spacing:0;color:var(--text-muted);">Meta Ads</div>
                                 <label class="um-check"><input type="checkbox" id="caEditHasMeta"> Meta Ads enabled</label>
+                                <div id="caMetaSystemNotice" style="font-size:0.75rem;padding:0.4rem 0.6rem;border-radius:6px;margin:0.5rem 0;display:none;"></div>
                                 <div class="um-form" style="margin-top:0.5rem;">
                                     <div class="form-group"><label>Ad Account ID</label><input type="text" id="caEditMetaAdId" placeholder="act_123456789"></div>
-                                    <div class="form-group"><label>App ID</label><input type="text" id="caEditMetaAppId"></div>
-                                    <div class="form-group"><label>App Secret</label><input type="password" id="caEditMetaAppSecret"></div>
-                                    <div class="form-group full"><label>Access Token (paste token to connect without OAuth)</label><input type="password" id="caEditMetaAccessToken" placeholder="EAA..."></div>
+                                    <div class="form-group caMetaSystemField"><label>App ID</label><input type="text" id="caEditMetaAppId"></div>
+                                    <div class="form-group caMetaSystemField"><label>App Secret</label><input type="password" id="caEditMetaAppSecret"></div>
+                                    <div class="form-group full" id="caEditMetaAccessTokenWrap"><label>Access Token (paste token to connect without OAuth)</label><input type="password" id="caEditMetaAccessToken" placeholder="EAA..."></div>
                                     <div class="form-group full" style="display:flex;align-items:flex-end;gap:0.5rem;">
                                         <button class="btn btn-secondary" id="caEditConnectMetaBtn" onclick="connectMetaOAuth()">Connect Meta via OAuth</button>
                                         <span id="caEditMetaStatus" style="font-size:0.75rem;color:var(--text-muted);"></span>
@@ -1356,6 +1357,7 @@
     let centralDeleteId = null;
     let centralSelectedIds = new Set();
     let centralSearchQuery = '';
+    let metaSystemStatus = {};
 
     function openManageAccounts() {
         $('centralAccountModalTitle').textContent = 'Manage Client/Brand';
@@ -1392,7 +1394,35 @@
             if (searchInput) searchInput.value = '';
             renderCentralAccountsTable();
             await populateCentralGroupSelects();
+            try {
+                metaSystemStatus = await api('GET', '/config/meta-status') || {};
+                updateMetaSystemNotice();
+            } catch (e) { metaSystemStatus = {}; }
         } catch (e) { console.error(e); }
+    }
+
+    function updateMetaSystemNotice() {
+        const notice = $('caMetaSystemNotice');
+        const tokenWrap = $('caEditMetaAccessTokenWrap');
+        const systemFields = document.querySelectorAll('.caMetaSystemField');
+        if (!notice) return;
+        if (metaSystemStatus.system_user_token_configured) {
+            notice.style.display = 'block';
+            notice.style.background = 'var(--color-success-light)';
+            notice.style.color = 'var(--color-success-text)';
+            notice.style.border = '1px solid var(--color-success)';
+            notice.textContent = '✅ System User Token active — only Ad Account ID is required per client.';
+            if (tokenWrap) tokenWrap.style.display = 'none';
+            systemFields.forEach(el => el.style.display = 'none');
+        } else {
+            notice.style.display = 'block';
+            notice.style.background = 'var(--color-warning-light)';
+            notice.style.color = 'var(--color-warning-text)';
+            notice.style.border = '1px solid var(--color-warning)';
+            notice.textContent = '⚠️ Using per-client tokens — set up a System User for permanent access.';
+            if (tokenWrap) tokenWrap.style.display = 'block';
+            systemFields.forEach(el => el.style.display = '');
+        }
     }
 
     function filterCentralAccounts() {
@@ -1816,10 +1846,14 @@
         $('caEditGoogleStatus').textContent = a.google_credentials_masked ? 'Connected via OAuth' : 'Not connected via OAuth';
         $('caEditGoogleStatus').style.color = a.google_credentials_masked ? 'var(--color-success)' : 'var(--text-muted)';
         $('caEditMetaAdId').value = a.meta_external_id || '';
-        $('caEditMetaAppId').value = a.meta_app_id || '';
+        // When system user token is configured, pre-fill shared app ID and hide secret fields
+        $('caEditMetaAppId').value = metaSystemStatus.meta_app_id || a.meta_app_id || '';
         $('caEditMetaAppSecret').value = '';
-        $('caEditMetaStatus').textContent = a.meta_credentials_masked ? 'Connected via OAuth' : 'Not connected via OAuth';
-        $('caEditMetaStatus').style.color = a.meta_credentials_masked ? 'var(--color-success)' : 'var(--text-muted)';
+        $('caEditMetaAccessToken').value = '';
+        const metaConnected = a.meta_is_live || (a.meta_external_id && metaSystemStatus.system_user_token_configured);
+        $('caEditMetaStatus').textContent = metaConnected ? 'Connected' : 'Not connected';
+        $('caEditMetaStatus').style.color = metaConnected ? 'var(--color-success)' : 'var(--text-muted)';
+        updateMetaSystemNotice();
         $('caEditCrmType').value = a.crm_type || 'none';
         $('caEditCrmType').dataset.previousValue = a.crm_type || 'none';
         $('caEditLsqAccessKey').value = a.lsq_access_key || '';
@@ -1928,6 +1962,12 @@
             if (metaSecret) { body.meta_app_id = $('caEditMetaAppId').value.trim() || null; body.meta_app_secret = metaSecret; }
             const metaAccessToken = $('caEditMetaAccessToken').value.trim();
             if (metaAccessToken) body.meta_access_token = metaAccessToken;
+            // When a system user token is configured, don't send per-client app/secret overrides and ignore pasted token.
+            if (metaSystemStatus.system_user_token_configured) {
+                delete body.meta_app_id;
+                delete body.meta_app_secret;
+                delete body.meta_access_token;
+            }
             const lsqSecret = $('caEditLsqSecretKey').value.trim();
             body.crm_type = $('caEditCrmType').value;
             if ($('caEditLsqAccessKey').value.trim()) body.lsq_access_key = $('caEditLsqAccessKey').value.trim();
@@ -1975,6 +2015,10 @@
     async function connectMetaOAuth() {
         const id = $('caEditId').value;
         if (!id) { alert('Save the Client/Brand first before connecting Meta'); return; }
+        if (metaSystemStatus.system_user_token_configured) {
+            alert('System User Token is active. Just save the Ad Account ID and enable Meta — no OAuth needed.');
+            return;
+        }
         const btn = $('caEditConnectMetaBtn');
         if (btn) { btn.textContent = 'Connecting...'; btn.disabled = true; }
         try {

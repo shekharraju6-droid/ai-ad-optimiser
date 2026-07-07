@@ -13,6 +13,7 @@ from backend.services.search_term_auditor import run_search_term_audit
 from backend.db.database import SessionLocal
 from backend.db.models import Account, AccountStatus, AuditRun
 from backend.services.config import load_config
+from backend.services.connectors import meta_system_token_configured
 
 logger = logging.getLogger("AdOptima")
 _scheduler = None
@@ -188,7 +189,7 @@ def stop_scheduler():
 
 
 def _auto_refresh_live_metrics():
-    """Refresh metrics for all live accounts from Google Ads API."""
+    """Refresh metrics for all live accounts from Google Ads and Meta APIs."""
     logger.info("Auto-refreshing live account metrics")
     from backend.services.connectors import get_connector
     db = SessionLocal()
@@ -196,6 +197,13 @@ def _auto_refresh_live_metrics():
         accounts = db.query(Account).filter(Account.is_active == True, Account.is_live == True).all()
         today = (datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d")
         for account in accounts:
+            # Reset combined metrics at the start of each refresh cycle so we don't
+            # accumulate stale data when both platforms are enabled.
+            if account.has_google and account.has_meta:
+                account.spend = 0.0
+                account.clicks = 0
+                account.impressions = 0
+                account.conversions = 0
             for platform in ["google", "meta"]:
                 if platform == "google" and not account.has_google:
                     continue
@@ -203,7 +211,8 @@ def _auto_refresh_live_metrics():
                     continue
                 platform_live = account.google_is_live if platform == "google" else account.meta_is_live
                 platform_creds = account.google_credentials if platform == "google" else account.meta_credentials
-                if not (platform_live and platform_creds):
+                has_system_meta_token = platform == "meta" and meta_system_token_configured()
+                if not (platform_live and (platform_creds or has_system_meta_token)):
                     continue
                 try:
                     connector = get_connector(account, platform=platform, start_date=today, end_date=today)
