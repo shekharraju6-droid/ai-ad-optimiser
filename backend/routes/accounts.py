@@ -127,6 +127,7 @@ class AccountUpdate(BaseModel):
     google_client_id: Optional[str] = None
     google_client_secret: Optional[str] = None
     google_developer_token: Optional[str] = None
+    google_login_customer_id: Optional[str] = None
     meta_app_id: Optional[str] = None
     meta_app_secret: Optional[str] = None
     redirect_base_url: Optional[str] = None
@@ -371,6 +372,8 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.google_client_secret = req.google_client_secret or None
     if req.google_developer_token is not None:
         account.google_developer_token = req.google_developer_token or None
+    if req.google_login_customer_id is not None:
+        account.google_login_customer_id = req.google_login_customer_id or None
     # Encrypt raw tokens supplied from the integrations page (direct entry path)
     if hasattr(req, "google_refresh_token") and req.google_refresh_token:
         encrypted = build_google_credentials(

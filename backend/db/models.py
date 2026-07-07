@@ -76,6 +76,7 @@ class Account(Base):
     google_client_id = Column(String, nullable=True)
     google_client_secret = Column(String, nullable=True)
     google_developer_token = Column(String, nullable=True)
+    google_login_customer_id = Column(String, nullable=True)
     meta_app_id = Column(String, nullable=True)
     meta_app_secret = Column(String, nullable=True)
     redirect_base_url = Column(String, nullable=True)
@@ -176,6 +177,7 @@ class Account(Base):
             "google_client_id": self.google_client_id,
             "google_client_secret": self.google_client_secret,
             "google_developer_token": self.google_developer_token,
+            "google_login_customer_id": self.google_login_customer_id,
             "meta_app_id": self.meta_app_id,
             "meta_app_secret": self.meta_app_secret,
             "redirect_base_url": self.redirect_base_url,

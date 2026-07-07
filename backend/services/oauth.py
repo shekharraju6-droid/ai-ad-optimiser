@@ -117,12 +117,15 @@ def build_google_credentials(token_data: Dict[str, Any], account_id: int) -> Opt
     refresh_token = token_data.get("refresh_token") or token_data.get("access_token")
     if not refresh_token:
         return None
+    login_customer_id = ""
+    if account:
+        login_customer_id = (account.google_login_customer_id or "").replace("-", "")
     creds = {
         "developer_token": developer_token,
         "client_id": client_id,
         "client_secret": client_secret,
         "refresh_token": refresh_token,
-        "login_customer_id": "",
+        "login_customer_id": login_customer_id,
     }
     return encrypt(json.dumps(creds))
 
