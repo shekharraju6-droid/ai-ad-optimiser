@@ -212,13 +212,14 @@ class GoogleAdsConnector(AdsConnector):
         try:
             service = self.client.get_service("GoogleAdsService")
 
-            # Step 1: Fetch active account_budget to get spending limit and start date
+            # Step 1: Fetch active account_budget to get spending limit and amount served
             query_ab = """
                 SELECT
                   account_budget.id,
                   account_budget.status,
                   account_budget.approved_spending_limit_micros,
                   account_budget.adjusted_spending_limit_micros,
+                  account_budget.amount_served_micros,
                   account_budget.approved_start_date_time
                 FROM account_budget
             """
@@ -274,29 +275,13 @@ class GoogleAdsConnector(AdsConnector):
                     "month_label": month_label,
                 }
 
-            # PREPAID: existing balance logic + health
+            # PREPAID: balance = adjusted_spending_limit - amount_served
             total_budget = active_budget.adjusted_spending_limit_micros / 1_000_000.0
+            amount_served = (active_budget.amount_served_micros or 0) / 1_000_000.0
             budget_start = active_budget.approved_start_date_time or ""
-
-            # Step 2: Fetch spend since budget start date
             spend_start = budget_start[:10] if budget_start else "2026-01-01"
-            query_spend = f"""
-                SELECT
-                  metrics.cost_micros
-                FROM customer
-                WHERE segments.date BETWEEN '{spend_start}' AND '{_resolve_end_date(self.end_date, self.start_date)}'
-            """
-            try:
-                response_spend = service.search(customer_id=customer_id, query=query_spend)
-                total_spend = 0.0
-                for row in response_spend:
-                    total_spend += (row.metrics.cost_micros or 0) / 1_000_000.0
-            except Exception:
-                # Fallback: use account.spend if the spend query fails
-                total_spend = float(getattr(self.account, "spend", 0) or 0)
 
-            # Available balance = total budget - spend since budget start
-            balance = round(total_budget - total_spend, 2)
+            balance = round(total_budget - amount_served, 2)
             balance_pct = round((balance / total_budget * 100), 1) if total_budget > 0 else 0.0
             if balance_pct > 30:
                 health = "good"
@@ -310,7 +295,7 @@ class GoogleAdsConnector(AdsConnector):
                 "amount": balance,
                 "status": "available",
                 "total_budget": round(total_budget, 2),
-                "spend_since_budget_start": round(total_spend, 2),
+                "amount_served": round(amount_served, 2),
                 "budget_start_date": spend_start,
                 "balance_pct": balance_pct,
                 "health": health,
