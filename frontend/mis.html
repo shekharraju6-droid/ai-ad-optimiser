@@ -212,6 +212,10 @@
         .dsu-mode-row select:focus { outline: none; border-color: var(--color-border-focus); }
         .dsu-mode-row input[type="date"] { padding: 4px 8px; border: 1px solid var(--color-border-input); border-radius: var(--radius-sm); font-size: 12px; font-family: 'Inter', sans-serif; background: var(--color-bg-input); color: var(--color-text-primary); }
         .dsu-mis-row { text-align: center; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; padding: 8px; color: #b45309; background: var(--color-bg-card) !important; }
+        .dsu-radio-bar { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 16px; flex-wrap: nowrap; white-space: nowrap; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; }
+        .dsu-radio-bar label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 500; color: var(--color-text-primary); }
+        .dsu-radio-bar input[type="radio"] { width: 16px; height: 16px; accent-color: var(--color-accent); flex: 0 0 auto; }
+        .dsu-radio-bar .dsu-date-inline { display: inline-flex; align-items: center; gap: 0.35rem; }
         .dsu-range-label { margin-left: 1rem; color: #b45309; font-weight: 600; font-family: 'DM Sans', sans-serif; font-size: 13px; }
         .dsu-total-row td { background: #fef9e7 !important; font-weight: 500; border-top: 1.5px solid #d97706 !important; color: var(--color-text-primary); }
         .dsu-grand-row td { background: #fde68a !important; font-weight: 500; border-top: 2px solid #b45309 !important; color: var(--color-text-primary); }
@@ -1070,22 +1074,13 @@
             const label = t1RangeLabel(dsuT1Range);
             const custom = dsuT1Range.preset === 'custom';
             return `
-                <div style="display:flex;align-items:center;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
+                <div class="dsu-radio-bar">
                     <span>Table 1:</span>
-                    <label class="dsu-mode-row" style="margin:0 0.35rem">
-                        <input type="radio" name="dsuT1Mode" value="yesterday" ${dsuT1Range.preset==='yesterday'?'checked':''} onchange="dsuT1Preset('yesterday')">
-                        <span>Yesterday</span>
-                    </label>
-                    <label class="dsu-mode-row" style="margin:0 0.35rem">
-                        <input type="radio" name="dsuT1Mode" value="today" ${dsuT1Range.preset==='today'?'checked':''} onchange="dsuT1Preset('today')">
-                        <span>Today</span>
-                    </label>
-                    <label class="dsu-mode-row" style="margin:0 0.35rem">
-                        <input type="radio" name="dsuT1Mode" value="custom" ${custom?'checked':''} onchange="dsuT1Preset('custom')">
-                        <span>Custom</span>
-                    </label>
+                    <label><input type="radio" name="dsuT1Mode" value="yesterday" ${dsuT1Range.preset==='yesterday'?'checked':''} onchange="dsuT1Preset('yesterday')"><span>Yesterday</span></label>
+                    <label><input type="radio" name="dsuT1Mode" value="today" ${dsuT1Range.preset==='today'?'checked':''} onchange="dsuT1Preset('today')"><span>Today</span></label>
+                    <label><input type="radio" name="dsuT1Mode" value="custom" ${custom?'checked':''} onchange="dsuT1Preset('custom')"><span>Custom</span></label>
                     ${custom?`
-                        <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                        <div class="dsu-date-inline">
                             <input type="date" id="dsuT1Start" value="${dsuT1Range.start}" onchange="dsuT1Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
                             <span style="font-size:0.7rem">to</span>
                             <input type="date" id="dsuT1End" value="${dsuT1Range.end}" onchange="dsuT1Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
