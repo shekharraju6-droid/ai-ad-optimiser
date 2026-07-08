@@ -216,7 +216,7 @@
         .dsu-radio-bar label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 500; color: var(--color-text-primary); }
         .dsu-radio-bar input[type="radio"] { width: 16px; height: 16px; accent-color: var(--color-accent); flex: 0 0 auto; }
         .dsu-radio-bar .dsu-date-inline { display: inline-flex; align-items: center; gap: 0.35rem; }
-        .dsu-range-label { margin-left: 1rem; color: #b45309; font-weight: 600; font-family: 'DM Sans', sans-serif; font-size: 13px; }
+        .dsu-range-label { margin-left: 1rem; color: #b45309; font-weight: 600; font-family: 'DM Sans', sans-serif; font-size: 13px; white-space: nowrap; }
         .dsu-total-row td { background: #fef9e7 !important; font-weight: 500; border-top: 1.5px solid #d97706 !important; color: var(--color-text-primary); }
         .dsu-grand-row td { background: #fde68a !important; font-weight: 500; border-top: 2px solid #b45309 !important; color: var(--color-text-primary); }
         .dsu-section-row td {
@@ -1107,7 +1107,7 @@
             }
             const custom = dsuT2Range.preset === 'custom';
             return `
-                <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;flex-wrap:wrap;">
+                <div class="dsu-radio-bar">
                     <span>Table 2:</span>
                     <select id="dsuT2Preset" onchange="dsuT2Preset(this.value)" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);"
                         onfocus="this.style.background='#fff'">
@@ -1121,7 +1121,7 @@
                         <option value="custom" ${custom?'selected':''}>Custom</option>
                     </select>
                     ${custom?`
-                        <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                        <div class="dsu-date-inline">
                             <input type="date" id="dsuT2Start" value="${dsuT2Range.start}" onchange="dsuT2Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
                             <span style="font-size:0.7rem">to</span>
                             <input type="date" id="dsuT2End" value="${dsuT2Range.end}" onchange="dsuT2Custom()" class="date-input" style="padding:4px 8px;border:1px solid var(--color-border-input);border-radius:var(--radius-sm);font-size:12px;background:var(--color-bg-input);color:var(--color-text-primary);">
