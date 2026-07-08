@@ -33,19 +33,13 @@ def format_billing_amount(amount: Optional[float]) -> str:
 def build_billing_display(billing_cache: Optional[str], fallback_spend: float = 0.0) -> Dict[str, Any]:
     """Build the billing display object from cached billing data.
 
-    Args:
-        billing_cache: JSON string from account.billing_cache (populated by scheduler).
-        fallback_spend: Today's spend, used as postpaid 'USED' fallback if billing
-                        data is unavailable but we have spend.
-
     Returns:
         {
             billing_type: "prepaid" | "postpaid" | "unknown",
-            billing_label: "BAL" | "USED" | "BILL",
+            billing_display: "BAL ₹12.9K of ₹18.8L" | "USED ₹45.2K this month" | "BILL ---",
+            billing_colour: "good" | "warning" | "critical" | "neutral" | "grey",
+            balance_pct: float | None (prepaid only),
             billing_amount: number | null,
-            billing_display: "BAL ₹12.5K" | "USED ₹4.2K" | "BILL ---",
-            billing_status: "available" | "unavailable",
-            color: "neutral" | "yellow" | "red" | "grey",
         }
     """
     billing_data = None
@@ -56,80 +50,104 @@ def build_billing_display(billing_cache: Optional[str], fallback_spend: float = 
             billing_data = None
 
     if not billing_data or billing_data.get("status") != "available":
-        # No billing data — show placeholder, do NOT fall back to spend as USED
+        # No billing data — show placeholder
         if billing_data and billing_data.get("billing_type") == "postpaid":
             return {
                 "billing_type": "postpaid",
-                "billing_label": "USED",
-                "billing_amount": None,
                 "billing_display": "USED ---",
-                "billing_status": "unavailable",
-                "color": "grey",
+                "billing_colour": "grey",
+                "billing_amount": None,
             }
         if billing_data and billing_data.get("billing_type") == "prepaid":
             return {
                 "billing_type": "prepaid",
-                "billing_label": "BAL",
-                "billing_amount": None,
                 "billing_display": "BAL ---",
-                "billing_status": "unavailable",
-                "color": "grey",
+                "billing_colour": "grey",
+                "billing_amount": None,
             }
         return {
             "billing_type": "unknown",
-            "billing_label": "BILL",
-            "billing_amount": None,
             "billing_display": "BILL ---",
-            "billing_status": "unavailable",
-            "color": "grey",
+            "billing_colour": "grey",
+            "billing_amount": None,
         }
 
     # Billing data is available
     billing_type = billing_data.get("billing_type", "unknown")
     amount = billing_data.get("amount")
-    total_budget = billing_data.get("total_budget")
 
     if billing_type == "prepaid":
-        label = "BAL"
-        color = "neutral"
-        if amount is not None:
-            if amount <= 0:
-                color = "red"
-            elif total_budget and total_budget > 0 and amount < (total_budget * 0.10):
-                # Low balance: below 10% of total budget
-                color = "yellow"
-            elif amount < 500:  # Low absolute balance threshold
-                color = "yellow"
-        else:
-            color = "grey"
+        total_budget = billing_data.get("total_budget")
+        amount = billing_data.get("amount")
+        balance_pct = billing_data.get("balance_pct")
+        health = billing_data.get("health")
 
-        # Display: BAL ₹xx / ₹yy if total_budget available
+        # Compute balance_pct and health if not already cached by connector
+        if balance_pct is None and amount is not None and total_budget and total_budget > 0:
+            balance_pct = round((amount / total_budget * 100), 1)
+        if health is None and balance_pct is not None:
+            if balance_pct > 30:
+                health = "good"
+            elif balance_pct > 10:
+                health = "warning"
+            else:
+                health = "critical"
+        if health is None:
+            health = "good"
+
+        # Determine colour from health
+        if health == "good":
+            colour = "good"
+        elif health == "warning":
+            colour = "warning"
+        elif health == "critical":
+            colour = "critical"
+        else:
+            colour = "neutral"
+
+        # Build display with emoji indicators
+        indicator = ""
+        if health == "warning":
+            indicator = " \u26a0\ufe0f"
+        elif health == "critical":
+            indicator = " \ud83d\udd34"
+
         if amount is not None and total_budget:
-            display = f"BAL {format_billing_amount(amount)} / {format_billing_amount(total_budget)}"
+            display = f"BAL {format_billing_amount(amount)} of {format_billing_amount(total_budget)}{indicator}"
         elif amount is not None:
-            display = f"BAL {format_billing_amount(amount)}"
+            display = f"BAL {format_billing_amount(amount)}{indicator}"
         else:
             display = "BAL ---"
+            colour = "grey"
+
+        return {
+            "billing_type": "prepaid",
+            "billing_display": display,
+            "billing_colour": colour,
+            "balance_pct": balance_pct,
+            "billing_amount": amount,
+        }
     elif billing_type == "postpaid":
-        label = "USED"
-        color = "neutral"
-        if amount is not None:
-            display = f"USED {format_billing_amount(amount)}"
+        monthly_spend = billing_data.get("monthly_spend", amount)
+        month_label = billing_data.get("month_label", "")
+        if monthly_spend is not None:
+            suffix = f" this month" if not month_label else f" ({month_label})"
+            display = f"USED {format_billing_amount(monthly_spend)}{suffix}"
         else:
             display = "USED ---"
+        return {
+            "billing_type": "postpaid",
+            "billing_display": display,
+            "billing_colour": "neutral",
+            "billing_amount": monthly_spend,
+        }
     else:
-        label = "BILL"
-        color = "grey"
-        display = "BILL ---"
-
-    return {
-        "billing_type": billing_type,
-        "billing_label": label,
-        "billing_amount": amount,
-        "billing_display": display,
-        "billing_status": "available" if amount is not None else "unavailable",
-        "color": color,
-    }
+        return {
+            "billing_type": "unknown",
+            "billing_display": "BILL ---",
+            "billing_colour": "grey",
+            "billing_amount": None,
+        }
 
 
 def get_billing_for_account(account) -> Dict[str, Any]:

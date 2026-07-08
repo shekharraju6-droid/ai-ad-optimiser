@@ -209,11 +209,14 @@
         .hb-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 
         /* Billing chip */
-        .bill-chip { display: inline-flex; align-items: center; font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 4px; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
-        .bill-neutral { background: var(--color-bg-card-hover); color: var(--color-text-muted); }
-        .bill-yellow { background: var(--color-warning-light); color: var(--color-warning-text); }
-        .bill-red { background: var(--color-danger-light); color: var(--color-danger-text); }
-        .bill-grey { background: var(--color-bg-card-hover); color: var(--color-text-muted); }
+        .bill-chip { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+        .bill-type { font-size: 9px; opacity: 0.7; text-transform: uppercase; }
+        .bill-good { background: var(--color-success-light); color: var(--color-success-text); border: 1px solid var(--color-success); }
+        .bill-warning { background: var(--color-warning-light); color: var(--color-warning-text); border: 1px solid var(--color-warning); }
+        .bill-critical { background: var(--color-danger-light); color: var(--color-danger-text); border: 1px solid var(--color-danger); animation: pulse-critical 2s infinite; }
+        .bill-neutral { background: var(--color-bg-card-hover); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+        .bill-unknown { background: var(--color-bg-card-hover); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+        @keyframes pulse-critical { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
         .account-actions { display: flex; gap: 6px; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
@@ -1402,9 +1405,15 @@
     }
 
     function billChip(billing) {
-        if (!billing || !billing.billing_display) return '';
-        const colorClass = 'bill-' + (billing.color || 'neutral');
-        return `<span class="bill-chip ${colorClass}" title="${escapeHtml(billing.billing_type || '')}: ${escapeHtml(String(billing.billing_amount ?? '---'))}">${escapeHtml(billing.billing_display)}</span>`;
+        if (!billing || !billing.billing_display) return '<span class="bill-chip bill-unknown">BILL ---</span>';
+        let colourClass = 'bill-good';
+        if (billing.billing_colour === 'warning') colourClass = 'bill-warning';
+        else if (billing.billing_colour === 'critical') colourClass = 'bill-critical';
+        else if (billing.billing_colour === 'neutral') colourClass = 'bill-neutral';
+        else if (billing.billing_colour === 'grey') colourClass = 'bill-unknown';
+        let typeLabel = billing.billing_type === 'prepaid' ? 'prepaid' : (billing.billing_type === 'postpaid' ? 'postpaid' : '');
+        let typeSpan = typeLabel ? `<span class="bill-type">${typeLabel}</span>` : '';
+        return `<span class="bill-chip ${colourClass}">${escapeHtml(billing.billing_display)}${typeSpan}</span>`;
     }
 
     async function refreshTile(accountId, platform, btn) {

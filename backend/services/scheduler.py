@@ -26,8 +26,8 @@ def start_scheduler():
     _scheduler = BackgroundScheduler()
     # Recalculate schedules every minute
     _scheduler.add_job(_reschedule_all, 'interval', minutes=1, id='schedule_refresher', replace_existing=True)
-    # Auto-refresh live account metrics every 15 minutes
-    _scheduler.add_job(_auto_refresh_live_metrics, 'interval', minutes=15, id='auto_metrics_refresh', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(seconds=30))
+    # Auto-refresh live account metrics every 10 minutes
+    _scheduler.add_job(_auto_refresh_live_metrics, 'interval', minutes=10, id='auto_metrics_refresh', replace_existing=True, next_run_time=datetime.utcnow() + timedelta(seconds=30))
     # Per-account LeadSquared lead mirror sync (default 10 minutes, configurable per account)
     _schedule_lsq_sync_jobs(_scheduler)
     # Daily smart keyword + search term audit at 8:00 AM IST = 2:30 AM UTC
@@ -259,6 +259,39 @@ def _auto_refresh_live_metrics():
                                 _billing = connector.fetch_billing()
                                 if _billing:
                                     import json as _json
+                                    # Low-balance alert (prepaid only, log once per critical state)
+                                    if _billing.get("billing_type") == "prepaid" and _billing.get("health") == "critical":
+                                        # Check if we already logged the alert
+                                        _prev = None
+                                        try:
+                                            _prev = _json.loads(account.billing_cache) if account.billing_cache else {}
+                                        except Exception:
+                                            _prev = {}
+                                        if not _prev.get("alert_logged"):
+                                            _billing["alert_logged"] = True
+                                            try:
+                                                from backend.services.activity_log import log_activity
+                                                log_activity(
+                                                    module="AdPulse",
+                                                    action="Low Balance Alert",
+                                                    description=f"{account.name} balance critically low: {_billing.get('amount'):.0f} remaining ({_billing.get('balance_pct')}% of {_billing.get('total_budget'):.0f}). Ads may stop soon.",
+                                                    account_id=account.id,
+                                                    account_name=account.name,
+                                                    entity_type="account",
+                                                    entity_id=str(account.id),
+                                                    details={
+                                                        "balance": _billing.get("amount"),
+                                                        "balance_pct": _billing.get("balance_pct"),
+                                                        "total_budget": _billing.get("total_budget"),
+                                                    },
+                                                    db=db,
+                                                )
+                                                logger.warning(f"Low balance alert logged for {account.name}: {_billing.get('balance_pct')}%")
+                                            except Exception as _ae:
+                                                logger.warning(f"Failed to log low balance alert: {_ae}")
+                                    elif _billing.get("billing_type") == "prepaid" and _billing.get("health") != "critical":
+                                        # Reset alert flag when balance recovers
+                                        _billing["alert_logged"] = False
                                     account.billing_cache = _json.dumps(_billing)
                                     logger.info(f"Billing cached for {account.name} ({platform}): type={_billing.get('billing_type')}, amount={_billing.get('amount')}")
                             except Exception as _be:

@@ -200,10 +200,9 @@ class GoogleAdsConnector(AdsConnector):
     def fetch_billing(self) -> Dict[str, Any]:
         """Fetch billing/balance data from Google Ads API.
 
-        Queries account_budget for the spending limit (total budget) and
-        calculates available balance = adjusted_spending_limit - spend_since_budget_start.
-
-        Falls back to 'unknown' if the API call fails.
+        Detects prepaid (active account_budget with spending limit) vs postpaid
+        (no active budget or unlimited). For prepaid, calculates remaining balance
+        and health. For postpaid, returns monthly spend.
         """
         if not self.is_valid:
             return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
@@ -234,14 +233,52 @@ class GoogleAdsConnector(AdsConnector):
                 if active_budget is None:
                     active_budget = ab  # fallback to first row
 
-            if not active_budget or not active_budget.adjusted_spending_limit_micros:
-                return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
+            # Determine billing type: prepaid if there's an active budget with a
+            # positive, finite spending limit; otherwise postpaid.
+            has_active_limit = (
+                active_budget
+                and active_budget.adjusted_spending_limit_micros
+                and active_budget.adjusted_spending_limit_micros > 0
+            )
 
+            if not has_active_limit:
+                # POSTPAID: fetch spend for this calendar month
+                today_ist = _today_ist()
+                first_of_month = today_ist[:8] + "01"  # e.g. "2026-07-01"
+                query_month = f"""
+                    SELECT
+                      metrics.cost_micros
+                    FROM customer
+                    WHERE segments.date BETWEEN '{first_of_month}' AND '{_resolve_end_date(self.end_date, self.start_date)}'
+                """
+                try:
+                    response_month = service.search(customer_id=customer_id, query=query_month)
+                    monthly_spend = 0.0
+                    for row in response_month:
+                        monthly_spend += (row.metrics.cost_micros or 0) / 1_000_000.0
+                except Exception:
+                    monthly_spend = float(getattr(self.account, "spend", 0) or 0)
+
+                # Build month label e.g. "July 2026"
+                try:
+                    _dt = datetime.strptime(first_of_month, "%Y-%m-%d")
+                    month_label = _dt.strftime("%B %Y")
+                except Exception:
+                    month_label = ""
+
+                return {
+                    "billing_type": "postpaid",
+                    "amount": round(monthly_spend, 2),
+                    "status": "available",
+                    "monthly_spend": round(monthly_spend, 2),
+                    "month_label": month_label,
+                }
+
+            # PREPAID: existing balance logic + health
             total_budget = active_budget.adjusted_spending_limit_micros / 1_000_000.0
             budget_start = active_budget.approved_start_date_time or ""
 
             # Step 2: Fetch spend since budget start date
-            # Parse start date: "2026-04-02 09:36:11" -> "2026-04-02"
             spend_start = budget_start[:10] if budget_start else "2026-01-01"
             query_spend = f"""
                 SELECT
@@ -260,6 +297,14 @@ class GoogleAdsConnector(AdsConnector):
 
             # Available balance = total budget - spend since budget start
             balance = round(total_budget - total_spend, 2)
+            balance_pct = round((balance / total_budget * 100), 1) if total_budget > 0 else 0.0
+            if balance_pct > 30:
+                health = "good"
+            elif balance_pct > 10:
+                health = "warning"
+            else:
+                health = "critical"
+
             return {
                 "billing_type": "prepaid",
                 "amount": balance,
@@ -267,6 +312,8 @@ class GoogleAdsConnector(AdsConnector):
                 "total_budget": round(total_budget, 2),
                 "spend_since_budget_start": round(total_spend, 2),
                 "budget_start_date": spend_start,
+                "balance_pct": balance_pct,
+                "health": health,
             }
         except Exception as e:
             logger.warning(f"Google fetch billing failed for account {self.account.id}: {e}")
@@ -706,14 +753,10 @@ class MetaAdsConnector(AdsConnector):
             return []
 
     def fetch_billing(self) -> Dict[str, Any]:
-        """Fetch billing/balance data from Meta Marketing API.
+        """Fetch billing data from Meta Marketing API.
 
-        Meta doesn't expose a direct 'balance' field. We check:
-        - spend_cap (daily/total spend cap) → postpaid with cap
-        - spend (amount used today) → postpaid
-        - No prepaid balance concept in standard Meta API
-
-        Returns billing_type='postpaid' with spend amount if available.
+        Meta doesn't expose a prepaid balance. We return monthly spend as
+        postpaid so the dashboard can display "USED ₹X this month".
         """
         if not self.is_valid:
             return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
@@ -723,19 +766,38 @@ class MetaAdsConnector(AdsConnector):
             if not account_id:
                 return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
             account = AdAccount(account_id)
-            # Fetch spend cap and current spend
-            fields = ["spend_cap", "spend", "currency", "amount_spent"]
+            # Fetch insights for this calendar month (spend only)
+            today_ist = _today_ist()
+            first_of_month = today_ist[:8] + "01"
             try:
-                account_data = account.api_get(fields=fields)
-                spend_cap = float(account_data.get("spend_cap", 0) or 0)
-                amount_spent = float(account_data.get("amount_spent", 0) or 0)
-                if spend_cap > 0:
-                    # Has a spend cap → postpaid with cap
-                    return {"billing_type": "postpaid", "amount": amount_spent, "status": "available"}
-                if amount_spent > 0:
-                    return {"billing_type": "postpaid", "amount": amount_spent, "status": "available"}
+                params = {
+                    "time_range": {"since": first_of_month, "until": today_ist},
+                    "level": "account",
+                }
+                insights = account.get_insights(fields=["spend"], params=params)
+                monthly_spend = 0.0
+                for row in insights:
+                    monthly_spend += float(row.get("spend", 0) or 0)
             except Exception as e:
-                logger.warning(f"Meta billing api_get failed for account {self.account.id}: {e}")
+                logger.warning(f"Meta billing insights failed for account {self.account.id}: {e}")
+                # Fallback to account-level cached spend
+                monthly_spend = float(getattr(self.account, "spend", 0) or 0)
+
+            # Build month label e.g. "July 2026"
+            try:
+                _dt = datetime.strptime(first_of_month, "%Y-%m-%d")
+                month_label = _dt.strftime("%B %Y")
+            except Exception:
+                month_label = ""
+
+            if monthly_spend > 0:
+                return {
+                    "billing_type": "postpaid",
+                    "amount": round(monthly_spend, 2),
+                    "status": "available",
+                    "monthly_spend": round(monthly_spend, 2),
+                    "month_label": month_label,
+                }
             return {"billing_type": "unknown", "amount": None, "status": "unavailable"}
         except Exception as e:
             logger.warning(f"Meta fetch billing failed for account {self.account.id}: {e}")
