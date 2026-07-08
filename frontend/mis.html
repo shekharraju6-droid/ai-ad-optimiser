@@ -212,12 +212,18 @@
         .dsu-mode-row select:focus { outline: none; border-color: var(--color-border-focus); }
         .dsu-mode-row input[type="date"] { padding: 4px 8px; border: 1px solid var(--color-border-input); border-radius: var(--radius-sm); font-size: 12px; font-family: 'Inter', sans-serif; background: var(--color-bg-input); color: var(--color-text-primary); }
         .dsu-mis-row { text-align: center; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; padding: 8px; color: #b45309; background: var(--color-bg-card) !important; }
-        .dsu-radio-bar { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: nowrap; font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500; padding-left: 1.5rem; }
+        .dsu-radio-bar { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; }
         .dsu-radio-bar > * { flex-shrink: 0; white-space: nowrap; }
-        .dsu-radio-bar label { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; font-weight: 500; color: var(--color-text-primary); white-space: nowrap; }
+        .dsu-radio-bar label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 500; color: var(--color-text-primary); white-space: nowrap; font-size: 12px; }
         .dsu-radio-bar input[type="radio"] { width: 14px; height: 14px; accent-color: var(--color-accent); flex: 0 0 auto; }
-        .dsu-radio-bar .dsu-date-inline { display: inline-flex; align-items: center; gap: 0.3rem; flex-shrink: 0; white-space: nowrap; }
-        .dsu-range-label { margin-left: 0.5rem; color: #b45309; font-weight: 600; font-family: 'DM Sans', sans-serif; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+        .dsu-radio-bar select { min-width: auto; max-width: 100%; font-size: 12px; }
+        .dsu-radio-bar .dsu-date-inline { display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0; white-space: nowrap; }
+        .dsu-range-label { margin-left: 0.5rem; color: #b45309; font-weight: 600; font-family: 'DM Sans', sans-serif; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+        .report-controls-row {
+            display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px;
+            width: 100%; max-width: 100%; padding: 8px 12px; box-sizing: border-box;
+            overflow: visible; margin: 0; position: relative;
+        }
         .dsu-total-row td { background: #fef9e7 !important; font-weight: 500; border-top: 1.5px solid #d97706 !important; color: var(--color-text-primary); }
         .dsu-grand-row td { background: #fde68a !important; font-weight: 500; border-top: 2px solid #b45309 !important; color: var(--color-text-primary); }
         .dsu-section-row td {
@@ -1161,13 +1167,17 @@
 
         const t1Header = `
             <tr><th colspan="4" class="dsu-banner">${data.gst_note || 'MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026'}</th></tr>
-            <tr><th colspan="4" class="dsu-mode-row">${dsuT1DateSelector()}</th></tr>
             <tr><th colspan="4" class="dsu-mis-row">${formatHeaderDate(dsuT1Range.end)}</th></tr>
+        `;
+        const t1Controls = `
+            <div class="report-controls-row">${dsuT1DateSelector()}</div>
         `;
         const t2Header = `
             <tr><th colspan="4" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
-            <tr><th colspan="4" class="dsu-mode-row">${dsuT2DateSelector()}</th></tr>
             <tr><th colspan="4" class="dsu-mis-row">${dsuT2Range.preset === 'custom' ? `${formatHeaderDate(dsuT2Range.start)} — ${formatHeaderDate(dsuT2Range.end)}` : (dsuT2Range.preset === 'inception' ? `28th November 2025 — ${formatHeaderDate(dsuT2Range.end)}` : formatHeaderDate(dsuT2Range.end))}</th></tr>
+        `;
+        const t2Controls = `
+            <div class="report-controls-row">${dsuT2DateSelector()}</div>
         `;
 
         $('reportContent').innerHTML = `
@@ -1177,10 +1187,12 @@
                     <div class="report-title">DSU Course Performance Report</div>
                 </div>
                 <div class="report-tables-flex" style="gap:16px">
-                    <div class="report-container" style="padding:0;box-shadow:none">
+                    <div class="report-container" style="padding:0;box-shadow:none;overflow:visible">
+                        ${t1Controls}
                         ${renderDSUTable(d.title, d.rows, d.total, t1Header)}
                     </div>
-                    <div class="report-container" style="padding:0;box-shadow:none">
+                    <div class="report-container" style="padding:0;box-shadow:none;overflow:visible">
+                        ${t2Controls}
                         ${renderDSUTable(c.title, c.rows, c.total, t2Header)}
                     </div>
                 </div>
