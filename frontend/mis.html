@@ -149,63 +149,109 @@
         .date-input { min-width: 130px; cursor: pointer; }
         input[type="date"].date-input { position: relative; z-index: 1; background: var(--color-bg-input); }
 
-        /* DSU Report tables - using variable-based colors */
-        .dsu-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--color-bg-card); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); overflow: hidden; }
-        .dsu-table th { padding: 8px 12px; border: 1px solid var(--color-border); text-align: left; background: var(--color-accent-light); color: var(--color-accent-text); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
-        .dsu-table td { padding: 8px 12px; border: 1px solid var(--color-border); background: var(--color-bg-card); text-align: left; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
-        .dsu-table td[style*="font-weight:500"], .dsu-table td[style*="font-weight: 500"] { font-variant-numeric: normal; }
-        .dsu-table tbody tr:nth-child(even) td { background: var(--color-bg-card-hover); }
-        .dsu-table tbody tr:hover td { background: var(--color-bg-card-hover); }
-        .dsu-table .text-right { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
-        .dsu-table .text-center { text-align: center; }
+        /* DSU/DSI report tables - standardized visual quality */
+        .dsu-table, .dsu-table7 {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 13px;
+            background: var(--color-bg-card);
+            border: 1px solid var(--color-border-strong);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+        .dsu-table th, .dsu-table7 th {
+            background: #fef3c7;
+            color: #92400e;
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 8px 12px;
+            border-bottom: 0.5px solid #e7e5e4;
+            text-align: left;
+        }
+        .dsu-table td, .dsu-table7 td {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            color: var(--color-text-primary);
+            padding: 7px 12px;
+            border-bottom: 0.5px solid var(--color-border);
+            background: var(--color-bg-card);
+            text-align: left;
+            font-variant-numeric: tabular-nums;
+        }
+        .dsu-table tbody tr:nth-child(even) td, .dsu-table7 tbody tr:nth-child(even) td { background: var(--color-bg-card-hover); }
+        .dsu-table tbody tr:hover td, .dsu-table7 tbody tr:hover td { background: var(--color-bg-card-hover); }
+        .dsu-table .text-right, .dsu-table7 .text-right,
+        .dsu-table td.text-right, .dsu-table7 td.text-right {
+            text-align: right !important;
+            font-variant-numeric: tabular-nums;
+            font-weight: 500;
+        }
+        .dsu-table .text-center, .dsu-table7 .text-center,
+        .dsu-table td.text-center, .dsu-table7 td.text-center { text-align: center; }
+        .dsu-table td em.dash, .dsu-table7 td em.dash {
+            color: var(--color-text-muted);
+            font-style: italic;
+            font-weight: 400;
+        }
+        .negative { color: #dc2626; }
+        .dark-mode .negative { color: #f87171; }
         .dsu-banner { text-align: center; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0.02em; padding: 12px 16px; background: var(--color-accent-light) !important; color: var(--color-accent-text) !important; border: 1px solid var(--color-accent) !important; }
-        .dsu-mode-row { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; text-align: center; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; padding: 8px; color: var(--color-text-primary); background: var(--color-bg-card) !important; }
+        .dsu-mode-row {
+            display: flex; flex-direction: row; align-items: center; justify-content: center;
+            gap: 16px; flex-wrap: wrap; text-align: center;
+            font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
+            padding: 8px; color: var(--color-text-primary); background: var(--color-bg-card) !important;
+        }
         .dsu-mode-row label { display: inline-flex; align-items: center; gap: 4px; margin: 0; cursor: pointer; font-weight: 500; color: var(--color-text-primary); }
         .dsu-mode-row input[type="radio"] { width: 16px; height: 16px; accent-color: var(--color-accent); }
         .dsu-mode-row select { padding: 6px 10px; border: 1px solid var(--color-border-input); border-radius: var(--radius-sm); font-size: 12px; font-family: 'Inter', sans-serif; background: var(--color-bg-input); color: var(--color-text-primary); }
         .dsu-mode-row select:focus { outline: none; border-color: var(--color-border-focus); }
         .dsu-mode-row input[type="date"] { padding: 4px 8px; border: 1px solid var(--color-border-input); border-radius: var(--radius-sm); font-size: 12px; font-family: 'Inter', sans-serif; background: var(--color-bg-input); color: var(--color-text-primary); }
-        .dsu-mis-row { text-align: center; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; padding: 8px; color: var(--color-accent); background: var(--color-bg-card) !important; }
-        .dsu-range-label { margin-left: 1rem; color: var(--color-accent); font-weight: 600; font-family: 'DM Sans', sans-serif; font-size: 13px; }
-        .dsu-total-row td { background: var(--color-accent-light) !important; border: 1px solid var(--color-border-strong) !important; font-weight: 600; color: var(--color-text-primary); }
-        .dsu-grand-row td { background: var(--color-warning-light) !important; border: 1px solid var(--color-warning) !important; font-weight: 600; color: var(--color-text-primary); }
-        .dsu-section-row td { background: var(--color-bg-card-hover) !important; border: 1px solid var(--color-border-strong) !important; font-weight: 600; color: var(--color-text-primary); text-align: center; letter-spacing: 0.03em; font-size: 12px; }
-        .dsu-table4-wrap { max-width: 720px; margin: 0 auto; }
-        .dsi-table4-wrap { max-width: 720px; margin: 0 auto; }
-        /* Compact Table 4 row spacing */
-        .dsu-table4-wrap .dsu-table th,
-        .dsu-table4-wrap .dsu-table td,
-        .dsi-table4-wrap .dsu-table th,
-        .dsi-table4-wrap .dsu-table td { padding: 4px 8px; }
-        .dsu-table4-wrap .dsu-section-row td,
-        .dsi-table4-wrap .dsu-section-row td { padding: 4px 8px; }
+        .dsu-mis-row { text-align: center; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; padding: 8px; color: #b45309; background: var(--color-bg-card) !important; }
+        .dsu-range-label { margin-left: 1rem; color: #b45309; font-weight: 600; font-family: 'DM Sans', sans-serif; font-size: 13px; }
+        .dsu-total-row td { background: #fef9e7 !important; font-weight: 500; border-top: 1.5px solid #d97706 !important; color: var(--color-text-primary); }
+        .dsu-grand-row td { background: #fde68a !important; font-weight: 500; border-top: 2px solid #b45309 !important; color: var(--color-text-primary); }
+        .dsu-section-row td {
+            background: var(--color-bg-card-hover) !important;
+            font-weight: 500;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--color-text-secondary);
+            padding: 6px 12px;
+            text-align: center;
+            border-bottom: none;
+        }
+        .dsu-table4-wrap { max-width: 100%; width: 100%; margin: 0 auto; overflow-x: hidden; box-sizing: border-box; }
+        .dsi-table4-wrap { max-width: 100%; width: 100%; margin: 0 auto; overflow-x: hidden; box-sizing: border-box; }
+
+        /* Status column standardized */
+        .status-live { color: #059669; font-weight: 500; font-size: 12px; text-align: center; }
+        .status-paused { color: #d97706; font-weight: 500; font-size: 12px; text-align: center; }
 
         /* Report title, labels, containers */
         .report-title { font-family: 'DM Sans', sans-serif; font-size: 20px; font-weight: 700; color: var(--color-text-primary); padding-bottom: 10px; border-bottom: 3px solid var(--color-accent); margin-bottom: 16px; display: inline-block; }
-        .report-notice { background: var(--color-accent-light); border: 1px solid var(--color-accent); border-radius: var(--radius-md); padding: 12px 16px; font-size: 12px; font-weight: 500; color: var(--color-accent-text); letter-spacing: 0.02em; margin-bottom: 12px; }
+        .report-notice { background: var(--color-accent-light); border: 1px solid var(--color-accent); border-radius: var(--radius-md); padding: 12px 16px; font-size: 12px; font-weight: 500; color: var(--color-accent-text); letter-spacing: 0.02em; margin-bottom: 8px; }
         .table-label { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700; color: var(--color-text-primary); background: var(--color-bg-card-hover); padding: 8px 14px; border-radius: var(--radius-sm); display: inline-block; margin-bottom: 8px; }
         .report-container { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-sm); }
 
         /* DSI Table 1 & 2 compact layout */
-        .dsi-t1t2-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .dsi-t1t2-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 1100px) { .dsi-t1t2-wrap { grid-template-columns: 1fr; } }
-        .dsi-t1t2-wrap .dsu-table { font-size: 11px; }
-        .dsi-t1t2-wrap .dsu-table th { padding: 4px 6px; font-size: 10px; }
-        .dsi-t1t2-wrap .dsu-table td { padding: 4px 6px; }
+        .dsi-t1t2-wrap .dsu-table { font-size: 13px; }
+        .dsi-t1t2-wrap .dsu-table th { padding: 8px 12px; font-size: 11px; }
+        .dsi-t1t2-wrap .dsu-table td { padding: 7px 12px; }
         .dsi-t1t2-wrap .dsu-banner { padding: 6px 10px; font-size: 10px; letter-spacing: 0.02em; }
-        .dsi-t1t2-wrap .dsu-mis-row { padding: 4px; font-size: 11px; }
-        .dsi-t1t2-wrap .dsu-total-row td { padding: 4px 6px; }
+        .dsi-t1t2-wrap .dsu-mis-row { padding: 4px; font-size: 13px; }
+        .dsi-t1t2-wrap .dsu-total-row td { padding: 7px 12px; }
 
-        .dsu-table7 { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--color-bg-card); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); overflow: hidden; }
-        .dsu-table7 th { padding: 8px 12px; border: 1px solid var(--color-border); text-align: left; background: var(--color-accent-light); color: var(--color-accent-text); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
-        .dsu-table7 td { padding: 8px 12px; border: 1px solid var(--color-border); background: var(--color-bg-card); text-align: left; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
-        .dsu-table7 tbody tr:nth-child(even) td { background: var(--color-bg-card-hover); }
-        .dsu-table7 tbody tr:hover td { background: var(--color-bg-card-hover); }
-        .dsu-table7 .text-right { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
-        .dsu-table7 .text-center { text-align: center; }
         .dsu-table7 .balance-positive { color: var(--color-success-text); font-weight: 600; }
         .dsu-table7 .balance-negative { color: var(--color-danger-text); font-weight: 600; }
-        .dsu-table7-grand td { background: var(--color-info-light) !important; color: var(--color-info-text) !important; border: 1px solid var(--color-info) !important; font-weight: 600; }
+        .dsu-table7-grand td { background: #fde68a !important; font-weight: 500; border-top: 2px solid #b45309 !important; color: var(--color-text-primary); }
 
         /* =========================================================
            RESPONSIVE REPORT LAYOUT — screenshot & zoom ready
@@ -326,6 +372,13 @@
                 width: auto;
             }
         }
+        /* No carousel / swipe arrows on report tables */
+        .report-container .swiper-button-prev, .report-container .swiper-button-next,
+        .report-container .carousel-arrow, .report-container [class*="arrow"],
+        #reportContent .swiper-button-prev, #reportContent .swiper-button-next,
+        #reportContent .carousel-arrow, #reportContent [class*="arrow"] {
+            display: none !important;
+        }
 
         /* Report container styling for clean screenshot separation */
         .report-container {
@@ -344,18 +397,18 @@
             max-width: 100%;
             table-layout: fixed;
             word-wrap: break-word;
-            font-size: clamp(11px, 1.1vw, 14px);
+            font-size: clamp(12px, 1.1vw, 14px);
         }
         .dsu-table th, .dsu-table7 th {
-            font-size: clamp(10px, 1vw, 13px);
-            padding: clamp(4px, 0.5vw, 8px) clamp(6px, 0.8vw, 12px);
+            font-size: clamp(10px, 1vw, 12px);
+            padding: 8px 12px;
             word-break: break-word;
             overflow-wrap: break-word;
             hyphens: auto;
         }
         .dsu-table td, .dsu-table7 td {
-            font-size: clamp(11px, 1.1vw, 14px);
-            padding: clamp(4px, 0.5vw, 8px) clamp(6px, 0.8vw, 12px);
+            font-size: clamp(12px, 1.1vw, 14px);
+            padding: 7px 12px;
             word-break: break-word;
             overflow-wrap: break-word;
             hyphens: auto;
@@ -370,6 +423,7 @@
             text-align: right !important;
             white-space: nowrap;
             font-variant-numeric: tabular-nums;
+            font-weight: 500;
         }
 
         /* Text columns */
@@ -421,9 +475,19 @@
             z-index: 2;
         }
         .dsu-total-row td {
-            background: var(--color-accent-light) !important;
-            border: 1px solid var(--color-border-strong) !important;
-            font-weight: 600;
+            background: #fef9e7 !important;
+            border-top: 1.5px solid #d97706 !important;
+            font-weight: 500;
+        }
+        .dsu-grand-row td {
+            background: #fde68a !important;
+            border-top: 2px solid #b45309 !important;
+            font-weight: 500;
+        }
+        .dsu-table7-grand td {
+            background: #fde68a !important;
+            border-top: 2px solid #b45309 !important;
+            font-weight: 500;
         }
 
         /* Centered table wrappers for Table 4 / Table 5 should not overflow */
@@ -860,11 +924,16 @@
         if (!d) return '';
         const day = d.getDate();
         const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-        let suffix = 'th';
-        if ([1,21,31].includes(day)) suffix = 'st';
-        else if ([2,22].includes(day)) suffix = 'nd';
-        else if ([3,23].includes(day)) suffix = 'rd';
-        return `${day}${suffix} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        const suffix = (n) => {
+            if (n > 3 && n < 21) return 'th';
+            switch (n % 10) {
+                case 1: return 'st';
+                case 2: return 'nd';
+                case 3: return 'rd';
+                default: return 'th';
+            }
+        };
+        return `${day}${suffix(day)} ${months[d.getMonth()]} ${d.getFullYear()}`;
     };
     const fmtDDMMMYYYY = (dateStr) => {
         if (!dateStr) return '';
@@ -877,7 +946,7 @@
         if (rangeObj.preset === 'today') return `Today: ${formatHeaderDate(rangeObj.start)}`;
         if (rangeObj.preset === 'yesterday') return formatHeaderDate(rangeObj.start);
         if (rangeObj.preset === 'custom' && rangeObj.start && rangeObj.end) {
-            return `${formatHeaderDate(rangeObj.start)} - ${formatHeaderDate(rangeObj.end)}`;
+            return `${formatHeaderDate(rangeObj.start)} — ${formatHeaderDate(rangeObj.end)}`;
         }
         return '';
     };
@@ -947,14 +1016,16 @@
         const renderDSUTable = (title, rows, total, headerRows) => {
             const activeRows = rows.filter(r => (r.leads || 0) > 0 || (r.spend || 0) > 0);
             const body = activeRows.map(r => {
-                const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
-                const spend = fmtMoney(r.spend);
-                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td><td class="text-right">${cpl}</td><td class="text-right">${spend}</td></tr>`;
+                const leadVal = fmtNum(r.leads || 0);
+                const cplVal = (r.leads || 0) ? fmtMoney(r.cpl) : '<em class="dash">—</em>';
+                const spend = fmtMoney(r.spend || 0);
+                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-right">${leadVal}</td><td class="text-right">${cplVal}</td><td class="text-right">${spend}</td></tr>`;
             }).join('');
-            const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
+            const totalCpl = total.leads ? fmtMoney(total.cpl) : '<em class="dash">—</em>';
             return `
-                <div class="report-container" style="margin-bottom:12px">
+                <div class="report-container" style="margin-bottom:0">
                     <table class="dsu-table">
+                        <colgroup><col style="width:35%"></col><col style="width:15%"></col><col style="width:20%"></col><col style="width:30%"></col></colgroup>
                         <thead>${headerRows}
                             <tr><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend ↓</th></tr>
                         </thead>
@@ -968,21 +1039,23 @@
 
         const renderTable = (title, subtitle, rows, total) => {
             const body = rows.map(r => {
-                const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
-                const spend = fmtMoney(r.spend);
-                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td><td class="text-right">${cpl}</td><td class="text-right">${spend}</td></tr>`;
+                const leadVal = fmtNum(r.leads || 0);
+                const cplVal = (r.leads || 0) ? fmtMoney(r.cpl) : '<em class="dash">—</em>';
+                const spend = fmtMoney(r.spend || 0);
+                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-right">${leadVal}</td><td class="text-right">${cplVal}</td><td class="text-right">${spend}</td></tr>`;
             }).join('');
-            const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
+            const totalCpl = total.leads ? fmtMoney(total.cpl) : '<em class="dash">—</em>';
             return `
-                <div class="report-container" style="text-align:center;margin-bottom:12px">
+                <div class="report-container" style="text-align:center;margin-bottom:0">
                     <div style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--color-text-muted);letter-spacing:0.04em">${subtitle}</div>
                     <div style="font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--color-text-primary);margin-top:4px">${title}</div>
                     <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--color-accent);margin-top:4px">MIS</div>
                 </div>
-                <table>
+                <table class="dsu-table" style="table-layout:fixed;width:100%">
+                    <colgroup><col style="width:35%"></col><col style="width:15%"></col><col style="width:20%"></col><col style="width:30%"></col></colgroup>
                     <thead><tr><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend ↓</th></tr></thead>
                     <tbody>${body}
-                        <tr style="background:var(--color-accent-light);font-weight:600">
+                        <tr class="dsu-total-row">
                             <td>TOTAL</td><td class="text-right">${fmtNum(total.leads)}</td><td class="text-right">${totalCpl}</td><td class="text-right">${fmtMoney(total.spend)}</td>
                         </tr>
                     </tbody>
@@ -1027,15 +1100,15 @@
             const inceptionDate = (data && data.inception_date) || '2025-11-28';
             let label;
             if (dsuT2Range.preset === 'custom') {
-                label = `${formatHeaderDate(dsuT2Range.start)} - ${formatHeaderDate(dsuT2Range.end)}`;
+                label = `${formatHeaderDate(dsuT2Range.start)} — ${formatHeaderDate(dsuT2Range.end)}`;
             } else if (dsuT2Range.preset === 'inception') {
-                label = `${formatHeaderDate(inceptionDate)} - ${formatHeaderDate(dsuT2Range.end)}`;
+                label = `${formatHeaderDate(inceptionDate)} — ${formatHeaderDate(dsuT2Range.end)}`;
             } else if (dsuT2Range.preset === 'yesterday') {
                 label = formatHeaderDate(dsuT2Range.start);
             } else if (dsuT2Range.preset === 'today') {
                 label = `Today: ${formatHeaderDate(dsuT2Range.start)}`;
             } else {
-                label = `${formatHeaderDate(dsuT2Range.start)} - ${formatHeaderDate(dsuT2Range.end)}`;
+                label = `${formatHeaderDate(dsuT2Range.start)} — ${formatHeaderDate(dsuT2Range.end)}`;
             }
             const custom = dsuT2Range.preset === 'custom';
             return `
@@ -1093,12 +1166,12 @@
         const t1Header = `
             <tr><th colspan="4" class="dsu-banner">${data.gst_note || 'MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026'}</th></tr>
             <tr><th colspan="4" class="dsu-mode-row">${dsuT1DateSelector()}</th></tr>
-            <tr><th colspan="4" class="dsu-mis-row">${fmtDDMMMYYYY(dsuT1Range.end)}</th></tr>
+            <tr><th colspan="4" class="dsu-mis-row">${formatHeaderDate(dsuT1Range.end)}</th></tr>
         `;
         const t2Header = `
             <tr><th colspan="4" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
             <tr><th colspan="4" class="dsu-mode-row">${dsuT2DateSelector()}</th></tr>
-            <tr><th colspan="4" class="dsu-mis-row">${dsuT2Range.preset === 'custom' ? `${formatHeaderDate(dsuT2Range.start)} - ${formatHeaderDate(dsuT2Range.end)}` : (dsuT2Range.preset === 'inception' ? `28th November 2025 - ${formatHeaderDate(dsuT2Range.end)}` : formatHeaderDate(dsuT2Range.end))}</th></tr>
+            <tr><th colspan="4" class="dsu-mis-row">${dsuT2Range.preset === 'custom' ? `${formatHeaderDate(dsuT2Range.start)} — ${formatHeaderDate(dsuT2Range.end)}` : (dsuT2Range.preset === 'inception' ? `28th November 2025 — ${formatHeaderDate(dsuT2Range.end)}` : formatHeaderDate(dsuT2Range.end))}</th></tr>
         `;
 
         $('reportContent').innerHTML = `
@@ -1107,7 +1180,7 @@
                 <div class="card-header">
                     <div class="report-title">DSU Course Performance Report</div>
                 </div>
-                <div class="report-tables-flex">
+                <div class="report-tables-flex" style="gap:16px">
                     <div class="report-container" style="padding:0;box-shadow:none">
                         ${renderDSUTable(d.title, d.rows, d.total, t1Header)}
                     </div>
@@ -1115,7 +1188,7 @@
                         ${renderDSUTable(c.title, c.rows, c.total, t2Header)}
                     </div>
                 </div>
-                <div style="margin-top:1rem;display:flex;gap:.75rem;justify-content:flex-end">
+                <div style="margin-top:16px;display:flex;gap:.75rem;justify-content:flex-end">
                     <button class="btn btn-primary" onclick="downloadDSUPDF('daily')">Download Table 1 PDF</button>
                     <button class="btn btn-success" onclick="downloadDSUPDF('cumulative')">Download Table 2 PDF</button>
                 </div>
@@ -1133,15 +1206,15 @@
         const grandTotal = data.grand_total || 0;
 
         const headerCells = stages.map(s => `<th class="text-right">${escapeHtml(s)}</th>`).join('');
-        const totalCells = stages.map(s => `<td class="text-right">${colTotals[s] || 0}</td>`).join('');
+        const totalCells = stages.map(s => `<td class="text-right">${fmtNum(colTotals[s] || 0)}</td>`).join('');
 
         const bodyRows = rows.map(r => {
             const cells = stages.map(s => {
                 const v = r[s] || 0;
-                return `<td class="text-right">${v === 0 ? '' : v}</td>`;
+                return `<td class="text-right">${fmtNum(v)}</td>`;
             }).join('');
             const rowSum = stages.reduce((sum, s) => sum + (r[s] || 0), 0);
-            return `<tr><td style="font-weight:500">${escapeHtml(r.source)}</td>${cells}<td class="text-right" style="font-weight:600">${rowSum === 0 ? '' : rowSum}</td></tr>`;
+            return `<tr><td>${escapeHtml(r.source)}</td>${cells}<td class="text-right">${fmtNum(rowSum)}</td></tr>`;
         }).join('');
 
         $('reportContent').innerHTML = `
@@ -1152,12 +1225,13 @@
                 </div>
                 <div style="overflow-x:auto;">
                 <table class="dsu-table">
+                    <colgroup><col style="width:18%">${stages.map(() => '<col style="width:' + (82 / (stages.length + 1)).toFixed(1) + '%" />').join('')}<col style="width:' + (82 / (stages.length + 1)).toFixed(1) + '%" /></colgroup>
                     <thead>
-                        <tr><th>Source</th>${headerCells}<th class="text-right">Total</th></tr>
+                        <tr><th>Source</th>${stages.map(() => '<th class="text-right"></th>').join('')}<th class="text-right">Total</th></tr>
                     </thead>
                     <tbody>
                         ${bodyRows}
-                        <tr class="dsu-total-row"><td>TOTAL</td>${totalCells}<td class="text-right">${grandTotal}</td></tr>
+                        <tr class="dsu-total-row"><td>TOTAL</td>${totalCells}<td class="text-right">${fmtNum(grandTotal)}</td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -1174,24 +1248,24 @@
 
         const renderSection = (label, rows, total) => {
             const body = rows.map(r => {
-                const cpa = r.submitted > 0 ? fmtMoney(r.cpa) : '0';
-                const submitted = r.submitted > 0 ? fmtNum(r.submitted) : '0';
-                const spend = r.spend > 0 ? fmtMoney(r.spend) : '0';
-                const target = r.target > 0 ? fmtNum(r.target) : '0';
-                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${submitted}</td><td class="text-right">${cpa}</td><td class="text-right">${spend}</td><td class="text-right">${target}</td></tr>`;
+                const submitted = fmtNum(r.submitted || 0);
+                const cpa = (r.submitted || 0) ? fmtMoney(r.cpa) : '<em class="dash">—</em>';
+                const spend = fmtMoney(r.spend || 0);
+                const target = fmtNum(r.target || 0);
+                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-right">${submitted}</td><td class="text-right">${cpa}</td><td class="text-right">${spend}</td><td class="text-right">${target}</td></tr>`;
             }).join('');
-            const totalCpa = total.submitted > 0 ? fmtMoney(total.cpa) : '0';
-            const totalSubmitted = total.submitted > 0 ? fmtNum(total.submitted) : '0';
+            const totalCpa = total.submitted ? fmtMoney(total.cpa) : '<em class="dash">—</em>';
+            const totalSubmitted = fmtNum(total.submitted || 0);
             return `
                 <tr class="dsu-section-row"><td colspan="5">${escapeHtml(label)}</td></tr>
                 ${body}
-                <tr class="dsu-total-row"><td style="font-weight:700">${total.course}</td><td class="text-right">${totalSubmitted}</td><td class="text-right">${totalCpa}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${total.target > 0 ? fmtNum(total.target) : '0'}</td></tr>
+                <tr class="dsu-total-row"><td>${total.course}</td><td class="text-right">${totalSubmitted}</td><td class="text-right">${totalCpa}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${fmtNum(total.target || 0)}</td></tr>
             `;
         };
 
         const gt = data.grand_total;
-        const gtCpa = gt.submitted > 0 ? fmtMoney(gt.cpa) : '0';
-        const gtSubmitted = gt.submitted > 0 ? fmtNum(gt.submitted) : '0';
+        const gtCpa = gt.submitted ? fmtMoney(gt.cpa) : '<em class="dash">—</em>';
+        const gtSubmitted = fmtNum(gt.submitted || 0);
 
         $('reportContent').innerHTML = `
             ${dsuTabBar()}
@@ -1201,11 +1275,12 @@
                 </div>
                 <div class="dsu-table4-wrap">
                 <table class="dsu-table">
+                    <colgroup><col style="width:25%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:15%"></colgroup>
                     <thead><tr><th>Course</th><th class="text-right">Application Submitted</th><th class="text-right">Cost Per Application</th><th class="text-right">Spend</th><th class="text-right">Target Application</th></tr></thead>
                     <tbody>
-                        ${renderSection('CAMPUS - 4 PROGRAMMS', data.campus4_rows, data.campus4_total)}
-                        ${renderSection('CAMPUS - 3 PROGRAMMS', data.campus3_rows, data.campus3_total)}
-                        <tr class="dsu-grand-row"><td style="font-weight:700">${gt.course}</td><td class="text-right">${gtSubmitted}</td><td class="text-right">${gtCpa}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${gt.target > 0 ? fmtNum(gt.target) : '0'}</td></tr>
+                        ${renderSection('CAMPUS - 4 PROGRAMMES', data.campus4_rows, data.campus4_total)}
+                        ${renderSection('CAMPUS - 3 PROGRAMMES', data.campus3_rows, data.campus3_total)}
+                        <tr class="dsu-grand-row"><td>${gt.course}</td><td class="text-right">${gtSubmitted}</td><td class="text-right">${gtCpa}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${fmtNum(gt.target || 0)}</td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -1218,6 +1293,7 @@
     // ========================================================================
     function buildDSUTable5(data) {
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        const negClass = (n) => (n || 0) < 0 ? 'negative' : '';
 
         const renderSection = (label, rows, total) => {
             const rowCount = rows.length || 1;
@@ -1225,14 +1301,14 @@
                 const budgetCell = (idx === 0 && total.budget > 0)
                     ? `<td class="text-right" rowspan="${rowCount}" style="vertical-align:middle;background:var(--color-bg-card);font-weight:700">${fmtMoney(total.budget)}</td>`
                     : '';
-                const statusColor = r.status === 'Live' ? 'color:var(--color-success-text);font-weight:600' : 'color:var(--color-text-muted);font-weight:600';
-                return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-center" style="${statusColor}">${escapeHtml(r.status)}</td>${budgetCell}<td class="text-right">${fmtMoney(r.spend)}</td><td class="text-right">${idx === 0 ? fmtMoney(total.remaining) : ''}</td></tr>`;
+                const statusClass = r.status === 'Live' ? 'status-live' : (r.status === 'Paused' ? 'status-paused' : '');
+                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-center ${statusClass}">${escapeHtml(r.status)}</td>${budgetCell}<td class="text-right">${fmtMoney(r.spend)}</td><td class="text-right ${negClass(idx === 0 ? total.remaining : 0)}">${idx === 0 ? fmtMoney(total.remaining) : ''}</td></tr>`;
             }).join('');
 
             return `
                 <tr class="dsu-section-row"><td colspan="5">${escapeHtml(label)}</td></tr>
                 ${sectionBody}
-                <tr class="dsu-total-row"><td style="font-weight:700">${total.course}</td><td></td><td class="text-right">${fmtMoney(total.budget)}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${fmtMoney(total.remaining)}</td></tr>
+                <tr class="dsu-total-row"><td>${total.course}</td><td></td><td class="text-right">${fmtMoney(total.budget)}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right ${negClass(total.remaining)}">${fmtMoney(total.remaining)}</td></tr>
             `;
         };
 
@@ -1246,11 +1322,12 @@
                 </div>
                 <div class="dsu-table4-wrap">
                 <table class="dsu-table">
+                    <colgroup><col style="width:25%"><col style="width:15%"><col style="width:25%"><col style="width:20%"><col style="width:15%"></colgroup>
                     <thead><tr><th>Course</th><th class="text-center">Campaign Status</th><th class="text-right">Media Budget Received</th><th class="text-right">Spend</th><th class="text-right">Remaining Budget</th></tr></thead>
                     <tbody>
-                        ${renderSection('CAMPUS - 4 PROGRAMMS', data.campus4_rows, data.campus4_total)}
-                        ${renderSection('CAMPUS - 3 PROGRAMMS', data.campus3_rows, data.campus3_total)}
-                        <tr class="dsu-grand-row"><td style="font-weight:700">${gt.course}</td><td></td><td class="text-right">${fmtMoney(gt.budget)}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${fmtMoney(gt.remaining)}</td></tr>
+                        ${renderSection('CAMPUS - 4 PROGRAMMES', data.campus4_rows, data.campus4_total)}
+                        ${renderSection('CAMPUS - 3 PROGRAMMES', data.campus3_rows, data.campus3_total)}
+                        <tr class="dsu-grand-row"><td>${gt.course}</td><td></td><td class="text-right">${fmtMoney(gt.budget)}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right ${negClass(gt.remaining)}">${fmtMoney(gt.remaining)}</td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -1267,7 +1344,7 @@
         const total = data.total || 0;
 
         const body = rows.map(r => {
-            return `<tr><td style="font-weight:500">${escapeHtml(r.stage)}</td><td class="text-right">${fmtNum(r.count)}</td><td class="text-right">${r.percentage}%</td></tr>`;
+            return `<tr><td>${escapeHtml(r.stage)}</td><td class="text-right">${fmtNum(r.count)}</td><td class="text-right">${r.percentage}%</td></tr>`;
         }).join('');
 
         $('reportContent').innerHTML = `
@@ -1277,6 +1354,7 @@
                     <div class="report-title">Table 6: Lead Stage Summary</div>
                 </div>
                 <table class="dsu-table">
+                    <colgroup><col style="width:60%"><col style="width:20%"><col style="width:20%"></colgroup>
                     <thead><tr><th>Stage</th><th class="text-right">Count</th><th class="text-right">Percentage</th></tr></thead>
                     <tbody>
                         ${body}
@@ -1297,6 +1375,7 @@
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
         const rows = data.rows || [];
         const gt = data.grand_total || {};
+        const negClass = (n) => (n || 0) < 0 ? 'negative' : '';
 
         const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
         const fmtDate = (dateStr) => {
@@ -1308,12 +1387,12 @@
             } catch(e) { return dateStr; }
         };
 
-        const balanceClass = (n) => (n || 0) < 0 ? 'balance-negative' : 'balance-positive';
+        const balanceClass = (n) => negClass(n);
 
         const body = rows.map(r => {
             const monthlyCells = r.is_first_in_month
                 ? `
-                    <td class="text-right ${balanceClass(r.available_balance)}" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
+                    <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
                         ${fmtMoney(r.received_monthly)}
                     </td>
                     <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
@@ -1325,7 +1404,7 @@
                     <td class="text-right" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
                         ${fmtMoney(r.total_spend)}
                     </td>
-                    <td class="text-right ${balanceClass(r.available_balance)}" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
+                    <td class="text-right ${negClass(r.available_balance)}" ${r.month_rowspan > 1 ? `rowspan="${r.month_rowspan}"` : ''} style="vertical-align:middle;background:var(--color-bg-card)">
                         ${fmtMoney(r.available_balance)}
                     </td>`
                 : '';
@@ -1393,6 +1472,9 @@
 
                 <div style="overflow-x:auto;">
                 <table class="dsu-table7">
+                    <colgroup>
+                        <col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th>Date</th>
@@ -1418,7 +1500,7 @@
                             <td class="text-right">${fmtMoney(gt.google_spend)}</td>
                             <td class="text-right">${fmtMoney(gt.meta_spend)}</td>
                             <td class="text-right">${fmtMoney(gt.total_spend)}</td>
-                            <td class="text-right">${fmtMoney(gt.available_balance)}</td>
+                            <td class="text-right ${negClass(gt.available_balance)}">${fmtMoney(gt.available_balance)}</td>
                             <td></td>
                         </tr>
                     </tbody>
@@ -1598,18 +1680,7 @@
             if (!dateStr) return '';
             const d = new Date(dateStr + 'T00:00:00');
             if (isNaN(d)) return '';
-            const day = d.getDate();
-            const suffix = (n) => {
-                if (n > 3 && n < 21) return 'th';
-                switch (n % 10) {
-                    case 1: return 'st';
-                    case 2: return 'nd';
-                    case 3: return 'rd';
-                    default: return 'th';
-                }
-            };
-            const month = d.toLocaleString('en-GB', { month: 'long' });
-            return `${day}${suffix(day)} ${month}`;
+            return formatHeaderDate(d);
         };
 
         const renderDSITable = (title, rows, total, headerRows) => {
@@ -1639,13 +1710,13 @@
 
             const body = rows.map((r, i) => {
                 const deptCell = deptRowSpan[i]
-                    ? `<td style="font-weight:700;vertical-align:middle;text-align:center" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
+                    ? `<td style="font-weight:600;vertical-align:middle;text-align:left" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
                     : '';
 
                 let cplCell, spendCell;
                 if (r.department === 'DSCASC - UG') {
                     if (cplSpendRowSpan[i]) {
-                        const deptCpl = r.dept_leads ? fmtMoney(r.dept_cpl) : 'No Leads';
+                        const deptCpl = r.dept_leads ? fmtMoney(r.dept_cpl) : '<em class="dash">—</em>';
                         cplCell = `<td class="text-right" style="vertical-align:middle" rowspan="${cplSpendRowSpan[i]}">${deptCpl}</td>`;
                         spendCell = `<td class="text-right" style="vertical-align:middle" rowspan="${cplSpendRowSpan[i]}">${fmtMoney(r.dept_spend)}</td>`;
                     } else {
@@ -1653,17 +1724,18 @@
                         spendCell = '';
                     }
                 } else {
-                    const cpl = r.leads ? fmtMoney(r.cpl) : 'No Leads';
+                    const cpl = r.leads ? fmtMoney(r.cpl) : '<em class="dash">—</em>';
                     cplCell = `<td class="text-right">${cpl}</td>`;
                     spendCell = `<td class="text-right">${fmtMoney(r.spend)}</td>`;
                 }
 
-                return `<tr>${deptCell}<td style="font-weight:500">${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads)}</td>${cplCell}${spendCell}</tr>`;
+                return `<tr>${deptCell}<td>${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads || 0)}</td>${cplCell}${spendCell}</tr>`;
             }).join('');
-            const totalCpl = total.leads ? fmtMoney(total.cpl) : 'No Leads';
+            const totalCpl = total.leads ? fmtMoney(total.cpl) : '<em class="dash">—</em>';
             return `
-                <div class="report-container" style="margin-bottom:12px">
+                <div class="report-container" style="margin-bottom:0">
                     <table class="dsu-table">
+                        <colgroup><col style="width:18%"><col style="width:22%"><col style="width:13%"><col style="width:18%"><col style="width:29%"></colgroup>
                         <thead>${headerRows}
                             <tr><th>Department</th><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend</th></tr>
                         </thead>
@@ -1710,17 +1782,19 @@
 
         const t1Header = `
             <tr><th colspan="5" class="dsu-banner">${data.gst_note || 'MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026'}</th></tr>
-            <tr><th colspan="5" class="dsu-mis-row">MIS - ${dsiT1Range.preset === 'custom' ? `${fmtDayMonth(dsiT1Range.start)} to ${fmtDayMonth(dsiT1Range.end)}` : fmtDayMonth(dsiT1Range.end)}</th></tr>
+            <tr><th colspan="5" class="dsu-mis-row">MIS — ${dsiT1Range.preset === 'custom' ? `${fmtDayMonth(dsiT1Range.start)} — ${fmtDayMonth(dsiT1Range.end)}` : fmtDayMonth(dsiT1Range.end)}</th></tr>
         `;
         const t2Header = `
             <tr><th colspan="5" class="dsu-banner">MIXED GST: BASE TILL 18-JUN-2026 · 18% GST FROM 19-JUN-2026</th></tr>
-            <tr><th colspan="5" class="dsu-mis-row">MIS - ${fmtDayMonth(dsiT2Range.start)} to ${fmtDayMonth(dsiT2Range.end)}</th></tr>
+            <tr><th colspan="5" class="dsu-mis-row">MIS — ${fmtDayMonth(dsiT2Range.start)} — ${fmtDayMonth(dsiT2Range.end)}</th></tr>
         `;
 
         $('reportContent').innerHTML = `
             ${dsiTabBar()}
-            ${dsiT1DateSelector()}
-            <div class="report-tables-flex">
+            <div class="card" style="margin-bottom:0">
+                ${dsiT1DateSelector()}
+            </div>
+            <div class="report-tables-flex" style="gap:16px;margin-top:16px">
                 <div class="report-container" style="padding:0;box-shadow:none">
                     ${renderDSITable(d.title, d.rows, d.total, t1Header)}
                 </div>
@@ -1743,10 +1817,10 @@
         const bodyRows = rows.map(r => {
             const cells = stages.map(s => {
                 const v = r[s] || 0;
-                return `<td class="text-right">${v === 0 ? '' : v}</td>`;
+                return `<td class="text-right">${fmtNum(v)}</td>`;
             }).join('');
             const rowSum = stages.reduce((sum, s) => sum + (r[s] || 0), 0);
-            return `<tr><td style="font-weight:500">${escapeHtml(r.course)}</td>${cells}<td class="text-right" style="font-weight:600">${rowSum === 0 ? '' : rowSum}</td></tr>`;
+            return `<tr><td>${escapeHtml(r.course)}</td>${cells}<td class="text-right">${fmtNum(rowSum)}</td></tr>`;
         }).join('');
 
         $('reportContent').innerHTML = `
@@ -1757,8 +1831,9 @@
                 </div>
                 <div style="overflow-x:auto;">
                 <table class="dsu-table">
+                    <colgroup><col style="width:18%">${stages.map(() => '<col style="width:' + (82 / (stages.length + 1)).toFixed(1) + '%" />').join('')}<col style="width:' + (82 / (stages.length + 1)).toFixed(1) + '%" /></colgroup>
                     <thead>
-                        <tr><th>Course</th>${headerCells}<th class="text-right">Total</th></tr>
+                        <tr><th>Course</th>${stages.map(() => '<th class="text-right"></th>').join('')}<th class="text-right">Total</th></tr>
                     </thead>
                     <tbody>
                         ${bodyRows}
@@ -1800,37 +1875,36 @@
                 }
             }
         }
-
         const body = rows.map((r, i) => {
-            const submitted = r.submitted > 0 ? fmtNum(r.submitted) : '';
-            const target = r.target > 0 ? fmtNum(r.target) : '';
+            const submitted = fmtNum(r.submitted || 0);
+            const target = fmtNum(r.target || 0);
             const deptCell = deptRowSpan[i]
-                ? `<td style="font-weight:700;vertical-align:middle;text-align:center;padding:0.35rem 0.5rem" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
+                ? `<td style="font-weight:600;vertical-align:middle;text-align:left" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
                 : '';
 
             let cpaCell, spendCell;
             if (r.department === 'DSCASC - UG') {
                 if (cpaSpendRowSpan[i]) {
-                    const deptCpa = r.dept_cpa > 0 ? fmtMoney(r.dept_cpa) : '0';
-                    const deptSpend = r.dept_spend > 0 ? fmtMoney(r.dept_spend) : '';
-                    cpaCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:middle" rowspan="${cpaSpendRowSpan[i]}">${deptCpa}</td>`;
-                    spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:middle" rowspan="${cpaSpendRowSpan[i]}">${deptSpend}</td>`;
+                    const deptCpa = r.dept_submitted ? fmtMoney(r.dept_cpa) : '<em class="dash">—</em>';
+                    const deptSpend = fmtMoney(r.dept_spend || 0);
+                    cpaCell = `<td class="text-right" style="vertical-align:middle" rowspan="${cpaSpendRowSpan[i]}">${deptCpa}</td>`;
+                    spendCell = `<td class="text-right" style="vertical-align:middle" rowspan="${cpaSpendRowSpan[i]}">${deptSpend}</td>`;
                 } else {
                     cpaCell = '';
                     spendCell = '';
                 }
             } else {
-                const cpa = r.submitted > 0 ? fmtMoney(r.cpa) : '0';
-                const spend = r.spend > 0 ? fmtMoney(r.spend) : '';
-                cpaCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${cpa}</td>`;
-                spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${spend}</td>`;
+                const cpa = r.submitted ? fmtMoney(r.cpa) : '<em class="dash">—</em>';
+                const spend = fmtMoney(r.spend || 0);
+                cpaCell = `<td class="text-right">${cpa}</td>`;
+                spendCell = `<td class="text-right">${spend}</td>`;
             }
 
-            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-right" style="padding:0.35rem 0.5rem">${submitted}</td>${cpaCell}${spendCell}<td class="text-right" style="padding:0.35rem 0.5rem">${target}</td></tr>`;
+            return `<tr>${deptCell}<td>${escapeHtml(r.course)}</td><td class="text-right">${submitted}</td>${cpaCell}${spendCell}<td class="text-right">${target}</td></tr>`;
         }).join('');
 
-        const gtCpa = gt.submitted > 0 ? fmtMoney(gt.cpa) : '0';
-        const gtSubmitted = gt.submitted > 0 ? fmtNum(gt.submitted) : '';
+        const gtCpa = gt.submitted ? fmtMoney(gt.cpa) : '<em class="dash">—</em>';
+        const gtSubmitted = fmtNum(gt.submitted || 0);
 
         $('reportContent').innerHTML = `
             ${dsiTabBar()}
@@ -1839,21 +1913,24 @@
                     <div class="report-title" style="font-size:0.9rem">Table 4: Application Submitted and CPA by Department</div>
                 </div>
                 <div class="dsi-table4-wrap">
-                <table class="dsu-table" style="font-size:0.78rem">
-                    <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-right" style="padding:0.35rem 0.5rem;white-space:nowrap">Application Submitted</th><th class="text-right" style="padding:0.35rem 0.5rem">CPA</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Target</th></tr></thead>
+                <table class="dsu-table">
+                    <colgroup><col style="width:18%"><col style="width:20%"><col style="width:18%"><col style="width:18%"><col style="width:16%"><col style="width:10%"></colgroup>
+                    <thead><tr><th>Department</th><th>Course</th><th class="text-right" style="white-space:nowrap">Application Submitted</th><th class="text-right">CPA</th><th class="text-right">Spend</th><th class="text-right">Target</th></tr></thead>
                     <tbody>
                         ${body}
-                        <tr class="dsu-grand-row"><td colspan="2" style="padding:4px 6px">${gt.course}</td><td class="text-right" style="padding:4px 6px">${gtSubmitted}</td><td class="text-right" style="padding:4px 6px">${gtCpa}</td><td class="text-right" style="padding:4px 6px">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:4px 6px">${gt.target > 0 ? fmtNum(gt.target) : ''}</td></tr>
+                        <tr class="dsu-grand-row"><td colspan="2">${gt.course}</td><td class="text-right">${gtSubmitted}</td><td class="text-right">${gtCpa}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${fmtNum(gt.target || 0)}</td></tr>
                     </tbody>
                 </table>
                 </div>
             </div>
+
         `;
     }
 
     function buildDSITable5(data, entries = []) {
         const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
         const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
+        const negClass = (n) => (n || 0) < 0 ? 'negative' : '';
         const fmtDate = (dateStr) => {
             if (!dateStr) return '-';
             const d = new Date(dateStr + 'T00:00:00');
@@ -1890,29 +1967,29 @@
         }
 
         const body = rows.map((r, i) => {
-            const statusColor = r.status === 'Live' ? 'color:var(--color-success-text);font-weight:600' : 'color:var(--color-text-muted);font-weight:600';
+            const statusClass = r.status === 'Live' ? 'status-live' : (r.status === 'Paused' ? 'status-paused' : '');
             const deptCell = deptRowSpan[i]
-                ? `<td style="font-weight:700;vertical-align:middle;text-align:center;padding:0.35rem 0.5rem" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
+                ? `<td style="font-weight:600;vertical-align:middle;text-align:left" rowspan="${deptRowSpan[i]}">${escapeHtml(r.department || '')}</td>`
                 : '';
 
             let budgetCell, spendCell, remainingCell;
             if (r.department === 'DSCASC - UG') {
                 if (budgetMergeRowSpan[i]) {
-                    budgetCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:middle" rowspan="${budgetMergeRowSpan[i]}">${fmtMoney(r.dept_budget)}</td>`;
-                    spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:middle" rowspan="${budgetMergeRowSpan[i]}">${fmtMoney(r.dept_spend)}</td>`;
-                    remainingCell = `<td class="text-right" style="padding:0.35rem 0.5rem;vertical-align:middle" rowspan="${budgetMergeRowSpan[i]}">${fmtMoney(r.dept_remaining)}</td>`;
+                    budgetCell = `<td class="text-right" style="vertical-align:middle" rowspan="${budgetMergeRowSpan[i]}">${fmtMoney(r.dept_budget)}</td>`;
+                    spendCell = `<td class="text-right" style="vertical-align:middle" rowspan="${budgetMergeRowSpan[i]}">${fmtMoney(r.dept_spend)}</td>`;
+                    remainingCell = `<td class="text-right ${negClass(r.dept_remaining)}" style="vertical-align:middle" rowspan="${budgetMergeRowSpan[i]}">${fmtMoney(r.dept_remaining)}</td>`;
                 } else {
                     budgetCell = '';
                     spendCell = '';
                     remainingCell = '';
                 }
             } else {
-                budgetCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(r.budget)}</td>`;
-                spendCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(r.spend)}</td>`;
-                remainingCell = `<td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(r.remaining)}</td>`;
+                budgetCell = `<td class="text-right">${fmtMoney(r.budget)}</td>`;
+                spendCell = `<td class="text-right">${fmtMoney(r.spend)}</td>`;
+                remainingCell = `<td class="text-right ${negClass(r.remaining)}">${fmtMoney(r.remaining)}</td>`;
             }
 
-            return `<tr>${deptCell}<td style="font-weight:500;padding:0.35rem 0.5rem">${escapeHtml(r.course)}</td><td class="text-center" style="padding:0.35rem 0.5rem;${statusColor}">${escapeHtml(r.status)}</td>${budgetCell}${spendCell}${remainingCell}</tr>`;
+            return `<tr>${deptCell}<td>${escapeHtml(r.course)}</td><td class="text-center ${statusClass}">${escapeHtml(r.status)}</td>${budgetCell}${spendCell}${remainingCell}</tr>`;
         }).join('');
 
         // Budget entries table
@@ -1924,11 +2001,11 @@
         const entryRows = (entries || []).map(e => {
             const isEditing = dsiEditingBudgetId === e.id;
             return `<tr style="${isEditing ? 'background:var(--color-warning-light)' : ''}">
-                <td style="white-space:nowrap;padding:0.35rem 0.5rem">${escapeHtml(fmtDate(e.date))}</td>
-                <td class="text-right" style="padding:0.35rem 0.5rem">${fmtMoney(e.amount)}</td>
-                <td style="padding:0.35rem 0.5rem">${escapeHtml(e.invoice || '-')}</td>
-                <td style="padding:0.35rem 0.5rem">${escapeHtml(e.section || '-')}</td>
-                <td class="text-center" style="padding:0.35rem 0.5rem">
+                <td style="white-space:nowrap">${escapeHtml(fmtDate(e.date))}</td>
+                <td class="text-right">${fmtMoney(e.amount)}</td>
+                <td>${escapeHtml(e.invoice || '-')}</td>
+                <td>${escapeHtml(e.section || '-')}</td>
+                <td class="text-center">
                     <button class="action-btn" title="Edit" onclick="dsiEditBudgetEntry(${e.id})">&#9998;</button>
                      <button class="action-btn" title="Delete" onclick="dsiDeleteBudgetEntry(${e.id})" style="color:var(--color-danger)">&#10005;</button>
                 </td>
@@ -1979,22 +2056,24 @@
 
                 <!-- Budget Summary Table -->
                 <div class="dsi-table4-wrap" style="margin-bottom:0.75rem">
-                <table class="dsu-table" style="font-size:0.78rem">
-                    <thead><tr><th style="padding:0.35rem 0.5rem">Department</th><th style="padding:0.35rem 0.5rem">Course</th><th class="text-center" style="padding:0.35rem 0.5rem">Status</th><th class="text-right" style="padding:0.35rem 0.5rem">Media Budget Received</th><th class="text-right" style="padding:0.35rem 0.5rem">Spend</th><th class="text-right" style="padding:0.35rem 0.5rem">Remaining Budget</th></tr></thead>
+                <table class="dsu-table">
+                    <colgroup><col style="width:18%"><col style="width:18%"><col style="width:12%"><col style="width:20%"><col style="width:18%"><col style="width:14%"></colgroup>
+                    <thead><tr><th>Department</th><th>Course</th><th class="text-center">Status</th><th class="text-right">Media Budget Received</th><th class="text-right">Spend</th><th class="text-right">Remaining Budget</th></tr></thead>
                     <tbody>
                         ${body}
-                        <tr class="dsu-grand-row"><td colspan="2" style="padding:4px 6px">${gt.course}</td><td style="padding:4px 6px"></td><td class="text-right" style="padding:4px 6px">${fmtMoney(gt.budget)}</td><td class="text-right" style="padding:4px 6px">${fmtMoney(gt.spend)}</td><td class="text-right" style="padding:4px 6px">${fmtMoney(gt.remaining)}</td></tr>
+                        <tr class="dsu-grand-row"><td colspan="2">${gt.course}</td><td></td><td class="text-right">${fmtMoney(gt.budget)}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right ${negClass(gt.remaining)}">${fmtMoney(gt.remaining)}</td></tr>
                     </tbody>
                 </table>
                 </div>
 
                 <!-- Budget Entries List -->
                 <div style="overflow-x:auto;">
-                <table class="dsu-table" style="font-size:0.78rem">
-                    <thead><tr><th style="padding:0.35rem 0.5rem">Date</th><th class="text-right" style="padding:0.35rem 0.5rem">Amount Received</th><th style="padding:0.35rem 0.5rem">Invoice #</th><th style="padding:0.35rem 0.5rem">Section</th><th class="text-center" style="padding:0.35rem 0.5rem">Actions</th></tr></thead>
+                <table class="dsu-table">
+                    <colgroup><col style="width:22%"><col style="width:18%"><col style="width:22%"><col style="width:22%"><col style="width:16%"></colgroup>
+                    <thead><tr><th>Date</th><th class="text-right">Amount Received</th><th>Invoice #</th><th>Section</th><th class="text-center">Actions</th></tr></thead>
                     <tbody>
                         ${entryRows || '<tr><td colspan="5" style="text-align:center;padding:0.75rem;color:var(--text-muted)">No budget entries yet.</td></tr>'}
-                        <tr class="dsu-grand-row"><td style="padding:4px 6px">TOTAL RECEIVED</td><td class="text-right" style="padding:4px 6px">${fmtMoney(totalReceived)}</td><td colspan="3" style="padding:4px 6px"></td></tr>
+                        <tr class="dsu-grand-row"><td>TOTAL RECEIVED</td><td class="text-right">${fmtMoney(totalReceived)}</td><td colspan="3"></td></tr>
                     </tbody>
                 </table>
                 </div>
