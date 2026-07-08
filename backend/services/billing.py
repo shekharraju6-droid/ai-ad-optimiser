@@ -105,17 +105,11 @@ def build_billing_display(billing_cache: Optional[str], fallback_spend: float = 
         else:
             colour = "neutral"
 
-        # Build display with emoji indicators
-        indicator = ""
-        if health == "warning":
-            indicator = " \u26a0\ufe0f"
-        elif health == "critical":
-            indicator = " \ud83d\udd34"
-
+        # Build display (plain text only — CSS chips handle colour/visual indicators)
         if amount is not None and total_budget:
-            display = f"BAL {format_billing_amount(amount)} of {format_billing_amount(total_budget)}{indicator}"
+            display = f"BAL {format_billing_amount(amount)} of {format_billing_amount(total_budget)}"
         elif amount is not None:
-            display = f"BAL {format_billing_amount(amount)}{indicator}"
+            display = f"BAL {format_billing_amount(amount)}"
         else:
             display = "BAL ---"
             colour = "grey"
