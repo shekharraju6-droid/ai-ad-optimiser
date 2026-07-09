@@ -179,8 +179,15 @@ def exchange_sheets_code(code: str, redirect_uri: str, account_id: int) -> Optio
     try:
         with urllib.request.urlopen(req) as resp:
             return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read().decode()
+        except Exception:
+            body = "<unreadable>"
+        logger.error(f"[OAuth] Google Sheets token exchange HTTP {e.code}: {body}")
+        return None
     except Exception as e:
-        logger.error(f"Google Sheets token exchange failed: {e}")
+        logger.error(f"[OAuth] Google Sheets token exchange failed: {e}")
         return None
 
 
