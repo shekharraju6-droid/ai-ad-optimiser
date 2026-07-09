@@ -113,10 +113,16 @@ def load_config() -> Dict[str, Any]:
         ("mantri_salesforce_refresh_token", "MANTRI_SALESFORCE_REFRESH_TOKEN"),
     ]
     for cfg_key, env_key in env_mappings:
-        if env.get(env_key):
+        # Prefer actual OS environment variables (e.g. Railway) over .env file values
+        os_val = os.environ.get(env_key)
+        if os_val:
+            config[cfg_key] = os_val
+        elif env.get(env_key):
             config[cfg_key] = env[env_key]
 
-    if "SAFE_MODE" in env:
+    if "SAFE_MODE" in os.environ:
+        config["safe_mode"] = os.environ["SAFE_MODE"].lower() in ("true", "1", "yes")
+    elif "SAFE_MODE" in env:
         config["safe_mode"] = env["SAFE_MODE"].lower() in ("true", "1", "yes")
 
     return config
