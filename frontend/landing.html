@@ -1892,7 +1892,7 @@
         updateCrmFieldLabels();
         // Show Google Sheets export only for Shyam Steel (name or brand_name)
         const combinedName = ((a.name || '') + ' ' + (a.brand_name || '')).toLowerCase();
-        const isShyamSteel = combinedName.includes('shym') && combinedName.includes('steel');
+        const isShyamSteel = combinedName.includes('shyam') && combinedName.includes('steel');
         $('caSheetsSection').style.display = isShyamSteel ? 'block' : 'none';
         $('caEditSheetsStatus').textContent = (a.crm_credentials && a.crm_credentials.includes('sheets_refresh_token')) ? 'Google Sheets linked' : 'Not linked';
         $('caEditSheetsStatus').style.color = (a.crm_credentials && a.crm_credentials.includes('sheets_refresh_token')) ? 'var(--color-success)' : 'var(--text-muted)';
