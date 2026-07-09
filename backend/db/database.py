@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Load environment variables from .env if present
-load_dotenv()
+# Load environment variables from .env if present, but do not override
+# existing environment variables (e.g. Railway-provided vars).
+load_dotenv(override=False)
 
 logger = logging.getLogger("AdOptima")
 
