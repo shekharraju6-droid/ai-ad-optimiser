@@ -37,29 +37,38 @@ def connect_google(account_id: int, db: Session = Depends(get_db)):
 
 @router.get("/google/callback")
 def google_callback(request: Request, code: str, state: str, error: Optional[str] = None, db: Session = Depends(get_db)):
+    import logging
+    logger = logging.getLogger("AdOptima")
     if error:
+        logger.error(f"[OAuth] Google callback returned error from Google for state={state}: {error}")
         return RedirectResponse(url=f"/?oauth_error={error}")
     payload = parse_state(state)
     if not payload or payload.get("platform") != "google":
+        logger.error(f"[OAuth] Google callback invalid state: {state}")
         return RedirectResponse(url="/?oauth_error=invalid_state")
     account_id = payload.get("account_id")
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
+        logger.error(f"[OAuth] Google callback account not found: {account_id}")
         return RedirectResponse(url="/?oauth_error=account_not_found")
 
     redirect_uri = f"{_account_oauth(account)['redirect_base_url'].rstrip('/')}/api/oauth/google/callback"
+    logger.info(f"[OAuth] Google callback for account {account_id} ({account.name}), redirect_uri={redirect_uri}")
     token_data = exchange_google_code(code, redirect_uri, account_id)
     if not token_data:
+        logger.error(f"[OAuth] Google token exchange failed for account {account_id} ({account.name}). redirect_uri={redirect_uri}")
         return RedirectResponse(url="/?oauth_error=google_token_exchange_failed")
 
     encrypted = build_google_credentials(token_data, account_id)
     if not encrypted:
+        logger.error(f"[OAuth] Google missing refresh_token for account {account_id} ({account.name}). token keys={list(token_data.keys())}")
         return RedirectResponse(url="/?oauth_error=missing_refresh_token")
 
     account.google_credentials = encrypted
     account.google_is_live = True
     account.is_live = account.google_is_live or account.meta_is_live
     db.commit()
+    logger.info(f"[OAuth] Google connected successfully for account {account_id} ({account.name})")
     return RedirectResponse(url=f"/?oauth_success=google&account_id={account_id}")
 
 
