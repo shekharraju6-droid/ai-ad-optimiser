@@ -135,11 +135,21 @@ def build_google_credentials(token_data: Dict[str, Any], account_id: int) -> Opt
 # Google Sheets OAuth (for Shyam Steel user Gmail account)
 # ---------------------------------------------------------------------------
 
+def _sheets_oauth_cfg(oauth_cfg: Dict[str, Any]) -> Dict[str, str]:
+    """Prefer GMAIL_* credentials for user-facing Sheets OAuth, fallback to GOOGLE_* globals."""
+    client_id = oauth_cfg.get("gmail_client_id") or oauth_cfg.get("google_client_id", "")
+    client_secret = oauth_cfg.get("gmail_client_secret") or oauth_cfg.get("google_client_secret", "")
+    if not client_id or not client_secret:
+        raise RuntimeError("Missing Gmail/Google OAuth credentials for Google Sheets")
+    return {"client_id": client_id, "client_secret": client_secret}
+
+
 def get_sheets_auth_url(account_id: int) -> str:
     """Build Google's OAuth URL for Sheets access via user's Gmail account."""
     account = _get_account(account_id)
     oauth_cfg = _account_oauth(account)
-    client_id = _require(oauth_cfg, "google_client_id")
+    sheets_cfg = _sheets_oauth_cfg(oauth_cfg)
+    client_id = sheets_cfg["client_id"]
     base = _redirect_base(oauth_cfg)
     redirect_uri = f"{base}/api/oauth/sheets/callback"
     state = secrets.token_urlsafe(16)
@@ -161,8 +171,9 @@ def get_sheets_auth_url(account_id: int) -> str:
 def exchange_sheets_code(code: str, redirect_uri: str, account_id: int) -> Optional[Dict[str, Any]]:
     account = _get_account(account_id)
     oauth_cfg = _account_oauth(account)
-    client_id = _require(oauth_cfg, "google_client_id")
-    client_secret = _require(oauth_cfg, "google_client_secret")
+    sheets_cfg = _sheets_oauth_cfg(oauth_cfg)
+    client_id = sheets_cfg["client_id"]
+    client_secret = sheets_cfg["client_secret"]
     data = urllib.parse.urlencode({
         "code": code,
         "client_id": client_id,
