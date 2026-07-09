@@ -149,9 +149,6 @@ class AccountUpdate(BaseModel):
     crm_credentials: Optional[str] = None
     target_cpa: Optional[float] = None
 
-    gsheets_service_account: Optional[str] = None
-    gsheets_spreadsheet_id: Optional[str] = None
-
     brand_name: Optional[str] = None
     brand_keywords: Optional[str] = None
     business_context: Optional[str] = None
@@ -438,19 +435,6 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
         account.crm_credentials = req.crm_credentials or None
     if req.target_cpa is not None:
         account.target_cpa = req.target_cpa or None
-
-    # Store Google Sheets config inside crm_credentials JSON so it survives as generic integration data
-    if req.gsheets_service_account is not None or req.gsheets_spreadsheet_id is not None:
-        import json as _json
-        try:
-            cfg = _json.loads(account.crm_credentials) if account.crm_credentials else {}
-        except Exception:
-            cfg = {}
-        if req.gsheets_service_account is not None:
-            cfg["gsheets_service_account"] = req.gsheets_service_account or None
-        if req.gsheets_spreadsheet_id is not None:
-            cfg["gsheets_spreadsheet_id"] = req.gsheets_spreadsheet_id or None
-        account.crm_credentials = _json.dumps(cfg) if cfg else None
 
     if req.client_status is not None:
         account.client_status = req.client_status or "Active"

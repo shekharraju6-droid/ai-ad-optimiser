@@ -132,66 +132,6 @@ def build_google_credentials(token_data: Dict[str, Any], account_id: int) -> Opt
 
 
 # ---------------------------------------------------------------------------
-# Google Sheets OAuth (for Shyam Steel user Gmail account)
-# ---------------------------------------------------------------------------
-
-def get_sheets_auth_url(account_id: int) -> str:
-    """Build Google's OAuth URL for Sheets access via user's Google account."""
-    account = _get_account(account_id)
-    oauth_cfg = _account_oauth(account)
-    client_id = _require(oauth_cfg, "google_client_id")
-    base = _redirect_base(oauth_cfg)
-    redirect_uri = f"{base}/api/oauth/sheets/callback"
-    state = secrets.token_urlsafe(16)
-    payload = {"account_id": account_id, "platform": "sheets", "token": state}
-    from base64 import urlsafe_b64encode
-    state_b64 = urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
-    params = {
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": "https://www.googleapis.com/auth/spreadsheets",
-        "access_type": "offline",
-        "prompt": "consent",
-        "state": state_b64,
-    }
-    return "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
-
-
-def exchange_sheets_code(code: str, redirect_uri: str, account_id: int) -> Optional[Dict[str, Any]]:
-    account = _get_account(account_id)
-    oauth_cfg = _account_oauth(account)
-    client_id = _require(oauth_cfg, "google_client_id")
-    client_secret = _require(oauth_cfg, "google_client_secret")
-    data = urllib.parse.urlencode({
-        "code": code,
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "redirect_uri": redirect_uri,
-        "grant_type": "authorization_code",
-    }).encode()
-    req = urllib.request.Request(
-        "https://oauth2.googleapis.com/token",
-        data=data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        try:
-            body = e.read().decode()
-        except Exception:
-            body = "<unreadable>"
-        logger.error(f"[OAuth] Google Sheets token exchange HTTP {e.code}: {body}")
-        return None
-    except Exception as e:
-        logger.error(f"[OAuth] Google Sheets token exchange failed: {e}")
-        return None
-
-
-# ---------------------------------------------------------------------------
 # Meta Marketing API OAuth
 # ---------------------------------------------------------------------------
 

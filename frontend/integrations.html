@@ -175,10 +175,10 @@ const integrations=[
         {id:'slack_channel',label:'Channel',placeholder:'#mis-reports',type:'text'},
         {id:'slack_bot_token',label:'Bot Token',placeholder:'xoxb-...',type:'password'}
      ]},
-    {id:'google-sheets',name:'Google Sheets',category:'Export',icon:'📊',desc:'Interim: design Shyam Steel report format in Google Sheets.',color:'#dcfce7',iconColor:'#16a34a',wired:true,
+    {id:'google-sheets',name:'Google Sheets',category:'Export',icon:'📊',desc:'Sync campaign and lead data to Google Sheets.',color:'#dcfce7',iconColor:'#16a34a',wired:false,
      fields:[
         {id:'gsheets_service_account',label:'Service Account JSON',placeholder:'Paste service account JSON',type:'textarea'},
-        {id:'gsheets_spreadsheet_id',label:'Spreadsheet ID (optional)',placeholder:'Leave blank to create new',type:'text'}
+        {id:'gsheets_spreadsheet_id',label:'Spreadsheet ID',placeholder:'1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',type:'text'}
      ]},
     {id:'google-drive',name:'Google Drive',category:'Export',icon:'📁',desc:'Save exported MIS reports and dashboards to Drive.',color:'#dbeafe',iconColor:'#2563eb',wired:false,
      fields:[
@@ -302,13 +302,6 @@ function getFieldValue(f){
     // System-level Meta fields: pull from global config/meta-status
     if(f.system && f.id==='meta_app_id') return globalConfig.meta_app_id || metaStatus.meta_app_id || '';
     if(f.system && f.id==='meta_app_secret') return globalConfig.meta_app_secret || '';
-    // Google Sheets config is stored inside crm_credentials JSON
-    if(selectedAccount && selectedAccount.crm_credentials && (f.id==='gsheets_service_account' || f.id==='gsheets_spreadsheet_id')){
-        try{
-            const cfg=JSON.parse(selectedAccount.crm_credentials);
-            if(cfg[f.id]!==undefined)return cfg[f.id]||'';
-        }catch(e){}
-    }
     const key=f.id.replace(/^(google_|meta_)/,'');
     return selectedAccount? (selectedAccount[f.id]||globalConfig[f.id]||globalConfig[key]||''): (globalConfig[f.id]||globalConfig[key]||'');
 }
@@ -380,23 +373,6 @@ async function saveIntegration(){
 
 async function testIntegration(){
     if(!activeIntegration)return;
-    if(activeIntegration.id==='google-sheets'){
-        if(!selectedAccount){toast('Select an account first','error');return}
-        if(selectedAccount.name !== 'Shyam Steel'){toast('Google Sheets format tool is only enabled for Shyam Steel in this interim release.','error');return}
-        const btn=(typeof event!=='undefined'&&event)?event.target:null;
-        if(btn){btn.textContent='Formatting...';btn.disabled=true}
-        try{
-            const data=await api('POST','/sheets/format-shyam-steel',{account_id:selectedAccount.id});
-            toast(`Google Sheet formatted: ${data.spreadsheet_url}`,'success');
-            if(btn)btn.textContent='Open Sheet';
-            if(btn)btn.onclick=()=>window.open(data.spreadsheet_url,'_blank');
-        }catch(e){
-            toast(e.message,'error');
-            if(btn)btn.textContent='Test Pull / Connect';
-        }
-        finally{if(btn){btn.disabled=false}}
-        return;
-    }
     if(!activeIntegration.wired){toast(`${activeIntegration.name} test pull not yet implemented`,'error');return}
     if(activeIntegration.id==='google-ads')toast('Google Ads test pull: uses live connector if credentials are valid','success');
     else if(activeIntegration.id==='meta-ads'){

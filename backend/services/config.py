@@ -94,9 +94,6 @@ def load_config() -> Dict[str, Any]:
         ("gemini_api_key", "GEMINI_API_KEY"),
         ("google_client_id", "GOOGLE_CLIENT_ID"),
         ("google_client_secret", "GOOGLE_CLIENT_SECRET"),
-        ("gmail_client_id", "GMAIL_CLIENT_ID"),
-        ("gmail_client_secret", "GMAIL_CLIENT_SECRET"),
-        ("gmail_redirect_uri", "GMAIL_REDIRECT_URI"),
         ("google_developer_token", "GOOGLE_DEVELOPER_TOKEN"),
         ("meta_app_id", "META_APP_ID"),
         ("meta_app_secret", "META_APP_SECRET"),
@@ -116,16 +113,10 @@ def load_config() -> Dict[str, Any]:
         ("mantri_salesforce_refresh_token", "MANTRI_SALESFORCE_REFRESH_TOKEN"),
     ]
     for cfg_key, env_key in env_mappings:
-        # Prefer actual OS environment variables (e.g. Railway) over .env file values
-        os_val = os.environ.get(env_key)
-        if os_val:
-            config[cfg_key] = os_val
-        elif env.get(env_key):
+        if env.get(env_key):
             config[cfg_key] = env[env_key]
 
-    if "SAFE_MODE" in os.environ:
-        config["safe_mode"] = os.environ["SAFE_MODE"].lower() in ("true", "1", "yes")
-    elif "SAFE_MODE" in env:
+    if "SAFE_MODE" in env:
         config["safe_mode"] = env["SAFE_MODE"].lower() in ("true", "1", "yes")
 
     return config
