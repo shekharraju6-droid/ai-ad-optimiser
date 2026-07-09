@@ -24,8 +24,8 @@ EXCEL_PATH = "data/shym_steel_report.xlsx"
 
 def _get_sheets_credentials(refresh_token: str) -> UserCredentials:
     cfg = load_config()
-    client_id = cfg.get("gmail_client_id") or cfg.get("google_client_id", "")
-    client_secret = cfg.get("gmail_client_secret") or cfg.get("google_client_secret", "")
+    client_id = cfg.get("google_client_id", "")
+    client_secret = cfg.get("google_client_secret", "")
     if not client_id or not client_secret or not refresh_token:
         raise RuntimeError("Missing Google Sheets OAuth credentials")
     creds = UserCredentials(
