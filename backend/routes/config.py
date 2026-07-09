@@ -50,6 +50,20 @@ def get_meta_status():
     }
 
 
+@router.get("/config/debug")
+def get_config_debug():
+    """Debug: show raw loaded config values for OAuth. Not for production."""
+    import os
+    cfg = load_config()
+    return {
+        "google_client_id": cfg.get("google_client_id", ""),
+        "google_client_secret_prefix": cfg.get("google_client_secret", "")[:8],
+        "redirect_base_url": cfg.get("redirect_base_url", ""),
+        "os_env_google_client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
+        "os_env_redirect_base_url": os.environ.get("REDIRECT_BASE_URL", ""),
+    }
+
+
 @router.post("/config")
 def update_config(new_config: ConfigModel):
     current = load_config()
