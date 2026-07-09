@@ -1,4 +1,8 @@
-"""Interim Google Sheets route for Shyam Steel report formatting."""
+"""Google Sheets routes for Shyam Steel.
+
+1. Link Google Sheet via Gmail OAuth.
+2. Push local Excel report to a new Google Sheet.
+"""
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -6,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.database import get_db
 from backend.db.models import Account
+from backend.services.excel_to_sheets import push_excel_to_new_google_sheet
 from backend.services.sheets_connector import format_shyam_steel_sheet
 
 router = APIRouter(prefix="/api/sheets", tags=["sheets"])
@@ -16,9 +21,13 @@ class SheetsFormatRequest(BaseModel):
     spreadsheet_id: Optional[str] = None
 
 
+class PushExcelRequest(BaseModel):
+    account_id: int
+
+
 @router.post("/format-shyam-steel")
 def format_shyam_steel_report(req: SheetsFormatRequest, db: Session = Depends(get_db)):
-    """Create or format a Google Sheet for Shyam Steel reports.
+    """Create or format a Google Sheet for Shyam Steel reports using a service account.
 
     Expects the account to have saved:
     - crm_credentials['gsheets_service_account'] or
@@ -29,8 +38,9 @@ def format_shyam_steel_report(req: SheetsFormatRequest, db: Session = Depends(ge
     account = db.query(Account).filter(Account.id == req.account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    if account.name != "Shyam Steel":
-        raise HTTPException(status_code=400, detail="This interim endpoint is only for Shyam Steel")
+    label = f"{account.name or ''} {account.brand_name or ''}".lower()
+    if "shym" not in label or "steel" not in label:
+        raise HTTPException(status_code=400, detail="This endpoint is only for Shyam Steel")
 
     # Load service account JSON from stored integration config
     import json
@@ -59,3 +69,21 @@ def format_shyam_steel_report(req: SheetsFormatRequest, db: Session = Depends(ge
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Google Sheets formatting failed: {e}")
+
+
+@router.post("/push-excel")
+def push_excel_to_sheets(req: PushExcelRequest, db: Session = Depends(get_db)):
+    """Create a new Google Sheet from the local Shyam Steel Excel file using a linked Gmail account."""
+    account = db.query(Account).filter(Account.id == req.account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    label = f"{account.name or ''} {account.brand_name or ''}".lower()
+    if "shym" not in label or "steel" not in label:
+        raise HTTPException(status_code=400, detail="This endpoint is only for Shyam Steel")
+
+    try:
+        return push_excel_to_new_google_sheet(account)
+    except Exception as e:
+        import logging
+        logging.getLogger("AdOptima").error(f"[Sheets] push_excel failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

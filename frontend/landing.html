@@ -889,6 +889,19 @@
                             </div>
                         </div>
                     </div>
+                    <div class="um-section" style="margin-top:0.75rem;">
+                        <div class="um-section-title" style="font-size:0.75rem;text-transform:none;letter-spacing:0;color:var(--text-muted);">Google Sheets Report Export</div>
+                        <div id="caSheetsSection" style="display:none;">
+                            <div class="form-group full" style="display:flex;align-items:flex-end;gap:0.5rem;flex-wrap:wrap;">
+                                <button class="btn btn-secondary" id="caEditLinkSheetsBtn" onclick="linkSheetsOAuth()">Link Google Sheet</button>
+                                <button class="btn btn-primary" id="caEditPushSheetsBtn" onclick="pushExcelToSheets()">Push Excel to New Sheet</button>
+                                <span id="caEditSheetsStatus" style="font-size:0.75rem;color:var(--text-muted);"></span>
+                            </div>
+                            <div id="caSheetsUrl" style="margin-top:0.5rem;display:none;">
+                                <a id="caSheetsUrlLink" href="#" target="_blank" style="font-size:0.78rem;color:var(--color-accent);word-break:break-all;"></a>
+                            </div>
+                        </div>
+                    </div>
                     <div class="um-section ca-section">
                         <div class="um-section-title" onclick="toggleCaSection(this)">CRM Integration <span class="ca-arrow">▾</span></div>
                         <div class="ca-section-body">
@@ -1029,8 +1042,24 @@
             currentUser = await api('GET', '/auth/me');
             updateUI(currentUser);
             checkGmailAuthStatus();
+            handleOAuthReturn();
         } catch (e) {
             updateUI(null);
+        }
+    }
+
+    function handleOAuthReturn() {
+        const params = new URLSearchParams(window.location.search);
+        const success = params.get('oauth_success');
+        const error = params.get('oauth_error');
+        const accountId = params.get('account_id');
+        if (error) {
+            toast('OAuth failed: ' + decodeURIComponent(error), 'error');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (success === 'sheets' && accountId) {
+            toast('Google Sheets linked for account ' + accountId, 'success');
+            window.history.replaceState({}, document.title, window.location.pathname);
+            loadCentralAccounts();
         }
     }
 
@@ -1861,6 +1890,15 @@
         $('caEditLsqBaseUrl').value = a.lsq_base_url || '';
         $('caEditLsqSyncInterval').value = a.lsq_sync_interval_minutes || '';
         updateCrmFieldLabels();
+        // Show Google Sheets export only for Shyam Steel (name or brand_name)
+        const combinedName = ((a.name || '') + ' ' + (a.brand_name || '')).toLowerCase();
+        const isShyamSteel = combinedName.includes('shym') && combinedName.includes('steel');
+        $('caSheetsSection').style.display = isShyamSteel ? 'block' : 'none';
+        $('caEditSheetsStatus').textContent = (a.crm_credentials && a.crm_credentials.includes('sheets_refresh_token')) ? 'Google Sheets linked' : 'Not linked';
+        $('caEditSheetsStatus').style.color = (a.crm_credentials && a.crm_credentials.includes('sheets_refresh_token')) ? 'var(--color-success)' : 'var(--text-muted)';
+        $('caSheetsUrl').style.display = 'none';
+        $('caSheetsUrlLink').href = '#';
+        $('caSheetsUrlLink').textContent = '';
         // Load BMs for dropdown
         populateCentralBMs('caEditBM', a.business_manager_id);
         expandAllCaSections();
@@ -2032,6 +2070,43 @@
             alert(e.message || 'Failed to start Meta OAuth');
         }
         finally { if (btn) { btn.textContent = 'Connect Meta'; btn.disabled = false; } }
+    }
+
+    async function linkSheetsOAuth() {
+        const id = $('caEditId').value;
+        if (!id) { alert('Save the Client/Brand first before linking Google Sheets'); return; }
+        const btn = $('caEditLinkSheetsBtn');
+        if (btn) { btn.textContent = 'Linking...'; btn.disabled = true; }
+        try {
+            const data = await api('GET', '/oauth/sheets/' + id + '/connect');
+            if (data && data.authorization_url) {
+                window.location.href = data.authorization_url;
+            } else {
+                alert('Could not get Google Sheets authorization URL');
+            }
+        } catch (e) {
+            alert(e.message || 'Failed to start Google Sheets OAuth');
+        }
+        finally { if (btn) { btn.textContent = 'Link Google Sheet'; btn.disabled = false; } }
+    }
+
+    async function pushExcelToSheets() {
+        const id = $('caEditId').value;
+        if (!id) { alert('Save the Client/Brand first'); return; }
+        const btn = $('caEditPushSheetsBtn');
+        if (btn) { btn.textContent = 'Pushing...'; btn.disabled = true; }
+        try {
+            const data = await api('POST', '/sheets/push-excel', { account_id: parseInt(id) });
+            $('caEditSheetsStatus').textContent = 'Pushed to new sheet';
+            $('caEditSheetsStatus').style.color = 'var(--color-success)';
+            $('caSheetsUrl').style.display = 'block';
+            $('caSheetsUrlLink').href = data.spreadsheet_url;
+            $('caSheetsUrlLink').textContent = data.spreadsheet_url;
+            toast('Excel report pushed to new Google Sheet', 'success');
+        } catch (e) {
+            alert(e.message || 'Failed to push Excel to Google Sheets');
+        }
+        finally { if (btn) { btn.textContent = 'Push Excel to New Sheet'; btn.disabled = false; } }
     }
 
     window.addEventListener('DOMContentLoaded', checkAuth);
