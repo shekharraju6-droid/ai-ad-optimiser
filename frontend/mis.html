@@ -151,8 +151,8 @@
 
         /* DSU/DSI report tables - standardized visual quality */
 .dsu-table, .dsu-table7 {
-            width: auto;
-            table-layout: auto;
+            width: auto !important;
+            table-layout: auto !important;
             border-collapse: collapse;
             font-size: 12px;
             background: var(--color-bg-card);
@@ -183,7 +183,7 @@
             font-family: 'Inter', sans-serif;
             font-size: 12px;
             color: var(--color-text-primary);
-            padding: 5px 12px;
+            padding: 5px 10px;
             border-bottom: 0.5px solid var(--color-border);
             background: var(--color-bg-card);
             text-align: left;
@@ -618,11 +618,11 @@
         .action-btn { background: none; border: none; cursor: pointer; padding: 3px 5px; font-size: 16px; color: var(--color-text-muted); }
         .action-btn:hover { opacity: 0.7; }
 
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--color-border); }
-        th { background: var(--color-bg-card-hover); font-weight: 600; color: var(--color-text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
-        td { color: var(--color-text-primary); }
-        tr:hover td { background: var(--color-bg-card-hover); }
+        table:not(.dsu-table):not(.dsu-table7) { width: 100%; border-collapse: collapse; font-size: 13px; }
+        table:not(.dsu-table):not(.dsu-table7) th, table:not(.dsu-table):not(.dsu-table7) td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--color-border); }
+        table:not(.dsu-table):not(.dsu-table7) th { background: var(--color-bg-card-hover); font-weight: 600; color: var(--color-text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+        table:not(.dsu-table):not(.dsu-table7) td { color: var(--color-text-primary); }
+        table:not(.dsu-table):not(.dsu-table7) tr:hover td { background: var(--color-bg-card-hover); }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; }
@@ -1071,7 +1071,7 @@
                 const leadVal = fmtNum(r.leads || 0);
                 const cplVal = (r.leads || 0) ? fmtMoney(r.cpl) : '<em class="dash">—</em>';
                 const spend = fmtMoney(r.spend || 0);
-                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-right">${leadVal}</td><td class="text-right">${cplVal}</td><td class="text-right">${spend}</td></tr>`;
+                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-right num">${leadVal}</td><td class="text-right num">${cplVal}</td><td class="text-right num">${spend}</td></tr>`;
             }).join('');
             const totalCpl = total.leads ? fmtMoney(total.cpl) : '<em class="dash">—</em>';
             return `
@@ -1079,10 +1079,10 @@
                     <div class="report-table-container">
 <table class="dsu-table">
                         <thead>${headerRows}
-                            <tr><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend ↓</th></tr>
+                            <tr><th>Course</th><th class="text-right num">Lead</th><th class="text-right num">CPL</th><th class="text-right">Spend ↓</th></tr>
                         </thead>
                         <tbody>${body}
-                            <tr class="dsu-total-row"><td>TOTAL</td><td class="text-right">${fmtNum(total.leads)}</td><td class="text-right">${totalCpl}</td><td class="text-right">${fmtMoney(total.spend)}</td></tr>
+                            <tr class="dsu-total-row"><td>TOTAL</td><td class="text-right num">${fmtNum(total.leads)}</td><td class="text-right num">${totalCpl}</td><td class="text-right num">${fmtMoney(total.spend)}</td></tr>
                         </tbody>
                     </table>
                 
@@ -1095,7 +1095,7 @@
                 const leadVal = fmtNum(r.leads || 0);
                 const cplVal = (r.leads || 0) ? fmtMoney(r.cpl) : '<em class="dash">—</em>';
                 const spend = fmtMoney(r.spend || 0);
-                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-right">${leadVal}</td><td class="text-right">${cplVal}</td><td class="text-right">${spend}</td></tr>`;
+                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-right num">${leadVal}</td><td class="text-right num">${cplVal}</td><td class="text-right num">${spend}</td></tr>`;
             }).join('');
             const totalCpl = total.leads ? fmtMoney(total.cpl) : '<em class="dash">—</em>';
             return `
@@ -1106,10 +1106,10 @@
                 </div>
                 <div class="report-table-container">
 <table class="dsu-table">
-                    <thead><tr><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend ↓</th></tr></thead>
+                    <thead><tr><th>Course</th><th class="text-right num">Lead</th><th class="text-right num">CPL</th><th class="text-right">Spend ↓</th></tr></thead>
                     <tbody>${body}
                         <tr class="dsu-total-row">
-                            <td>TOTAL</td><td class="text-right">${fmtNum(total.leads)}</td><td class="text-right">${totalCpl}</td><td class="text-right">${fmtMoney(total.spend)}</td>
+                            <td>TOTAL</td><td class="text-right num">${fmtNum(total.leads)}</td><td class="text-right num">${totalCpl}</td><td class="text-right num">${fmtMoney(total.spend)}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1258,15 +1258,15 @@
         const grandTotal = data.grand_total || 0;
 
         const headerCells = stages.map(s => `<th class="text-right">${escapeHtml(s)}</th>`).join('');
-        const totalCells = stages.map(s => `<td class="text-right">${fmtNum(colTotals[s] || 0)}</td>`).join('');
+        const totalCells = stages.map(s => `<td class="text-right num">${fmtNum(colTotals[s] || 0)}</td>`).join('');
 
         const bodyRows = rows.map(r => {
             const cells = stages.map(s => {
                 const v = r[s] || 0;
-                return `<td class="text-right">${fmtNum(v)}</td>`;
+                return `<td class="text-right num">${fmtNum(v)}</td>`;
             }).join('');
             const rowSum = stages.reduce((sum, s) => sum + (r[s] || 0), 0);
-            return `<tr><td>${escapeHtml(r.source)}</td>${cells}<td class="text-right">${fmtNum(rowSum)}</td></tr>`;
+            return `<tr><td>${escapeHtml(r.source)}</td>${cells}<td class="text-right num">${fmtNum(rowSum)}</td></tr>`;
         }).join('');
 
         $('reportContent').innerHTML = `
@@ -1283,7 +1283,7 @@
                     </thead>
                     <tbody>
                         ${bodyRows}
-                        <tr class="dsu-total-row"><td>TOTAL</td>${totalCells}<td class="text-right">${fmtNum(grandTotal)}</td></tr>
+                        <tr class="dsu-total-row"><td>TOTAL</td>${totalCells}<td class="text-right num">${fmtNum(grandTotal)}</td></tr>
                     </tbody>
                 </table>
                 
@@ -1305,14 +1305,14 @@
                 const cpa = (r.submitted || 0) ? fmtMoney(r.cpa) : '<em class="dash">—</em>';
                 const spend = fmtMoney(r.spend || 0);
                 const target = fmtNum(r.target || 0);
-                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-right">${submitted}</td><td class="text-right">${cpa}</td><td class="text-right">${spend}</td><td class="text-right">${target}</td></tr>`;
+                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-right num">${submitted}</td><td class="text-right num">${cpa}</td><td class="text-right num">${spend}</td><td class="text-right num">${target}</td></tr>`;
             }).join('');
             const totalCpa = total.submitted ? fmtMoney(total.cpa) : '<em class="dash">—</em>';
             const totalSubmitted = fmtNum(total.submitted || 0);
             return `
                 <tr class="dsu-section-row"><td colspan="5">${escapeHtml(label)}</td></tr>
                 ${body}
-                <tr class="dsu-total-row"><td>${total.course}</td><td class="text-right">${totalSubmitted}</td><td class="text-right">${totalCpa}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right">${fmtNum(total.target || 0)}</td></tr>
+                <tr class="dsu-total-row"><td>${total.course}</td><td class="text-right num">${totalSubmitted}</td><td class="text-right num">${totalCpa}</td><td class="text-right num">${fmtMoney(total.spend)}</td><td class="text-right num">${fmtNum(total.target || 0)}</td></tr>
             `;
         };
 
@@ -1326,14 +1326,13 @@
                 <div class="card-header" style="margin-bottom:0.5rem;">
                     <div class="report-title" style="font-size:0.9rem;">Table 4: Application Submitted and CPA by Campus/Program</div>
                 </div>
-                <div class="dsu-table4-wrap">
                 <div class="report-table-container">
 <table class="dsu-table">
-                    <thead><tr><th>Course</th><th class="text-right">Application Submitted</th><th class="text-right">Cost Per Application</th><th class="text-right">Spend</th><th class="text-right">Target Application</th></tr></thead>
+                    <thead><tr><th>Course</th><th class="text-right num">Apps</th><th class="text-right num">CPA</th><th class="text-right num">Spend</th><th class="text-right num">Target</th></tr></thead>
                     <tbody>
                         ${renderSection('CAMPUS - 4 PROGRAMMES', data.campus4_rows, data.campus4_total)}
                         ${renderSection('CAMPUS - 3 PROGRAMMES', data.campus3_rows, data.campus3_total)}
-                        <tr class="dsu-grand-row"><td>${gt.course}</td><td class="text-right">${gtSubmitted}</td><td class="text-right">${gtCpa}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${fmtNum(gt.target || 0)}</td></tr>
+                        <tr class="dsu-grand-row"><td>${gt.course}</td><td class="text-right num">${gtSubmitted}</td><td class="text-right num">${gtCpa}</td><td class="text-right num">${fmtMoney(gt.spend)}</td><td class="text-right num">${fmtNum(gt.target || 0)}</td></tr>
                     </tbody>
                 </table>
                 
@@ -1356,13 +1355,13 @@
                     ? `<td class="text-right" rowspan="${rowCount}" style="vertical-align:middle;background:var(--color-bg-card);font-weight:700">${fmtMoney(total.budget)}</td>`
                     : '';
                 const statusClass = r.status === 'Live' ? 'status-live' : (r.status === 'Paused' ? 'status-paused' : '');
-                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-center ${statusClass}">${escapeHtml(r.status)}</td>${budgetCell}<td class="text-right">${fmtMoney(r.spend)}</td><td class="text-right ${negClass(idx === 0 ? total.remaining : 0)}">${idx === 0 ? fmtMoney(total.remaining) : ''}</td></tr>`;
+                return `<tr><td>${escapeHtml(r.course)}</td><td class="text-center ${statusClass}">${escapeHtml(r.status)}</td>${budgetCell}<td class="text-right num">${fmtMoney(r.spend)}</td><td class="text-right ${negClass(idx === 0 ? total.remaining : 0)} num">${idx === 0 ? fmtMoney(total.remaining) : ''}</td></tr>`;
             }).join('');
 
             return `
                 <tr class="dsu-section-row"><td colspan="5">${escapeHtml(label)}</td></tr>
                 ${sectionBody}
-                <tr class="dsu-total-row"><td>${total.course}</td><td></td><td class="text-right">${fmtMoney(total.budget)}</td><td class="text-right">${fmtMoney(total.spend)}</td><td class="text-right ${negClass(total.remaining)}">${fmtMoney(total.remaining)}</td></tr>
+                <tr class="dsu-total-row"><td>${total.course}</td><td></td><td class="text-right num">${fmtMoney(total.budget)}</td><td class="text-right num">${fmtMoney(total.spend)}</td><td class="text-right ${negClass(total.remaining)} num">${fmtMoney(total.remaining)}</td></tr>
             `;
         };
 
@@ -1374,14 +1373,13 @@
                 <div class="card-header" style="margin-bottom:0.5rem;">
                     <div class="report-title" style="font-size:0.9rem;">Table 5: Budget MIS by Campus/Program</div>
                 </div>
-                <div class="dsu-table4-wrap">
                 <div class="report-table-container">
 <table class="dsu-table">
-                    <thead><tr><th>Course</th><th class="text-center">Campaign Status</th><th class="text-right">Media Budget Received</th><th class="text-right">Spend</th><th class="text-right">Remaining Budget</th></tr></thead>
+                    <thead><tr><th>Course</th><th class="text-center">Status</th><th class="text-right num">Budget</th><th class="text-right num">Spend</th><th class="text-right num">Remaining</th></tr></thead>
                     <tbody>
                         ${renderSection('CAMPUS - 4 PROGRAMMES', data.campus4_rows, data.campus4_total)}
                         ${renderSection('CAMPUS - 3 PROGRAMMES', data.campus3_rows, data.campus3_total)}
-                        <tr class="dsu-grand-row"><td>${gt.course}</td><td></td><td class="text-right">${fmtMoney(gt.budget)}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right ${negClass(gt.remaining)}">${fmtMoney(gt.remaining)}</td></tr>
+                        <tr class="dsu-grand-row"><td>${gt.course}</td><td></td><td class="text-right num">${fmtMoney(gt.budget)}</td><td class="text-right num">${fmtMoney(gt.spend)}</td><td class="text-right ${negClass(gt.remaining)} num">${fmtMoney(gt.remaining)}</td></tr>
                     </tbody>
                 </table>
                 
@@ -1399,7 +1397,7 @@
         const total = data.total || 0;
 
         const body = rows.map(r => {
-            return `<tr><td>${escapeHtml(r.stage)}</td><td class="text-right">${fmtNum(r.count)}</td><td class="text-right">${r.percentage}%</td></tr>`;
+            return `<tr><td>${escapeHtml(r.stage)}</td><td class="text-right num">${fmtNum(r.count)}</td><td class="text-right num">${r.percentage}%</td></tr>`;
         }).join('');
 
         $('reportContent').innerHTML = `
@@ -1413,7 +1411,7 @@
                     <thead><tr><th>Stage</th><th class="text-right">Count</th><th class="text-right">Percentage</th></tr></thead>
                     <tbody>
                         ${body}
-                        <tr class="dsu-total-row"><td>TOTAL</td><td class="text-right">${fmtNum(total)}</td><td></td></tr>
+                        <tr class="dsu-total-row"><td>TOTAL</td><td class="text-right num">${fmtNum(total)}</td><td></td></tr>
                     </tbody>
                 </table>
             
@@ -1473,7 +1471,7 @@
             if (r.is_virtual) {
                 return `<tr style="opacity:0.85">
                     <td>${escapeHtml(fmtDate(r.date))}</td>
-                    <td class="text-right">₹0</td>
+                    <td class="text-right num">₹0</td>
                     ${monthlyCells}
                     <td>-</td>
                     <td>-</td>
@@ -1483,7 +1481,7 @@
 
             return `<tr>
                 <td style="white-space:nowrap">${escapeHtml(fmtDate(r.date))}</td>
-                <td class="text-right">${fmtMoney(r.amount)}</td>
+                <td class="text-right num">${fmtMoney(r.amount)}</td>
                 ${monthlyCells}
                 <td>${escapeHtml(r.invoice || '-')}</td>
                 <td>${escapeHtml(r.campus || '-')}</td>
@@ -1532,7 +1530,7 @@
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th class="text-right">Amount Received</th>
+                            <th class="text-right num">Amount</th>
                             <th class="text-right">Received Monthly</th>
                             <th>Invoice #</th>
                             <th>Campus</th>
@@ -1547,14 +1545,14 @@
                         ${body}
                         <tr class="dsu-table7-grand">
                             <td>GRAND TOTAL</td>
-                            <td class="text-right">${fmtMoney(gt.amount)}</td>
-                            <td class="text-right">${fmtMoney(gt.amount)}</td>
+                            <td class="text-right num">${fmtMoney(gt.amount)}</td>
+                            <td class="text-right num">${fmtMoney(gt.amount)}</td>
                             <td></td>
                             <td></td>
-                            <td class="text-right">${fmtMoney(gt.google_spend)}</td>
-                            <td class="text-right">${fmtMoney(gt.meta_spend)}</td>
-                            <td class="text-right">${fmtMoney(gt.total_spend)}</td>
-                            <td class="text-right ${negClass(gt.available_balance)}">${fmtMoney(gt.available_balance)}</td>
+                            <td class="text-right num">${fmtMoney(gt.google_spend)}</td>
+                            <td class="text-right num">${fmtMoney(gt.meta_spend)}</td>
+                            <td class="text-right num">${fmtMoney(gt.total_spend)}</td>
+                            <td class="text-right ${negClass(gt.available_balance)} num">${fmtMoney(gt.available_balance)}</td>
                             <td></td>
                         </tr>
                     </tbody>
@@ -1780,11 +1778,11 @@
                     }
                 } else {
                     const cpl = r.leads ? fmtMoney(r.cpl) : '<em class="dash">—</em>';
-                    cplCell = `<td class="text-right">${cpl}</td>`;
-                    spendCell = `<td class="text-right">${fmtMoney(r.spend)}</td>`;
+                    cplCell = `<td class="text-right num">${cpl}</td>`;
+                    spendCell = `<td class="text-right num">${fmtMoney(r.spend)}</td>`;
                 }
 
-                return `<tr>${deptCell}<td>${escapeHtml(r.course)}</td><td class="text-right">${fmtNum(r.leads || 0)}</td>${cplCell}${spendCell}</tr>`;
+                return `<tr>${deptCell}<td>${escapeHtml(r.course)}</td><td class="text-right num">${fmtNum(r.leads || 0)}</td>${cplCell}${spendCell}</tr>`;
             }).join('');
             const totalCpl = total.leads ? fmtMoney(total.cpl) : '<em class="dash">—</em>';
             return `
@@ -1792,10 +1790,10 @@
                     <div class="report-table-container">
 <table class="dsu-table">
                         <thead>${headerRows}
-                            <tr><th>Department</th><th>Course</th><th class="text-right">Lead</th><th class="text-right">CPL</th><th class="text-right">Spend</th></tr>
+                            <tr><th>Department</th><th>Course</th><th class="text-right num">Lead</th><th class="text-right num">CPL</th><th class="text-right num">Spend</th></tr>
                         </thead>
                         <tbody>${body}
-                            <tr class="dsu-total-row"><td colspan="2">TOTAL</td><td class="text-right">${fmtNum(total.leads)}</td><td class="text-right">${totalCpl}</td><td class="text-right">${fmtMoney(total.spend)}</td></tr>
+                            <tr class="dsu-total-row"><td colspan="2">TOTAL</td><td class="text-right num">${fmtNum(total.leads)}</td><td class="text-right num">${totalCpl}</td><td class="text-right num">${fmtMoney(total.spend)}</td></tr>
                         </tbody>
                     </table>
                 
@@ -1868,15 +1866,15 @@
         const grandTotal = data.grand_total || 0;
 
         const headerCells = stages.map(s => `<th class="text-right">${escapeHtml(s)}</th>`).join('');
-        const totalCells = stages.map(s => `<td class="text-right">${colTotals[s] || 0}</td>`).join('');
+        const totalCells = stages.map(s => `<td class="text-right num">${colTotals[s] || 0}</td>`).join('');
 
         const bodyRows = rows.map(r => {
             const cells = stages.map(s => {
                 const v = r[s] || 0;
-                return `<td class="text-right">${fmtNum(v)}</td>`;
+                return `<td class="text-right num">${fmtNum(v)}</td>`;
             }).join('');
             const rowSum = stages.reduce((sum, s) => sum + (r[s] || 0), 0);
-            return `<tr><td>${escapeHtml(r.course)}</td>${cells}<td class="text-right">${fmtNum(rowSum)}</td></tr>`;
+            return `<tr><td>${escapeHtml(r.course)}</td>${cells}<td class="text-right num">${fmtNum(rowSum)}</td></tr>`;
         }).join('');
 
         $('reportContent').innerHTML = `
@@ -1893,7 +1891,7 @@
                     </thead>
                     <tbody>
                         ${bodyRows}
-                        <tr class="dsu-total-row"><td>TOTAL</td>${totalCells}<td class="text-right">${grandTotal}</td></tr>
+                        <tr class="dsu-total-row"><td>TOTAL</td>${totalCells}<td class="text-right num">${grandTotal}</td></tr>
                     </tbody>
                 </table>
                 
@@ -1953,11 +1951,11 @@
             } else {
                 const cpa = r.submitted ? fmtMoney(r.cpa) : '<em class="dash">—</em>';
                 const spend = fmtMoney(r.spend || 0);
-                cpaCell = `<td class="text-right">${cpa}</td>`;
-                spendCell = `<td class="text-right">${spend}</td>`;
+                cpaCell = `<td class="text-right num">${cpa}</td>`;
+                spendCell = `<td class="text-right num">${spend}</td>`;
             }
 
-            return `<tr>${deptCell}<td>${escapeHtml(r.course)}</td><td class="text-right">${submitted}</td>${cpaCell}${spendCell}<td class="text-right">${target}</td></tr>`;
+            return `<tr>${deptCell}<td>${escapeHtml(r.course)}</td><td class="text-right num">${submitted}</td>${cpaCell}${spendCell}<td class="text-right num">${target}</td></tr>`;
         }).join('');
 
         const gtCpa = gt.submitted ? fmtMoney(gt.cpa) : '<em class="dash">—</em>';
@@ -1972,10 +1970,10 @@
                 <div class="dsi-table4-wrap">
                 <div class="report-table-container">
 <table class="dsu-table">
-                    <thead><tr><th>Department</th><th>Course</th><th class="text-right" style="white-space:nowrap">Application Submitted</th><th class="text-right">CPA</th><th class="text-right">Spend</th><th class="text-right">Target</th></tr></thead>
+                    <thead><tr><th>Department</th><th>Course</th><th class="text-right num" style="white-space:nowrap">Apps</th><th class="text-right num">CPA</th><th class="text-right num">Spend</th><th class="text-right num">Target</th></tr></thead>
                     <tbody>
                         ${body}
-                        <tr class="dsu-grand-row"><td colspan="2">${gt.course}</td><td class="text-right">${gtSubmitted}</td><td class="text-right">${gtCpa}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right">${fmtNum(gt.target || 0)}</td></tr>
+                        <tr class="dsu-grand-row"><td colspan="2">${gt.course}</td><td class="text-right num">${gtSubmitted}</td><td class="text-right num">${gtCpa}</td><td class="text-right num">${fmtMoney(gt.spend)}</td><td class="text-right num">${fmtNum(gt.target || 0)}</td></tr>
                     </tbody>
                 </table>
                 
@@ -2042,9 +2040,9 @@
                     remainingCell = '';
                 }
             } else {
-                budgetCell = `<td class="text-right">${fmtMoney(r.budget)}</td>`;
-                spendCell = `<td class="text-right">${fmtMoney(r.spend)}</td>`;
-                remainingCell = `<td class="text-right ${negClass(r.remaining)}">${fmtMoney(r.remaining)}</td>`;
+                budgetCell = `<td class="text-right num">${fmtMoney(r.budget)}</td>`;
+                spendCell = `<td class="text-right num">${fmtMoney(r.spend)}</td>`;
+                remainingCell = `<td class="text-right ${negClass(r.remaining)} num">${fmtMoney(r.remaining)}</td>`;
             }
 
             return `<tr>${deptCell}<td>${escapeHtml(r.course)}</td><td class="text-center ${statusClass}">${escapeHtml(r.status)}</td>${budgetCell}${spendCell}${remainingCell}</tr>`;
@@ -2060,7 +2058,7 @@
             const isEditing = dsiEditingBudgetId === e.id;
             return `<tr style="${isEditing ? 'background:var(--color-warning-light)' : ''}">
                 <td style="white-space:nowrap">${escapeHtml(fmtDate(e.date))}</td>
-                <td class="text-right">${fmtMoney(e.amount)}</td>
+                <td class="text-right num">${fmtMoney(e.amount)}</td>
                 <td>${escapeHtml(e.invoice || '-')}</td>
                 <td>${escapeHtml(e.section || '-')}</td>
                 <td class="text-center">
@@ -2116,10 +2114,10 @@
                 <div class="dsi-table4-wrap" style="margin-bottom:0.75rem">
                 <div class="report-table-container">
 <table class="dsu-table">
-                    <thead><tr><th>Department</th><th>Course</th><th class="text-center">Status</th><th class="text-right">Media Budget Received</th><th class="text-right">Spend</th><th class="text-right">Remaining Budget</th></tr></thead>
+                    <thead><tr><th>Department</th><th>Course</th><th class="text-center">Status</th><th class="text-right num">Budget</th><th class="text-right num">Spend</th><th class="text-right num">Remaining</th></tr></thead>
                     <tbody>
                         ${body}
-                        <tr class="dsu-grand-row"><td colspan="2">${gt.course}</td><td></td><td class="text-right">${fmtMoney(gt.budget)}</td><td class="text-right">${fmtMoney(gt.spend)}</td><td class="text-right ${negClass(gt.remaining)}">${fmtMoney(gt.remaining)}</td></tr>
+                        <tr class="dsu-grand-row"><td colspan="2">${gt.course}</td><td></td><td class="text-right num">${fmtMoney(gt.budget)}</td><td class="text-right num">${fmtMoney(gt.spend)}</td><td class="text-right ${negClass(gt.remaining)} num">${fmtMoney(gt.remaining)}</td></tr>
                     </tbody>
                 </table>
                 
@@ -2129,10 +2127,10 @@
                 <div style="overflow-x:auto;">
                 <div class="report-table-container">
 <table class="dsu-table">
-                    <thead><tr><th>Date</th><th class="text-right">Amount Received</th><th>Invoice #</th><th>Section</th><th class="text-center">Actions</th></tr></thead>
+                    <thead><tr><th>Date</th><th class="text-right num">Amount</th><th>Invoice #</th><th>Section</th><th class="text-center">Actions</th></tr></thead>
                     <tbody>
                         ${entryRows || '<tr><td colspan="5" style="text-align:center;padding:0.75rem;color:var(--text-muted)">No budget entries yet.</td></tr>'}
-                        <tr class="dsu-grand-row"><td>TOTAL RECEIVED</td><td class="text-right">${fmtMoney(totalReceived)}</td><td colspan="3"></td></tr>
+                        <tr class="dsu-grand-row"><td>TOTAL RECEIVED</td><td class="text-right num">${fmtMoney(totalReceived)}</td><td colspan="3"></td></tr>
                     </tbody>
                 </table>
                 
@@ -2382,11 +2380,11 @@
                             const estSpend = (v.leads / (totalLeads || 1)) * totalSpend;
                             return `<tr>
                                 <td><span class="badge ${s === 'Google Ads' ? 'badge-google' : s === 'Meta Ads' ? 'badge-meta' : 'badge-crm'}">${s}</span></td>
-                                <td class="text-right">${formatNum(v.leads)}</td>
-                                <td class="text-right">${formatNum(v.opps)}</td>
-                                <td class="text-right">${formatMoney(v.openValue + v.wonValue)}</td>
-                                <td class="text-right">${formatMoney(v.wonValue)}</td>
-                                <td class="text-right">${formatMoney(estSpend)}</td>
+                                <td class="text-right num">${formatNum(v.leads)}</td>
+                                <td class="text-right num">${formatNum(v.opps)}</td>
+                                <td class="text-right num">${formatMoney(v.openValue + v.wonValue)}</td>
+                                <td class="text-right num">${formatMoney(v.wonValue)}</td>
+                                <td class="text-right num">${formatMoney(estSpend)}</td>
                                 <td><input type="text" class="note-input" data-source="${escapeHtml(s)}" placeholder="Remarks" style="width:100%; border:none; background:transparent; font-size:0.82rem;"></td>
                             </tr>`;
                         }).join('')}
@@ -2430,9 +2428,9 @@
                             <td>${escapeHtml(o.created_at || '-')}</td>
                             <td><span class="badge badge-neutral">${escapeHtml(o.platform)}</span></td>
                             <td>${escapeHtml(o.name || '-')}</td>
-                            <td class="text-right">${formatMoney(o.amount)}</td>
+                            <td class="text-right num">${formatMoney(o.amount)}</td>
                             <td><span class="badge ${stageBadge(o.stage)}">${escapeHtml(o.stage || '-')}</span></td>
-                            <td class="text-right">${formatPct(o.probability)}</td>
+                            <td class="text-right num">${formatPct(o.probability)}</td>
                             <td>${escapeHtml(o.close_date || '-')}</td>
                             <td>${escapeHtml(o.source || '-')}</td>
                         </tr>`).join('')}
