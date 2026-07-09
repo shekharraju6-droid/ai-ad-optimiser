@@ -39,7 +39,7 @@ def format_shyam_steel_report(req: SheetsFormatRequest, db: Session = Depends(ge
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     label = f"{account.name or ''} {account.brand_name or ''}".lower()
-    if "shym" not in label or "steel" not in label:
+    if "shyam" not in label or "steel" not in label:
         raise HTTPException(status_code=400, detail="This endpoint is only for Shyam Steel")
 
     # Load service account JSON from stored integration config
@@ -78,7 +78,7 @@ def push_excel_to_sheets(req: PushExcelRequest, db: Session = Depends(get_db)):
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     label = f"{account.name or ''} {account.brand_name or ''}".lower()
-    if "shym" not in label or "steel" not in label:
+    if "shyam" not in label or "steel" not in label:
         raise HTTPException(status_code=400, detail="This endpoint is only for Shyam Steel")
 
     try:

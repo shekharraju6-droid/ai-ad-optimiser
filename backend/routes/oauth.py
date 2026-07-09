@@ -81,11 +81,8 @@ def connect_sheets(account_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Account not found")
     # Enable for Shyam Steel by name or brand_name
     label = f"{account.name or ''} {account.brand_name or ''}".lower()
-    if "shym" not in label or "steel" not in label:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Google Sheets linking is only enabled for Shyam Steel. Account {account_id}: name='{account.name}', brand_name='{account.brand_name}'"
-        )
+    if "shyam" not in label or "steel" not in label:
+        raise HTTPException(status_code=400, detail="Google Sheets linking is only enabled for Shyam Steel")
     try:
         url = get_sheets_auth_url(account_id)
         return {"authorization_url": url}
