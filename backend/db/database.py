@@ -110,6 +110,11 @@ def init_db():
         except Exception as me:
             logger.warning(f"Additive account migration skipped/failed: {me}")
         try:
+            from backend.migrations.add_missing_account_columns import run_migration as run_missing_cols_migration
+            run_missing_cols_migration()
+        except Exception as me:
+            logger.warning(f"Missing account columns migration skipped/failed: {me}")
+        try:
             from backend.migrations.add_invoice_upload_columns import run_invoice_migration
             run_invoice_migration()
         except Exception as me:
@@ -139,6 +144,12 @@ def init_db():
             run_categories_migration()
         except Exception as me:
             logger.warning(f"Additive categories migration skipped/failed: {me}")
+        # Run safe additive migration for Mantri MIS Reports
+        try:
+            from backend.migrations.add_mis_mantri_tables import run_migration as run_mis_migration
+            run_mis_migration()
+        except Exception as me:
+            logger.warning(f"Additive MIS Mantri migration skipped/failed: {me}")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise

@@ -311,6 +311,7 @@ def update_client_billing(
         c.client_status = normalized
         if account:
             account.client_status = req.client_status or "Active"
+            account.is_active = (account.client_status.lower() in ["active"])
     if req.invoice_day is not None:
         c.invoice_day = req.invoice_day
         if account:
@@ -928,9 +929,9 @@ async def upload_invoice_extract(
 
     # Send to Gemini 2.5 Flash
     try:
-        from google import genai
         from google.genai import types
-        client = genai.Client()
+        from backend.services.ai_client import get_gemini_client
+        client = get_gemini_client()
 
         # Build the file part based on content type
         if ext == ".pdf":

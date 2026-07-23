@@ -1387,7 +1387,7 @@
 
     async function loadCentralAccounts() {
         try {
-            centralAccounts = await api('GET', '/accounts');
+            centralAccounts = await api('GET', '/accounts?active_only=false');
             centralSelectedIds.clear();
             centralSearchQuery = '';
             const searchInput = $('centralAccountSearch');

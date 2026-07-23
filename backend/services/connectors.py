@@ -197,6 +197,41 @@ class GoogleAdsConnector(AdsConnector):
             logger.error(f"Google fetch campaigns failed: {e}")
             return []
 
+    def fetch_daily_metrics(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Return per-day spend and conversions for a date range (inclusive)."""
+        if not self.is_valid:
+            return []
+        customer_id = (self.account.google_external_id or self.account.external_id or "").replace("-", "")
+        if not customer_id:
+            return []
+        s = start_date or self.start_date
+        e = end_date or self.end_date
+        if not s or not e:
+            return []
+        query = f"""
+            SELECT
+              segments.date,
+              metrics.cost_micros,
+              metrics.conversions
+            FROM customer
+            WHERE segments.date BETWEEN '{s}' AND '{e}'
+            ORDER BY segments.date
+        """
+        try:
+            service = self.client.get_service("GoogleAdsService")
+            response = service.search(customer_id=customer_id, query=query)
+            results = []
+            for row in response:
+                results.append({
+                    "date": str(row.segments.date),
+                    "spend": round((row.metrics.cost_micros or 0) / 1_000_000.0, 2),
+                    "leads": round(float(row.metrics.conversions or 0)),
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Google fetch daily metrics failed: {e}")
+            return []
+
     def fetch_billing(self) -> Dict[str, Any]:
         """Fetch billing/balance data from Google Ads API.
 
@@ -224,15 +259,21 @@ class GoogleAdsConnector(AdsConnector):
                 FROM account_budget
             """
             response_ab = service.search(customer_id=customer_id, query=query_ab)
-            active_budget = None
+            # Collect ALL active budgets — a top-up creates a NEW account_budget
+            # entry in Google Ads, so we must sum across all of them, not break on
+            # the first one.
+            active_budgets = []
+            fallback_budget = None
             for row in response_ab:
                 ab = row.account_budget
                 # status 3 = ACTIVE in v24 enum
                 if str(ab.status).endswith("3") or str(ab.status) == "AccountBudgetStatus.ACTIVE" or ab.status == 3:
-                    active_budget = ab
-                    break
-                if active_budget is None:
-                    active_budget = ab  # fallback to first row
+                    active_budgets.append(ab)
+                elif fallback_budget is None:
+                    fallback_budget = ab  # fallback to first non-active row
+
+            # Use the primary active budget for metadata (start date, etc.)
+            active_budget = active_budgets[0] if active_budgets else fallback_budget
 
             # Determine billing type: prepaid if there's an active budget with a
             # positive, finite spending limit; otherwise postpaid.
@@ -267,17 +308,53 @@ class GoogleAdsConnector(AdsConnector):
                 except Exception:
                     month_label = ""
 
+                # Resolve inception date for lifetime spend query
+                inception_date = "2026-04-01"  # Default (new accounts launch)
+                if self.account.id == 1 or "dsu" in self.account.name.lower():
+                    inception_date = "2025-11-28"  # DSU inception date
+                elif self.account.id == 2 or "dsi" in self.account.name.lower():
+                    inception_date = "2026-01-08"  # DSI inception date
+                else:
+                    inception_date = "2020-01-01"
+
+                today_str = _today_ist()
+                query_lifetime = f"""
+                    SELECT
+                      metrics.cost_micros
+                    FROM customer
+                    WHERE segments.date BETWEEN '{inception_date}' AND '{today_str}'
+                """
+                lifetime_spend = 0.0
+                try:
+                    response_lifetime = service.search(customer_id=customer_id, query=query_lifetime)
+                    for row in response_lifetime:
+                        lifetime_spend += (row.metrics.cost_micros or 0) / 1_000_000.0
+                except Exception as e:
+                    logger.error(f"Failed to fetch lifetime spend for postpaid account {self.account.id}: {e}")
+                    lifetime_spend = monthly_spend
+
                 return {
                     "billing_type": "postpaid",
-                    "amount": round(monthly_spend, 2),
+                    "amount": round(lifetime_spend, 2),
                     "status": "available",
                     "monthly_spend": round(monthly_spend, 2),
+                    "lifetime_spend": round(lifetime_spend, 2),
                     "month_label": month_label,
                 }
 
-            # PREPAID: balance = adjusted_spending_limit - amount_served
-            total_budget = active_budget.adjusted_spending_limit_micros / 1_000_000.0
-            amount_served = (active_budget.amount_served_micros or 0) / 1_000_000.0
+            # PREPAID: balance = sum(adjusted_spending_limit - amount_served) across
+            # ALL active budgets. Google Ads creates a NEW account_budget on each
+            # top-up, so only reading the first one misses recently added funds.
+            if active_budgets:
+                total_budget = sum(
+                    (ab.adjusted_spending_limit_micros or 0) for ab in active_budgets
+                ) / 1_000_000.0
+                amount_served = sum(
+                    (ab.amount_served_micros or 0) for ab in active_budgets
+                ) / 1_000_000.0
+            else:
+                total_budget = active_budget.adjusted_spending_limit_micros / 1_000_000.0
+                amount_served = (active_budget.amount_served_micros or 0) / 1_000_000.0
             budget_start = active_budget.approved_start_date_time or ""
             spend_start = budget_start[:10] if budget_start else "2026-01-01"
 
@@ -290,6 +367,32 @@ class GoogleAdsConnector(AdsConnector):
             else:
                 health = "critical"
 
+            # Resolve inception date for lifetime spend query
+            inception_date = "2026-04-01"  # Default (new accounts launch)
+            if self.account.id == 1 or "dsu" in self.account.name.lower():
+                inception_date = "2025-11-28"  # DSU inception date
+            elif self.account.id == 2 or "dsi" in self.account.name.lower():
+                inception_date = "2026-01-08"  # DSI inception date
+            else:
+                if spend_start:
+                    inception_date = spend_start
+
+            today_str = _today_ist()
+            query_lifetime = f"""
+                SELECT
+                  metrics.cost_micros
+                FROM customer
+                WHERE segments.date BETWEEN '{inception_date}' AND '{today_str}'
+            """
+            lifetime_spend = 0.0
+            try:
+                response_lifetime = service.search(customer_id=customer_id, query=query_lifetime)
+                for row in response_lifetime:
+                    lifetime_spend += (row.metrics.cost_micros or 0) / 1_000_000.0
+            except Exception as e:
+                logger.error(f"Failed to fetch lifetime spend for prepaid account {self.account.id}: {e}")
+                lifetime_spend = amount_served  # fallback to active budget amount_served
+
             return {
                 "billing_type": "prepaid",
                 "amount": balance,
@@ -299,6 +402,7 @@ class GoogleAdsConnector(AdsConnector):
                 "budget_start_date": spend_start,
                 "balance_pct": balance_pct,
                 "health": health,
+                "lifetime_spend": round(lifetime_spend, 2),
             }
         except Exception as e:
             logger.warning(f"Google fetch billing failed for account {self.account.id}: {e}")
@@ -645,10 +749,16 @@ class MetaAdsConnector(AdsConnector):
                 val = insight.get(f, 0)
                 if val is None:
                     continue
+                # conversions returns a list of action objects; sum their values
+                if isinstance(val, list):
+                    if f == "conversions":
+                        val = sum(float(v.get("value", 0) or 0) for v in val if isinstance(v, dict))
+                    else:
+                        val = sum(float(v or 0) for v in val)
                 if f in ("spend", "cpc", "ctr", "cost_per_result", "frequency"):
                     totals[f] += float(val or 0)
                 else:
-                    totals[f] += int(val or 0)
+                    totals[f] += int(float(val or 0))
         return totals
 
     def fetch_account_metrics(self) -> Dict[str, Any]:
@@ -737,6 +847,46 @@ class MetaAdsConnector(AdsConnector):
             logger.error(f"Meta fetch campaigns failed: {e}")
             return []
 
+    def fetch_daily_metrics(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Return per-day spend and conversions for a date range (inclusive)."""
+        if not self.is_valid:
+            return []
+        from facebook_business.adobjects.adaccount import AdAccount
+        account_id = self.account.meta_external_id or self.account.external_id or ""
+        if not account_id:
+            return []
+        s = start_date or self.start_date
+        e = end_date or self.end_date
+        if not s or not e:
+            return []
+        try:
+            account = AdAccount(account_id)
+            params = {
+                "time_range": {"since": s, "until": e},
+                "level": "account",
+                "time_increment": "1",
+            }
+            fields = ["spend", "actions"]
+            insights = account.get_insights(fields=fields, params=params)
+            results = []
+            for row in insights:
+                spend = float(row.get("spend", 0) or 0)
+                leads = 0
+                for action in row.get("actions", []) or []:
+                    if action.get("action_type") == "lead":
+                        leads = int(action.get("value", 0) or 0)
+                        break
+                date_str = row.get("date_start")
+                results.append({
+                    "date": date_str,
+                    "spend": spend,
+                    "leads": float(leads),
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Meta fetch daily metrics failed: {e}")
+            return []
+
     def fetch_billing(self) -> Dict[str, Any]:
         """Fetch billing data from Meta Marketing API.
 
@@ -775,12 +925,36 @@ class MetaAdsConnector(AdsConnector):
             except Exception:
                 month_label = ""
 
-            if monthly_spend > 0:
+            # Resolve inception date for lifetime spend query
+            inception_date = "2026-04-01"  # Default (new accounts launch)
+            if self.account.id == 1 or "dsu" in self.account.name.lower():
+                inception_date = "2025-11-28"  # DSU inception date
+            elif self.account.id == 2 or "dsi" in self.account.name.lower():
+                inception_date = "2026-01-08"  # DSI inception date
+            else:
+                inception_date = "2020-01-01"
+
+            # Fetch lifetime spend from inception to today
+            lifetime_spend = 0.0
+            try:
+                params_lifetime = {
+                    "time_range": {"since": inception_date, "until": today_ist},
+                    "level": "account",
+                }
+                insights_lifetime = account.get_insights(fields=["spend"], params=params_lifetime)
+                for row in insights_lifetime:
+                    lifetime_spend += float(row.get("spend", 0) or 0)
+            except Exception as e:
+                logger.warning(f"Meta lifetime billing insights failed for account {self.account.id}: {e}")
+                lifetime_spend = monthly_spend
+
+            if monthly_spend > 0 or lifetime_spend > 0:
                 return {
                     "billing_type": "postpaid",
-                    "amount": round(monthly_spend, 2),
+                    "amount": round(lifetime_spend, 2),
                     "status": "available",
                     "monthly_spend": round(monthly_spend, 2),
+                    "lifetime_spend": round(lifetime_spend, 2),
                     "month_label": month_label,
                 }
             return {"billing_type": "unknown", "amount": None, "status": "unavailable"}

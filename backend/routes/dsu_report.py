@@ -285,9 +285,9 @@ def trigger_lsq_sync(
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
     account = db.query(Account).filter(Account.id == account_id).first()
-    log_activity(db, module="InsightDesk", action="Leads Synced", description=f"LeadSquared leads synced for {account.name if account else 'Client/Brand #'+str(account_id)}: {result.get('synced', result.get('leads', 0))} leads",
+    log_activity(module="InsightDesk", action="Leads Synced", description=f"LeadSquared leads synced for {account.name if account else 'Client/Brand #'+str(account_id)}: {result.get('synced', result.get('leads', 0))} leads",
                  user_id=getattr(user, "id", None), user_name=getattr(user, "full_name", None) or getattr(user, "email", None),
-                 account_id=account_id, account_name=account.name if account else None)
+                 account_id=account_id, account_name=account.name if account else None, db=db)
     return result
 
 

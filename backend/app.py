@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import traceback
 
-from backend.routes import config, campaigns, search_terms, negatives, optimizations, logs, chat, auth, reports, accounts, audits, notifications, oauth, crm, revenueops, dsu_report, dsi_report, mantri, voice, categories, activity_log
+from backend.routes import config, campaigns, search_terms, negatives, optimizations, logs, chat, auth, reports, accounts, audits, notifications, oauth, crm, revenueops, dsu_report, dsi_report, mantri, voice, categories, activity_log, mis_mantri, salesforce_mantri
 
 from backend.db.database import init_db
 from backend.services.scheduler import start_scheduler, stop_scheduler
@@ -58,6 +58,8 @@ app.include_router(dsu_report.router)
 app.include_router(dsi_report.router)
 app.include_router(revenueops.router)
 app.include_router(mantri.router)
+app.include_router(mis_mantri.router)
+app.include_router(salesforce_mantri.router)
 app.include_router(voice.router)
 app.include_router(activity_log.router)
 

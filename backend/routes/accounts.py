@@ -176,11 +176,17 @@ class GroupCreate(BaseModel):
 
 
 @router.get("/accounts")
-def list_accounts(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+def list_accounts(active_only: bool = True, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     q = db.query(Account)
+    if active_only:
+        q = q.filter(
+            Account.is_active == True,
+            (Account.client_status.in_(["Active", "active"]) | (Account.client_status == None) | (Account.client_status == ""))
+        )
     q = _filter_accounts_for_user(q, user)
     accounts = q.all()
     return [a.to_dict() for a in accounts]
+
 
 
 @router.get("/accounts/summary")
@@ -188,7 +194,11 @@ def dashboard_summary(start_date: Optional[str] = None, end_date: Optional[str] 
     """Grouped dashboard summary across all accounts. Optionally filtered by date range.
     Only live accounts (DSU, DSI) contribute to totals and tile metrics; non-live accounts show zeros.
     BM users only see their assigned accounts."""
-    q = db.query(Account).filter(Account.is_active == True)
+    q = db.query(Account).filter(
+        Account.is_active == True,
+        Account.is_live == True,
+        (Account.client_status.in_(["Active", "active"]) | (Account.client_status == None) | (Account.client_status == ""))
+    )
     q = _filter_accounts_for_user(q, user)
     accounts = q.all()
     groups = db.query(AccountGroup).all()
@@ -282,6 +292,7 @@ def create_account(req: AccountCreate, db: Session = Depends(get_db)):
         refresh_interval_minutes=req.refresh_interval_minutes,
         status=AccountStatus.DISCONNECTED,
         is_live=req.google_is_live or req.meta_is_live,
+        is_active=(req.client_status or "Active").lower() in ["active"],
         crm_type=req.crm_type or "none",
         crm_credentials=req.crm_credentials,
         target_cpa=req.target_cpa,
@@ -438,6 +449,7 @@ def update_account(account_id: int, req: AccountUpdate, db: Session = Depends(ge
 
     if req.client_status is not None:
         account.client_status = req.client_status or "Active"
+        account.is_active = (account.client_status.lower() in ["active"])
     if req.invoice_day is not None:
         account.invoice_day = req.invoice_day
     if req.payment_due_days is not None:

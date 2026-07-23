@@ -36,7 +36,7 @@ def build_billing_display(billing_cache: Optional[str], fallback_spend: float = 
     Returns:
         {
             billing_type: "prepaid" | "postpaid" | "unknown",
-            billing_display: "BAL ₹12.9K of ₹18.8L" | "USED ₹45.2K this month" | "BILL ---",
+            billing_display: "BAL ₹12.9K SPEND ₹8.3L" | "SPEND ₹45.2L" | "BILL ---",
             billing_colour: "good" | "warning" | "critical" | "neutral" | "grey",
             balance_pct: float | None (prepaid only),
             billing_amount: number | null,
@@ -54,7 +54,7 @@ def build_billing_display(billing_cache: Optional[str], fallback_spend: float = 
         if billing_data and billing_data.get("billing_type") == "postpaid":
             return {
                 "billing_type": "postpaid",
-                "billing_display": "USED ---",
+                "billing_display": "SPEND ---",
                 "billing_colour": "grey",
                 "billing_amount": None,
             }
@@ -81,6 +81,7 @@ def build_billing_display(billing_cache: Optional[str], fallback_spend: float = 
         amount = billing_data.get("amount")
         balance_pct = billing_data.get("balance_pct")
         health = billing_data.get("health")
+        lifetime_spend = billing_data.get("lifetime_spend")
 
         # Compute balance_pct and health if not already cached by connector
         if balance_pct is None and amount is not None and total_budget and total_budget > 0:
@@ -105,10 +106,8 @@ def build_billing_display(billing_cache: Optional[str], fallback_spend: float = 
         else:
             colour = "neutral"
 
-        # Build display (plain text only — CSS chips handle colour/visual indicators)
-        if amount is not None and total_budget:
-            display = f"BAL {format_billing_amount(amount)} of {format_billing_amount(total_budget)}"
-        elif amount is not None:
+        # Build display — show available balance only
+        if amount is not None:
             display = f"BAL {format_billing_amount(amount)}"
         else:
             display = "BAL ---"
@@ -120,11 +119,16 @@ def build_billing_display(billing_cache: Optional[str], fallback_spend: float = 
             "billing_colour": colour,
             "balance_pct": balance_pct,
             "billing_amount": amount,
+            "lifetime_spend": lifetime_spend,
         }
+
     elif billing_type == "postpaid":
         monthly_spend = billing_data.get("monthly_spend", amount)
+        lifetime_spend = billing_data.get("lifetime_spend")
         month_label = billing_data.get("month_label", "")
-        if monthly_spend is not None:
+        if lifetime_spend is not None:
+            display = f"SPEND {format_billing_amount(lifetime_spend)}"
+        elif monthly_spend is not None:
             suffix = f" this month" if not month_label else f" ({month_label})"
             display = f"USED {format_billing_amount(monthly_spend)}{suffix}"
         else:

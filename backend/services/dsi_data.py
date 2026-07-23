@@ -659,9 +659,10 @@ def _dept_sort_key(course):
 
 def fetch_dsi_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch DSI course performance for a date range (Table 1).
-    Only enabled/live/active campaigns are included in spend (per AI_The_MIS rules).
-    Returns list of {department, course, leads, cpl, spend} sorted by dept order."""
-    spend_data = _fetch_dsi_google_ads_spend(start_date, end_date, live_only=True)
+    All campaigns (enabled, paused, or otherwise) are included in spend.
+    Returns list of {department, course, leads, cpl, spend} sorted by dept order.
+    Only rows with spend > 0 or leads > 0 are included."""
+    spend_data = _fetch_dsi_google_ads_spend(start_date, end_date, live_only=False)
     leads = _fetch_dsi_lsq_leads(start_date, end_date)
 
     leads_by_course = defaultdict(int)
@@ -720,7 +721,8 @@ def fetch_dsi_cumulative_range(start_date: str, end_date: str) -> List[Dict[str,
     spend (from Excel-seeded dsi_legacy_spend) is merged with new-account live
     API spend. Leads come from the LSQ mirror.
 
-    Returns list of {department, course, leads, cpl, spend} sorted by dept order."""
+    Returns list of {department, course, leads, cpl, spend} sorted by dept order.
+    Only rows with spend > 0 or leads > 0 are included."""
     from datetime import date as date_type
 
     yesterday = (date_type.today() - __import__('datetime').timedelta(days=1)).isoformat()
@@ -913,6 +915,7 @@ def fetch_dsi_application_mis(start_date: str, end_date: str) -> Dict[str, Any]:
         d_spend = round(dept_spend.get(dept, 0))
         row["dept_cpa"] = round(d_spend / d_sub) if d_sub > 0 else 0
         row["dept_spend"] = d_spend
+        row["dept_submitted"] = d_sub
 
     grand_cpa = round(grand_spend / grand_submitted) if grand_submitted > 0 else 0
     grand_total = {

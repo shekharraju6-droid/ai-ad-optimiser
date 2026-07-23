@@ -768,6 +768,62 @@ class ActivityLog(Base):
         }
 
 
+class MisProject(Base):
+    """MIS project (e.g. Mantri -> Serenity) for platform-daily snapshots."""
+    __tablename__ = "mis_projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    name = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = relationship("Account")
+    snapshots = relationship("MisDailySnapshot", back_populates="project", cascade="all, delete-orphan")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "client_id": self.client_id,
+            "client_name": self.client.name if self.client else None,
+            "name": self.name,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class MisDailySnapshot(Base):
+    """Daily platform spend/leads snapshot for an MIS project."""
+    __tablename__ = "mis_daily_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("mis_projects.id"), nullable=False)
+    platform = Column(String, nullable=False)  # meta | google
+    date = Column(Date, nullable=False)
+    leads = Column(Float, default=0.0)
+    amount_spent = Column(Float, default=0.0)
+    cpl = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project = relationship("MisProject", back_populates="snapshots")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "project_id": self.project_id,
+            "platform": self.platform,
+            "date": str(self.date) if self.date else None,
+            "leads": self.leads,
+            "amount_spent": self.amount_spent,
+            "cpl": self.cpl,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 class CampaignLandingPage(Base):
     """Landing page URL + crawled content per campaign, used for smarter search term audits."""
     __tablename__ = "campaign_landing_pages"

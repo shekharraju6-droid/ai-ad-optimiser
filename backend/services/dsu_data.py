@@ -132,12 +132,21 @@ def _get_dsu_account_creds() -> Dict[str, Any]:
     """Load DSU's Google Ads credentials from the DB."""
     c = _db_connect()
     cur = c.cursor()
-    cur.execute("SELECT google_credentials FROM accounts WHERE name='DSU'")
+    cur.execute("SELECT google_credentials, google_login_customer_id FROM accounts WHERE name='DSU'")
     row = cur.fetchone()
     c.close()
     if not row or not row[0]:
         raise ValueError("DSU has no stored google_credentials")
-    return json.loads(decrypt(row[0]))
+    creds = json.loads(decrypt(row[0]))
+    login_cid = (
+        creds.get("login_customer_id")
+        or (row[1] if len(row) > 1 and row[1] else None)
+        or os.environ.get("GOOGLE_LOGIN_CUSTOMER_ID")
+        or os.environ.get("GOOGLE_MCC_ID")
+    )
+    if login_cid:
+        creds["login_customer_id"] = str(login_cid).replace("-", "").strip()
+    return creds
 
 
 def _fetch_google_ads_spend(start_date: str, end_date: str, live_only: bool = False) -> Dict[str, float]:
@@ -149,50 +158,58 @@ def _fetch_google_ads_spend(start_date: str, end_date: str, live_only: bool = Fa
                    if False, include all campaigns regardless of status (Table 2).
     
     Returns {course: spend_float}."""
-    creds = _get_dsu_account_creds()
-    from google.ads.googleads.client import GoogleAdsClient
+    try:
+        creds = _get_dsu_account_creds()
+        from google.ads.googleads.client import GoogleAdsClient
 
-    client_dict = {
-        "developer_token": creds["developer_token"],
-        "client_id": creds["client_id"],
-        "client_secret": creds["client_secret"],
-        "refresh_token": creds["refresh_token"],
-        "use_proto_plus": True,
-    }
-    if creds.get("login_customer_id"):
-        client_dict["login_customer_id"] = str(creds["login_customer_id"]).replace("-", "")
+        client_dict = {
+            "developer_token": creds["developer_token"],
+            "client_id": creds["client_id"],
+            "client_secret": creds["client_secret"],
+            "refresh_token": creds["refresh_token"],
+            "use_proto_plus": True,
+        }
+        # Only pass login_customer_id if a manager (MCC) account is linked.
+        # DSU account 2909919094 has no linked manager, so sending an MCC id
+        # causes USER_PERMISSION_DENIED.
+        login_cid = creds.get("login_customer_id")
+        if login_cid:
+            client_dict["login_customer_id"] = str(login_cid).replace("-", "").strip()
 
-    gclient = GoogleAdsClient.load_from_dict(client_dict)
-    service = gclient.get_service("GoogleAdsService")
-    customer_id = "2909919094"  # DSU customer ID
+        gclient = GoogleAdsClient.load_from_dict(client_dict)
+        service = gclient.get_service("GoogleAdsService")
+        customer_id = "2909919094"  # DSU customer ID
 
-    query = f"""
-        SELECT
-          campaign.id,
-          campaign.name,
-          campaign.status,
-          segments.date,
-          metrics.cost_micros
-        FROM campaign
-        WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-    """
-    response = service.search(customer_id=customer_id, query=query)
-    course_spend = defaultdict(float)
-    for row in response:
-        cost = (row.metrics.cost_micros or 0) / 1_000_000.0
-        if cost == 0:
-            continue
-        if live_only:
-            status_str = str(row.campaign.status).lower() if row.campaign.status else ""
-            if status_str not in ("enabled", "live", "active", "campaignstatus.enabled", "2"):
+        query = f"""
+            SELECT
+              campaign.id,
+              campaign.name,
+              campaign.status,
+              segments.date,
+              metrics.cost_micros
+            FROM campaign
+            WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+        """
+        response = service.search(customer_id=customer_id, query=query)
+        course_spend = defaultdict(float)
+        for row in response:
+            cost = (row.metrics.cost_micros or 0) / 1_000_000.0
+            if cost == 0:
                 continue
-        spend_date = str(row.segments.date)
-        if spend_date >= DSU_GST_TRANSITION_DATE:
-            cost = cost * GST_MULTIPLIER
-        course = _map_campaign_to_course(row.campaign.name)
-        if course:
-            course_spend[course] += cost
-    return dict(course_spend)
+            if live_only:
+                status_str = str(row.campaign.status).lower() if row.campaign.status else ""
+                if status_str not in ("enabled", "live", "active", "campaignstatus.enabled", "2"):
+                    continue
+            spend_date = str(row.segments.date)
+            if spend_date >= DSU_GST_TRANSITION_DATE:
+                cost = cost * GST_MULTIPLIER
+            course = _map_campaign_to_course(row.campaign.name)
+            if course:
+                course_spend[course] += cost
+        return dict(course_spend)
+    except Exception as e:
+        logger.warning(f"DSU Google Ads spend fetch skipped or failed: {e}")
+        return {}
 
 
 def _fetch_lsq_leads(start_date: str, end_date: str, account_id: int = None) -> Dict[str, int]:
@@ -248,7 +265,7 @@ def _fetch_lsq_leads_direct(start_date: str, end_date: str, account_id: int = No
     if account_id:
         c = _db_connect()
         cur = c.cursor()
-        cur.execute("SELECT lsq_access_key, lsq_secret_key, lsq_base_url FROM accounts WHERE id=?", (account_id,))
+        cur.execute("SELECT lsq_access_key, lsq_secret_key, lsq_base_url FROM accounts WHERE id=%s", (account_id,))
         row = cur.fetchone()
         c.close()
         if row and row[0] and row[1]:
@@ -357,7 +374,8 @@ def _fetch_lsq_leads_direct(start_date: str, end_date: str, account_id: int = No
 
 def fetch_dsu_daily(report_date: str) -> List[Dict[str, Any]]:
     """Fetch daily course performance for a given date.
-    Returns list of {course, leads, cpl, spend} sorted by spend desc."""
+    Returns list of {course, leads, cpl, spend} sorted by spend desc.
+    Only courses with spend > 0 or leads > 0 are included."""
     spend_data = _fetch_google_ads_spend(report_date, report_date)
     lead_data = _fetch_lsq_leads(report_date, report_date, account_id=1)
 
@@ -365,6 +383,8 @@ def fetch_dsu_daily(report_date: str) -> List[Dict[str, Any]]:
     for course in DSU_COURSES:
         spend = round(spend_data.get(course, 0))
         leads = lead_data.get(course, 0)
+        if spend <= 0 and leads <= 0:
+            continue
         cpl = round(spend / leads) if leads else None
         rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
 
@@ -374,19 +394,20 @@ def fetch_dsu_daily(report_date: str) -> List[Dict[str, Any]]:
 
 def fetch_dsu_cumulative(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch cumulative course performance from start_date to end_date.
-    Returns list of {course, leads, cpl, spend} sorted by spend desc."""
+    Returns list of {course, leads, cpl, spend} sorted by spend desc.
+    Only courses with spend > 0 or leads > 0 are included."""
     spend_data = _fetch_google_ads_spend(start_date, end_date)
     lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
 
     rows = []
-    # Include all courses that have either spend or leads
     all_courses = set(DSU_COURSES) | set(spend_data.keys()) | set(lead_data.keys())
     for course in all_courses:
         spend = round(spend_data.get(course, 0))
         leads = lead_data.get(course, 0)
+        if spend <= 0 and leads <= 0:
+            continue
         cpl = round(spend / leads) if leads else None
-        if spend > 0 or leads > 0:
-            rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
+        rows.append({"course": course, "leads": leads, "cpl": cpl, "spend": spend})
 
     rows.sort(key=lambda r: -r["spend"])
     return rows
@@ -394,10 +415,10 @@ def fetch_dsu_cumulative(start_date: str, end_date: str) -> List[Dict[str, Any]]
 
 def fetch_dsu_daily_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch course performance for a date range (Table 1).
-    Only enabled/live/active campaigns are included in spend (per AI_The_MIS rules).
+    All campaigns (enabled, paused, or otherwise) are included in spend.
     Returns list of {course, leads, cpl, spend} sorted by spend desc.
     Only courses with leads > 0 or spend > 0 are included."""
-    spend_data = _fetch_google_ads_spend(start_date, end_date, live_only=True)
+    spend_data = _fetch_google_ads_spend(start_date, end_date, live_only=False)
     lead_data = _fetch_lsq_leads(start_date, end_date, account_id=1)
 
     rows = []
@@ -459,7 +480,7 @@ def _fetch_lsq_lead_details_direct(start_date: str, end_date: str, account_id: i
     if account_id:
         c = _db_connect()
         cur = c.cursor()
-        cur.execute("SELECT lsq_access_key, lsq_secret_key, lsq_base_url FROM accounts WHERE id=?", (account_id,))
+        cur.execute("SELECT lsq_access_key, lsq_secret_key, lsq_base_url FROM accounts WHERE id=%s", (account_id,))
         row = cur.fetchone()
         c.close()
         if row and row[0] and row[1]:
@@ -1157,15 +1178,16 @@ def _fetch_legacy_spend(start_date: str, end_date: str) -> Dict[str, float]:
 
 def fetch_dsu_cumulative_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch cumulative course performance for a date range (Table 2).
-    
+
     For the default "from inception to yesterday" range, the exact historical
     raw data is used so the report matches the client's shared report.
-    
+
     For custom ranges, spend = legacy spend (old account, Nov-25 to Mar-26) +
     live Google Ads spend (current account, Apr-26 onwards) with GST applied
     from 19-Jun-2026.
-    
-    Returns list of {course, leads, cpl, spend} sorted by spend desc."""
+
+    Returns list of {course, leads, cpl, spend} sorted by spend desc.
+    Only courses with spend > 0 or leads > 0 are included."""
     from datetime import date as date_type
 
     yesterday = (date_type.today() - __import__('datetime').timedelta(days=1)).isoformat()

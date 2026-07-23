@@ -43,9 +43,9 @@ def crm_summary(
     }
     data["start_date"] = start_date
     data["end_date"] = end_date
-    log_activity(db, module="InsightDesk", action="Report Viewed", description=f"CRM summary viewed for {account.name}",
+    log_activity(module="InsightDesk", action="Report Viewed", description=f"CRM summary viewed for {account.name}",
                  user_id=getattr(current_user, "id", None), user_name=getattr(current_user, "full_name", None) or getattr(current_user, "email", None),
-                 account_id=account.id, account_name=account.name)
+                 account_id=account.id, account_name=account.name, db=db)
     return data
 
 
