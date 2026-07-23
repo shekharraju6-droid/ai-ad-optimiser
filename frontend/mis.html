@@ -2791,13 +2791,13 @@
         if (!data) return '';
         const both = data.both_connected || (data.google_connected && data.meta_connected);
         if (both) {
-            return `<div class="report-notice" style="background:#dcfce7; border-color:#16a34a; color:#15803d; margin-bottom:12px;">
+            return `<div class="report-notice" style="background:#dcfce7; border-color:#16a34a; color:#15803d;">
                 ✓ Both Meta Ads and Google Ads are connected for Mantri Developers.
             </div>`;
         }
         const gStatus = data.google_connected ? 'Connected' : 'Disconnected';
         const mStatus = data.meta_connected ? 'Connected' : 'Disconnected';
-        return `<div class="report-notice" style="background:#fef3c7; border-color:#f59e0b; color:#92400e; margin-bottom:12px;">
+        return `<div class="report-notice" style="background:#fef3c7; border-color:#f59e0b; color:#92400e;">
             ⚠️ Mantri reports require both Meta and Google Ads to be connected. Current status: Google Ads (${gStatus}), Meta Ads (${mStatus}).
         </div>`;
     }
@@ -2807,12 +2807,12 @@
         container.innerHTML = `
             ${_mantriControlsHtml('overall')}
             <div class="report-title" id="mantriReportTitle" style="margin-bottom:8px; text-align:left;">MANTRI MIS – OVERALL</div>
-            <div id="mantriConnBadge"></div>
             <div style="overflow-x:auto;">
                 <div class="report-table-container">
                     <table class="dsu-table" id="mantriOverallTable"><thead><tr></tr></thead><tbody></tbody></table>
                 </div>
-            </div>`;
+            </div>
+            <div id="mantriConnBadge" style="margin-top:12px;"></div>`;
         if (!resolvedMantriProjectId) {
             container.innerHTML += '<div style="color:var(--color-danger); padding:1rem;">Mantri MIS project not found. Please set it up in Integrations.</div>';
             return;
@@ -2856,12 +2856,12 @@
         const titleText = platform === 'meta' ? 'MANTRI MIS – META ADS DAILY' : platform === 'google' ? 'MANTRI MIS – GOOGLE ADS DAILY' : 'MANTRI MIS – COMBINED DAILY';
         container.innerHTML = _mantriControlsHtml(platform, isCombined) + `
             <div class="report-title" id="mantri${capitalize(platform)}ReportTitle" style="margin-bottom:8px; text-align:left;">${titleText}</div>
-            <div id="mantri${capitalize(platform)}ConnBadge"></div>
             <div style="overflow-x:auto;">
                 <div class="report-table-container">
                     <table class="dsu-table" id="mantri${capitalize(platform)}Table"><thead><tr></tr></thead><tbody></tbody></table>
                 </div>
-            </div>`;
+            </div>
+            <div id="mantri${capitalize(platform)}ConnBadge" style="margin-top:12px;"></div>`;
         if (!resolvedMantriProjectId) {
             container.innerHTML += '<div style="color:var(--color-danger); padding:1rem;">Mantri MIS project not found.</div>';
             return;
@@ -2956,8 +2956,11 @@
                 <div class="report-table-container">
                     <table class="dsu-table" id="mantriSalesforceTable"><thead><tr></tr></thead><tbody></tbody></table>
                 </div>
-            </div>`;
+            </div>
+            <div id="mantriSalesforceConnBadge" style="margin-top:12px;"></div>`;
         const data = await api('GET', '/mis/mantri/salesforce/report');
+        const salesforceBadgeEl = document.getElementById('mantriSalesforceConnBadge');
+        if (salesforceBadgeEl) salesforceBadgeEl.innerHTML = _mantriConnectionBadgeHtml(data);
         const titleEl = document.getElementById('mantriSalesforceReportTitle');
         if (titleEl) titleEl.textContent = data.title || 'MANTRI - SALESFORCE LEAD STATUS';
         const table = document.querySelector('#mantriSalesforceTable');
