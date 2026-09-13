@@ -257,16 +257,26 @@
                     <span class="nav-section-arrow">▶</span><span>CRM Delivery</span>
                 </div>
                 <div class="nav-section-items" style="padding:0 12px 8px;">
-                    <select class="filter-select" id="crmSelect" onchange="saveCrmPreference(this.value)" style="width:100%;font-size:12px;padding:6px 8px;">
+                    <select class="filter-select" id="crmSelect" onchange="onCrmSelect(this.value)" style="width:100%;font-size:12px;padding:6px 8px;">
                         <option value="">Choose your CRM…</option>
                         <option value="leadsquared">LeadSquared</option>
                         <option value="zoho">Zoho CRM</option>
-                        <option value="salesforce">Salesforce</option>
                         <option value="hubspot">HubSpot</option>
                         <option value="webhook">Custom Webhook</option>
                         <option value="none">None — keep in AdGuard only</option>
                     </select>
                     <div id="crmStatus" style="font-size:11px;color:var(--color-text-muted);margin-top:4px;">Verified leads held in AdGuard until a CRM is connected.</div>
+
+                    <!-- Credential form (shown per CRM choice) -->
+                    <div id="crmCredsForm" style="display:none;margin-top:8px;">
+                        <div id="crmCredsFields"></div>
+                        <div style="display:flex;gap:6px;margin-top:8px;">
+                            <button class="btn btn-primary btn-sm" style="flex:1;" onclick="saveCrmCreds()">Connect CRM</button>
+                            <button class="btn btn-secondary btn-sm" onclick="testCrm()">Test</button>
+                            <button class="btn btn-secondary btn-sm" onclick="disconnectCrm()" title="Remove CRM connection">✕</button>
+                        </div>
+                        <div id="crmTestResult" style="font-size:11px;margin-top:6px;"></div>
+                    </div>
                 </div>
             </div>
 
@@ -584,11 +594,52 @@
             }
         }
 
-        // ---------- CRM preference ----------
+        // ---------- CRM preference + credential capture ----------
         const CRM_LABELS = {
-            leadsquared: 'LeadSquared', zoho: 'Zoho CRM', salesforce: 'Salesforce',
-            hubspot: 'HubSpot', webhook: 'Custom Webhook', none: 'AdGuard only'
+            leadsquared: 'LeadSquared', zoho: 'Zoho CRM', hubspot: 'HubSpot',
+            webhook: 'Custom Webhook', none: 'AdGuard only'
         };
+
+        const CRM_FIELDS = {
+            leadsquared: [
+                { key: 'access_key', label: 'Access Key', ph: 'your LeadSquared access key' },
+                { key: 'secret_key', label: 'Secret Key', ph: 'your LeadSquared secret key', type: 'password' },
+                { key: 'host', label: 'Host (optional)', ph: 'api-in21.leadsquared.com' },
+            ],
+            zoho: [
+                { key: 'client_id', label: 'Client ID', ph: 'Zoho client id' },
+                { key: 'client_secret', label: 'Client Secret', ph: 'Zoho client secret', type: 'password' },
+                { key: 'refresh_token', label: 'Refresh Token', ph: 'Zoho refresh token (CRM scope)', type: 'password' },
+                { key: 'api_domain', label: 'API Domain (optional)', ph: 'https://www.zohoapis.com' },
+            ],
+            hubspot: [
+                { key: 'access_token', label: 'Private App Token', ph: 'pat-na1-...', type: 'password' },
+            ],
+            webhook: [
+                { key: 'url', label: 'Webhook URL', ph: 'https://your-crm.com/hook' },
+                { key: 'secret', label: 'Secret (optional HMAC)', ph: 'shared secret', type: 'password' },
+            ],
+        };
+
+        function onCrmSelect(val) {
+            const form = $('crmCredsForm');
+            const fields = $('crmCredsFields');
+            const st = $('crmStatus');
+            $('crmTestResult').innerHTML = '';
+            if (!val || val === 'none') {
+                form.style.display = 'none';
+                saveCrmPreference(val || '');
+                return;
+            }
+            // Build credential inputs
+            fields.innerHTML = (CRM_FIELDS[val] || []).map(f =>
+                '<div style="margin-bottom:6px;"><label style="font-size:10px;color:var(--color-text-muted);text-transform:uppercase;">' + f.label + '</label>' +
+                '<input class="filter-input" id="crmField_' + f.key + '" type="' + (f.type || 'text') + '" placeholder="' + f.ph + '" style="width:100%;font-size:12px;padding:5px 8px;"></div>'
+            ).join('');
+            form.style.display = 'block';
+            st.textContent = 'Enter your ' + CRM_LABELS[val] + ' credentials to connect.';
+            st.style.color = 'var(--color-text-muted)';
+        }
 
         function renderCrmPreference() {
             const sel = $('crmSelect');
@@ -596,8 +647,11 @@
             if (!sel) return;
             const pref = (selectedWorkspaceObj && selectedWorkspaceObj.crm_preference) || '';
             sel.value = pref || '';
-            if (pref && pref !== 'none') {
-                st.textContent = '✅ ' + CRM_LABELS[pref] + ' selected — verified leads will deliver here once credentials are connected.';
+            const hasCreds = selectedWorkspaceObj && selectedWorkspaceObj.crm_preference && selectedWorkspaceObj.crm_preference !== 'none';
+            if (hasCreds) {
+                // Connected: show connected state, no form
+                $('crmCredsForm').style.display = 'none';
+                st.innerHTML = '✅ Connected to <b>' + (CRM_LABELS[pref] || pref) + '</b> — verified leads deliver here. <span style="cursor:pointer;text-decoration:underline;" onclick="onCrmSelect(\'' + pref + '\')">Update credentials</span>';
                 st.style.color = 'var(--color-success-text)';
             } else if (pref === 'none') {
                 st.textContent = 'Leads stay in AdGuard only. Export anytime via CSV.';
@@ -608,14 +662,84 @@
             }
         }
 
+        async function saveCrmCreds() {
+            if (!selectedWorkspaceObj) return;
+            const crm = $('crmSelect').value;
+            if (!crm || crm === 'none') return;
+            const credentials = {};
+            (CRM_FIELDS[crm] || []).forEach(f => {
+                const v = ($('crmField_' + f.key) || {}).value || '';
+                if (v.trim()) credentials[f.key] = v.trim();
+            });
+            try {
+                const res = await fetch(API + '/crm/connect', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workspace_id: selectedWorkspaceObj.id, crm, credentials })
+                });
+                if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'Failed'); }
+                selectedWorkspaceObj.crm_preference = crm;
+                toast('CRM connected: ' + (CRM_LABELS[crm] || crm));
+                $('crmCredsForm').style.display = 'none';
+                renderCrmPreference();
+            } catch (e) { toast(e.message, 'error'); }
+        }
+
+        async function testCrm() {
+            if (!selectedWorkspaceObj) return;
+            try {
+                const res = await fetch(API + '/crm/test', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workspace_id: selectedWorkspaceObj.id })
+                });
+                const data = await res.json().catch(() => ({}));
+                const box = $('crmTestResult');
+                if (!res.ok) { box.innerHTML = '<span style="color:var(--color-danger-text);">' + escapeHtml(data.detail || 'Test failed') + '</span>'; return; }
+                if (data.status === 'pushed') {
+                    box.innerHTML = '<span style="color:var(--color-success-text);">✅ Test lead delivered to ' + (CRM_LABELS[data.provider] || data.provider) + '. Check your CRM.</span>';
+                } else {
+                    box.innerHTML = '<span style="color:var(--color-danger-text);">❌ ' + escapeHtml(data.error || 'Delivery failed') + '</span>';
+                }
+            } catch (e) { $('crmTestResult').innerHTML = '<span style="color:var(--color-danger-text);">' + escapeHtml(e.message) + '</span>'; }
+        }
+
+        async function disconnectCrm() {
+            if (!selectedWorkspaceObj || !confirm('Disconnect CRM? Verified leads will be held in AdGuard.')) return;
+            try {
+                const res = await fetch(API + '/crm/disconnect', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workspace_id: selectedWorkspaceObj.id })
+                });
+                if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'Failed'); }
+                selectedWorkspaceObj.crm_preference = 'none';
+                $('crmSelect').value = '';
+                $('crmCredsForm').style.display = 'none';
+                toast('CRM disconnected');
+                renderCrmPreference();
+            } catch (e) { toast(e.message, 'error'); }
+        }
+
         async function saveCrmPreference(val) {
             if (!val || !selectedWorkspaceObj) { renderCrmPreference(); return; }
-            try {
-                await api('POST', '/workspace/settings', { workspace_id: selectedWorkspaceObj.id, crm_preference: val });
-                selectedWorkspaceObj.crm_preference = val;
-                toast('CRM preference saved: ' + (CRM_LABELS[val] || val));
+            if (val === 'none') {
+                // Full disconnect (also clears creds server-side)
+                try {
+                    await fetch(API + '/crm/disconnect', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ workspace_id: selectedWorkspaceObj.id })
+                    });
+                } catch (e) { /* non-fatal */ }
+                selectedWorkspaceObj.crm_preference = 'none';
+                $('crmCredsForm').style.display = 'none';
+                toast('CRM set to AdGuard only');
                 renderCrmPreference();
-            } catch (e) { toast(e.message, 'error'); renderCrmPreference(); }
+                return;
+            }
+            // Choosing a CRM opens the credential form (saved via Connect button)
+            renderCrmPreference();
         }
 
         // ---------- OAuth ----------

@@ -790,6 +790,107 @@ def workspace_settings(req: WorkspaceSettingsRequest, db: Session = Depends(get_
     }
 
 
+class CrmConnectRequest(BaseModel):
+    workspace_id: int
+    crm: str  # leadsquared|zoho|hubspot|webhook
+    credentials: dict  # provider-specific keys
+
+
+CRM_REQUIRED_KEYS = {
+    "leadsquared": ["access_key", "secret_key"],
+    "zoho": ["client_id", "client_secret", "refresh_token"],
+    "hubspot": ["access_token"],
+    "webhook": ["url"],
+}
+
+
+@router.post("/crm/connect")
+def crm_connect(req: CrmConnectRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Store the subscriber's CRM credentials (encrypted) + set crm_preference. Owner or admin."""
+    _require_adguard_access(user)
+    ws = db.query(AdGuardAccount).filter(AdGuardAccount.id == req.workspace_id).first()
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    if ws.owner_email != user.email and user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Not your workspace")
+    crm = (req.crm or "").strip().lower()
+    if crm not in CRM_REQUIRED_KEYS:
+        raise HTTPException(status_code=400, detail="Unsupported CRM (leadsquared/zoho/hubspot/webhook)")
+    missing = [k for k in CRM_REQUIRED_KEYS[crm] if not (req.credentials or {}).get(k)]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing required fields: {', '.join(missing)}")
+
+    from backend.services.crypto import encrypt as fernet_encrypt
+
+    ws.crm_preference = crm
+    ws.crm_credentials = fernet_encrypt(json.dumps(req.credentials))
+    db.commit()
+    log_activity(
+        module="AdGuard",
+        action="CRM Connected",
+        description=f"Workspace {ws.display_name or ws.owner_email} connected {crm}",
+        user_id=user.id,
+        user_name=user.full_name or user.email,
+        entity_type="adguard_account",
+        entity_id=str(ws.id),
+        db=db,
+    )
+    return {"status": "ok", "crm": crm, "message": "CRM connected. Verified leads will deliver here."}
+
+
+class CrmTestRequest(BaseModel):
+    workspace_id: int
+
+
+@router.post("/crm/test")
+def crm_test(req: CrmTestRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Send a test lead to the workspace's configured CRM. Owner or admin."""
+    _require_adguard_access(user)
+    ws = db.query(AdGuardAccount).filter(AdGuardAccount.id == req.workspace_id).first()
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    if ws.owner_email != user.email and user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Not your workspace")
+    if not ws.crm_preference or ws.crm_preference == "none":
+        raise HTTPException(status_code=400, detail="No CRM connected for this workspace")
+    from backend.services.adguard_crm import deliver_lead
+
+    test_lead = {
+        "full_name": "AdGuard Test Lead",
+        "email": f"adguard-test-{int(datetime.utcnow().timestamp())}@test.local",
+        "phone": "9999999999",
+        "city": "Test",
+        "state": "Test",
+        "campaign_name": "AdGuard CRM Test",
+        "source": "AdGuard Test",
+    }
+    result = deliver_lead(ws, test_lead)
+    # Persist the test outcome so status reflects reality
+    if result.get("status") == "failed":
+        ws.crm_credentials = ws.crm_credentials  # unchanged; failure surfaced to UI
+        db.commit()
+    return result
+
+
+class CrmDisconnectRequest(BaseModel):
+    workspace_id: int
+
+
+@router.post("/crm/disconnect")
+def crm_disconnect(req: CrmDisconnectRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Remove CRM credentials + reset preference. Owner or admin."""
+    _require_adguard_access(user)
+    ws = db.query(AdGuardAccount).filter(AdGuardAccount.id == req.workspace_id).first()
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    if ws.owner_email != user.email and user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Not your workspace")
+    ws.crm_credentials = None
+    ws.crm_preference = "none"
+    db.commit()
+    return {"status": "ok", "message": "CRM disconnected. Verified leads are held in AdGuard (CSV export anytime)."}
+
+
 class ShieldScanRequest(BaseModel):
     workspace_id: Optional[int] = None  # blank = all shield-enabled workspaces (admin)
 

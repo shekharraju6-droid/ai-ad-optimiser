@@ -984,6 +984,8 @@ class AdGuardAccount(Base):
 
     # Per-subscriber CRM delivery target (leadsquared | zoho | salesforce | hubspot | webhook | none)
     crm_preference = Column(String(30), nullable=True)
+    # Encrypted CRM credentials JSON (same Fernet scheme as google_credentials)
+    crm_credentials = Column(Text, nullable=True)
 
     # Money Shield Layer 1 (prevention before spend)
     shield_enabled = Column(Boolean, default=False)

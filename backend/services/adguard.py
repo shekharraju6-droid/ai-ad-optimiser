@@ -401,12 +401,39 @@ def process_incoming_lead(payload: Dict[str, Any], account: Any = None, raw_payl
         )
 
         if result["verdict"] == "verified":
-            push = push_lead_to_lsq(lead, account)
-            record.lsq_status = push["status"]
-            record.lsq_prospect_id = push["prospect_id"]
-            record.lsq_error = push["error"]
+            # Per-subscriber CRM delivery (SaaS path): use the workspace's own
+            # CRM choice + credentials when the lead came from a workspace.
+            crm_status, crm_provider, crm_id, crm_error = None, None, None, None
+            if workspace_id:
+                ws_row = db.query(AdGuardAccount).filter(AdGuardAccount.id == workspace_id).first()
+                if ws_row is not None:
+                    from backend.services.adguard_crm import deliver_lead
+
+                    lead_for_crm = dict(lead)
+                    lead_for_crm["source"] = lead.get("lead_type") or "AdGuard"
+                    push = deliver_lead(ws_row, lead_for_crm)
+                    if push.get("status") == "skipped" and push.get("provider") == "none":
+                        # No CRM connected: fall back to legacy global LSQ push
+                        push = push_lead_to_lsq(lead, account)
+                    crm_status = push.get("status")
+                    crm_provider = push.get("provider")
+                    crm_id = push.get("id")
+                    crm_error = push.get("error")
+                else:
+                    push = push_lead_to_lsq(lead, account)
+                    crm_status, crm_provider = push["status"], "leadsquared"
+                    crm_id, crm_error = push.get("prospect_id"), push.get("error")
+            else:
+                # Legacy path (no workspace binding): global LSQ
+                push = push_lead_to_lsq(lead, account)
+                crm_status, crm_provider = push["status"], "leadsquared"
+                crm_id, crm_error = push.get("prospect_id"), push.get("error")
+
+            record.lsq_status = crm_status
+            record.lsq_prospect_id = crm_id
+            record.lsq_error = crm_error
         else:
-            # Flagged/low-score: stored in AdGuard's own table, NOT pushed to LSQ.
+            # Flagged/low-score: stored in AdGuard's own table, NOT pushed to CRM.
             record.lsq_status = "skipped_flagged"
 
         db.add(record)
