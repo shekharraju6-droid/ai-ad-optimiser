@@ -113,7 +113,7 @@
         .sidebar{width:240px;background:var(--color-bg-sidebar);border-right:1px solid var(--color-border);display:flex;flex-direction:column;flex-shrink:0}
         .sidebar-header{padding:16px 16px 12px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--color-border)}
         .brand{display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;text-decoration:none;color:var(--color-text-primary)}
-        .logo-icon{width:26px;height:26px;background:var(--color-accent);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;box-shadow:0 0 10px rgba(16,185,129,0.3)}
+        .logo-icon{width:26px;height:26px;background:linear-gradient(135deg,#34e89e,#0ac770);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#041008;font-weight:700;font-size:12px;box-shadow:0 0 12px rgba(16,217,126,0.45)}
         .role-pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;}
         .pill-admin{background:var(--color-purple-light);color:var(--color-purple-text);border:1px solid rgba(124,58,237,0.2);}
         .pill-customer{background:var(--color-accent-light);color:var(--color-accent-text);border:1px solid rgba(16,185,129,0.2);}
@@ -160,7 +160,7 @@
 
         /* BUTTONS */
         .btn{padding:6px 14px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease;text-decoration:none;font-family:'Inter',sans-serif}
-        .btn-primary{background:var(--color-accent);color:#fff;}
+        .btn-primary{background:linear-gradient(90deg,#34e89e,#0ac770);color:#06130b;box-shadow:0 4px 18px rgba(16,217,126,0.25);font-weight:700;}
         .btn-primary:hover{background:var(--color-accent-hover);}
         .btn-secondary{background:transparent;border:1px solid var(--color-border);color:var(--color-text-secondary)}
         .btn-secondary:hover{background:var(--color-bg-card-hover);color:var(--color-text-primary)}
@@ -458,6 +458,18 @@
                     <option value="pro">Pro — 5,000 leads</option>
                     <option value="agency">Agency — Unlimited</option>
                 </select>
+            </div>
+            <div class="form-group" style="margin-bottom:14px;">
+                <label style="font-size:12px;font-weight:500;">Activation</label>
+                <div style="display:flex;gap:12px;font-size:13px;margin-top:4px;">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input type="radio" name="csMode" value="invite" checked> 📧 Send invite email
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input type="radio" name="csMode" value="instant"> ⚡ Instant password
+                    </label>
+                </div>
+                <div style="font-size:11px;color:var(--color-text-muted);margin-top:4px;">Invite = they set their own password via emailed link. Instant = one-time password shown for manual sharing.</div>
             </div>
             <div style="display:flex;gap:8px;justify-content:flex-end;">
                 <button class="btn btn-secondary" onclick="document.getElementById('createSubOverlayWrap').parentElement.style.display='none'">Cancel</button>
@@ -899,22 +911,38 @@
             const email = $('csEmail').value.trim();
             const fullName = $('csFullName').value.trim();
             const plan = $('csPlan').value;
+            const mode = (document.querySelector('input[name="csMode"]:checked') || {}).value || 'instant';
             if (!email || !email.includes('@')) { toast('Enter a valid email', 'error'); return; }
             try {
                 const res = await fetch(API + '/admin/create-subscriber', {
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, full_name: fullName || email, plan })
+                    body: JSON.stringify({ email, full_name: fullName || email, plan, mode })
                 });
                 if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'Failed'); }
                 const data = await res.json();
                 $('createSubResult').style.display = 'block';
-                $('createSubResult').innerHTML =
-                    '<div style="background:var(--color-success-light);color:var(--color-success-text);border-radius:8px;padding:12px;">' +
-                    '<b>✅ Subscriber created.</b><br>Login: <b>' + escapeHtml(data.login_email) + '</b><br>' +
-                    'Password: <b style="user-select:all;">' + escapeHtml(data.login_password) + '</b><br>' +
-                    '<span style="font-size:11px;">Plan: ' + data.plan.toUpperCase() + ' · Quota: ' + data.lead_quota.toLocaleString() + ' leads. Copy the password now — it is shown only once.</span></div>';
-                toast('Subscriber created: ' + data.login_email);
+                if (mode === 'invite') {
+                    if (data.invite_sent) {
+                        $('createSubResult').innerHTML =
+                            '<div style="background:var(--color-success-light);color:var(--color-success-text);border-radius:8px;padding:12px;">' +
+                            '<b>📧 Invite sent to ' + escapeHtml(data.login_email) + '.</b><br>' +
+                            'They click the link, set their own password, and land in their workspace.<br>' +
+                            '<span style="font-size:11px;">Plan: ' + data.plan.toUpperCase() + ' · Quota: ' + data.lead_quota.toLocaleString() + ' leads · Link expires in 72h.</span></div>';
+                    } else {
+                        $('createSubResult').innerHTML =
+                            '<div style="background:var(--color-warning-light);color:var(--color-warning-text);border-radius:8px;padding:12px;">' +
+                            '<b>⚠️ Subscriber created but email failed</b> (' + escapeHtml(data.invite_error || 'unknown') + ').<br>' +
+                            'Share this setup link manually:<br><span style="user-select:all;font-size:11px;word-break:break-all;">' + escapeHtml(data.setup_link || '') + '</span></div>';
+                    }
+                } else {
+                    $('createSubResult').innerHTML =
+                        '<div style="background:var(--color-success-light);color:var(--color-success-text);border-radius:8px;padding:12px;">' +
+                        '<b>✅ Subscriber created.</b><br>Login: <b>' + escapeHtml(data.login_email) + '</b><br>' +
+                        'Password: <b style="user-select:all;">' + escapeHtml(data.login_password) + '</b><br>' +
+                        '<span style="font-size:11px;">Plan: ' + data.plan.toUpperCase() + ' · Quota: ' + data.lead_quota.toLocaleString() + ' leads. Copy the password now — it is shown only once.</span></div>';
+                }
+                toast(mode === 'invite' ? 'Invite sent to ' + data.login_email : 'Subscriber created: ' + data.login_email);
                 loadAdminSubscribers();
                 loadWorkspaces();
             } catch (e) { toast(e.message, 'error'); }

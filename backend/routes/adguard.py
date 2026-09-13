@@ -33,7 +33,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.db.database import get_db
-from backend.db.models import Account, AdGuardAccount, AdGuardLead, User
+from backend.db.models import Account, AdGuardAccount, AdGuardLead, AppSetting, User
 from backend.routes.auth import get_current_user_required
 from backend.services.activity_log import log_activity
 
@@ -1096,12 +1096,17 @@ class CreateSubscriberRequest(BaseModel):
     email: str
     full_name: str
     plan: str = "trial"
-    password: Optional[str] = None  # auto-generated if blank
+    password: Optional[str] = None  # auto-generated if blank (instant mode)
+    mode: str = "instant"  # instant = show password now | invite = email setup link
 
 
 @router.post("/admin/create-subscriber")
-def admin_create_subscriber(req: CreateSubscriberRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
-    """Create a customer: user login + AdGuard workspace + plan in one call. Admin/superadmin only."""
+def admin_create_subscriber(req: CreateSubscriberRequest, request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Create a customer: user login + AdGuard workspace + plan in one call. Admin/superadmin only.
+
+    mode=invite: sends AdGuard-branded setup email; user sets own password via link.
+    mode=instant: returns a one-time password for manual sharing (testing).
+    """
     if user.role not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     email = req.email.strip().lower()
@@ -1113,19 +1118,37 @@ def admin_create_subscriber(req: CreateSubscriberRequest, db: Session = Depends(
     if existing_user:
         raise HTTPException(status_code=400, detail="User with this email already exists")
 
-    from backend.routes.auth import get_password_hash
+    from backend.routes.auth import get_password_hash, ONBOARDING_TOKEN_EXPIRE_HOURS
     import secrets as _secrets
 
+    invite_mode = (req.mode or "instant").lower() == "invite"
     password = req.password or _secrets.token_urlsafe(8)
-    new_user = User(
-        email=email,
-        hashed_password=get_password_hash(password),
-        full_name=req.full_name or email,
-        role="user",
-        access_adguard=True,
-        onboarding_completed=True,
-        is_active=True,
-    )
+
+    if invite_mode:
+        # User activates via emailed link (is_active until link used; onboarding token gates it)
+        setup_token = _secrets.token_urlsafe(32)
+        from datetime import timedelta
+        new_user = User(
+            email=email,
+            hashed_password=get_password_hash(password),
+            full_name=req.full_name or email,
+            role="user",
+            access_adguard=True,
+            onboarding_token=setup_token,
+            onboarding_token_expires_at=datetime.utcnow() + timedelta(hours=ONBOARDING_TOKEN_EXPIRE_HOURS),
+            onboarding_completed=False,
+            is_active=False,
+        )
+    else:
+        new_user = User(
+            email=email,
+            hashed_password=get_password_hash(password),
+            full_name=req.full_name or email,
+            role="user",
+            access_adguard=True,
+            onboarding_completed=True,
+            is_active=True,
+        )
     db.add(new_user)
 
     ws = AdGuardAccount(
@@ -1141,21 +1164,57 @@ def admin_create_subscriber(req: CreateSubscriberRequest, db: Session = Depends(
     log_activity(
         module="AdGuard",
         action="Subscriber Created",
-        description=f"Created subscriber {email} (plan={req.plan})",
+        description=f"Created subscriber {email} (plan={req.plan}, mode={req.mode})",
         user_id=user.id,
         user_name=user.full_name or user.email,
         entity_type="adguard_account",
         entity_id=str(ws.id),
         db=db,
     )
+
+    if not invite_mode:
+        return {
+            "status": "ok",
+            "workspace_id": ws.id,
+            "login_email": email,
+            "login_password": password,
+            "plan": req.plan,
+            "lead_quota": ws.lead_quota,
+            "message": "Share the password with the customer securely. They can change it later.",
+        }
+
+    # Invite mode: build setup link + send AdGuard-branded email in background
+    base_url = os.getenv("ADOPTIMA_PUBLIC_BASE_URL", "") or str(request.base_url).rstrip("/")
+    setup_link = f"{base_url}/onboard.html?token={setup_token}"
+    from backend.services.onboarding_email import send_adguard_invite_email
+
+    refresh_token_setting = db.query(AppSetting).filter(AppSetting.key == "gmail_refresh_token").first()
+    gmail_rt = refresh_token_setting.value if refresh_token_setting else None
+
+    send_result = {"sent": False, "error": "pending"}
+    try:
+        send_result = send_adguard_invite_email(
+            recipient_email=email,
+            full_name=req.full_name or email,
+            setup_link=setup_link,
+            refresh_token=gmail_rt,
+            timeout=30,
+        )
+    except Exception as e:
+        logger.exception(f"AdGuard invite send crashed for {email}: {e}")
+        send_result = {"sent": False, "error": str(e)}
+
     return {
         "status": "ok",
         "workspace_id": ws.id,
         "login_email": email,
-        "login_password": password,
         "plan": req.plan,
         "lead_quota": ws.lead_quota,
-        "message": "Share the password with the customer securely. They can change it later.",
+        "invite_sent": bool(send_result.get("sent")),
+        "invite_provider": send_result.get("provider"),
+        "invite_error": send_result.get("error"),
+        "setup_link": setup_link if not send_result.get("sent") else None,
+        "message": "Invite email sent — subscriber activates by setting their own password." if send_result.get("sent") else "Email failed; share the setup link manually.",
     }
 
 

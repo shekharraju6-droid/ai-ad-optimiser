@@ -201,3 +201,115 @@ def send_onboarding_email(
 
     logger.warning("No Gmail refresh token; falling back to SMTP (may fail on Railway)")
     return _send_via_smtp(recipient_email, full_name, setup_link, timeout=timeout)
+
+
+def _build_adguard_payloads(recipient_email: str, full_name: str, setup_link: str, sender_name: str) -> Dict[str, str]:
+    """AdGuard-branded subscriber invite."""
+    subject = "You're invited to AdGuard — activate your workspace"
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1c1917; background:#fafaf9; padding:24px;">
+        <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:12px;overflow:hidden;">
+            <div style="background:#d97706;padding:20px 24px;">
+                <span style="display:inline-block;width:32px;height:32px;background:#ffffff;color:#d97706;font-weight:700;border-radius:8px;text-align:center;line-height:32px;font-size:14px;">AG</span>
+                <span style="color:#ffffff;font-size:18px;font-weight:700;margin-left:8px;font-family:Arial,sans-serif;">AdGuard</span>
+            </div>
+            <div style="padding:28px 24px;">
+                <p style="margin:0 0 12px;">Hi {full_name or 'there'},</p>
+                <p style="margin:0 0 8px;"><strong>Your AdGuard workspace is ready.</strong></p>
+                <p style="margin:0 0 16px; color:#57534e;">Stop paying for garbage leads — every lead from your Google &amp; Meta ads gets scored for integrity before it reaches your team.</p>
+                <p style="margin:0 0 20px;">
+                    <a href="{setup_link}" style="display:inline-block;padding:12px 28px;background:#d97706;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;">
+                        Activate My Workspace
+                    </a>
+                </p>
+                <p style="margin:0 0 6px; font-size:13px;color:#57534e;">Or copy this link into your browser:</p>
+                <p style="font-size:13px;"><a href="{setup_link}">{setup_link}</a></p>
+                <p style="font-size:13px;color:#a8a29e;">This link expires in 72 hours. If you didn't expect this invitation, ignore this email.</p>
+            </div>
+            <div style="padding:14px 24px;background:#fafaf9;border-top:1px solid #e7e5e4;font-size:11px;color:#a8a29e;">
+                © 2026 AdGuard · Built by Chlear Digital
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    plain_body = f"""Hi {full_name or 'there'},
+
+Your AdGuard workspace is ready.
+
+Activate it (set your password):
+{setup_link}
+
+Stop paying for garbage leads — every lead from your Google & Meta ads gets scored for integrity before it reaches your team.
+
+This link expires in 72 hours.
+
+— AdGuard, built by Chlear Digital
+"""
+    return {"subject": subject, "html": html_body, "text": plain_body}
+
+
+def send_adguard_invite_email(
+    recipient_email: str,
+    full_name: str,
+    setup_link: str,
+    refresh_token: str = None,
+    timeout: int = 60,
+) -> Dict[str, Any]:
+    """Send the AdGuard-branded subscriber invite (Gmail API if token, else SMTP)."""
+    sender_email = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "")).strip()
+    sender_name = os.getenv("SMTP_SENDER_NAME", "AdGuard").strip()
+    payloads = _build_adguard_payloads(recipient_email, full_name, setup_link, sender_name)
+
+    if refresh_token:
+        from backend.services.gmail_api import send_email_via_gmail_api
+        return send_email_via_gmail_api(
+            recipient_email=recipient_email,
+            subject=payloads["subject"],
+            plain_body=payloads["text"],
+            html_body=payloads["html"],
+            sender_email=sender_email,
+            sender_name=sender_name,
+            refresh_token=refresh_token,
+        )
+
+    logger.warning("No Gmail refresh token; sending AdGuard invite via SMTP fallback")
+    cfg = _smtp_from_env()
+    if cfg.get("error"):
+        return {"sent": False, "error": cfg["error"], "provider": "smtp"}
+
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from email.utils import formataddr, make_msgid
+    import smtplib
+    import socket
+
+    message_id = make_msgid(domain=(sender_email.split("@")[-1] or "adguard.app"))
+    msg = MIMEMultipart("alternative")
+    msg["From"] = formataddr((sender_name, sender_email))
+    msg["To"] = recipient_email
+    msg["Subject"] = payloads["subject"]
+    msg["Message-ID"] = message_id
+    msg["Date"] = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
+    msg["Reply-To"] = sender_email
+    msg["X-Mailer"] = "AdGuardMailer/1.0"
+    msg["Precedence"] = "bulk"
+    msg["Auto-Submitted"] = "auto-generated"
+    msg.attach(MIMEText(payloads["text"], "plain", _charset="utf-8"))
+    msg.attach(MIMEText(payloads["html"], "html", _charset="utf-8"))
+
+    try:
+        addrs = socket.getaddrinfo(cfg["host"], cfg["port"], socket.AF_INET, socket.SOCK_STREAM)
+        server = smtplib.SMTP(addrs[0][4][0], cfg["port"], timeout=timeout)
+        server.ehlo(cfg["host"])
+        server.starttls()
+        server.ehlo(cfg["host"])
+        server.login(cfg["user"], cfg["pass"])
+        server.sendmail(sender_email, [recipient_email], msg.as_string())
+        server.quit()
+        logger.info(f"AdGuard invite sent to {recipient_email} via SMTP")
+        return {"sent": True, "provider": "smtp", "message_id": message_id}
+    except Exception as e:
+        logger.exception(f"AdGuard invite SMTP send failed for {recipient_email}: {e}")
+        return {"sent": False, "error": str(e), "provider": "smtp"}
