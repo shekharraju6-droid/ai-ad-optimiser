@@ -247,6 +247,7 @@
                 <div class="nav-section-items">
                     <button class="add-account-btn" id="addAccountBtn" onclick="startConnect()">🔗 Connect Google Ads</button>
                     <button class="add-account-btn" id="addMetaBtn" onclick="startMetaConnect()">🔗 Connect Meta Ads</button>
+                    <button class="add-account-btn" id="addWorkspaceBtn" onclick="openAddWorkspace()">➕ Add Another Account</button>
                 </div>
             </div>
 
@@ -465,7 +466,11 @@
                     selectedWorkspaceObj = workspaces.find(w => String(w.id) === String(simWsId)) || null;
                     $('pageTitle').innerHTML = '<span>' + escapeHtml(selectedWorkspaceObj ? (selectedWorkspaceObj.display_name || selectedWorkspaceObj.owner_email) : 'Unknown workspace') + '</span> <span class="badge badge-purple" style="font-size:11px;">Simulating Customer View</span>';
                 } else if (!isAdmin) {
-                    selectedWorkspaceObj = workspaces.find(w => w.owner_email === currentUser.email) || workspaces[0] || null;
+                    const mine = workspaces.filter(w => w.owner_email === currentUser.email);
+                    const first = mine[0] || workspaces[0] || null;
+                    // Honor ?ws= switch for multi-account users too
+                    const wanted = workspaces.find(w => String(w.id) === String(simWsId));
+                    selectedWorkspaceObj = wanted || first;
                     $('pageTitle').innerHTML = '<span>' + escapeHtml(selectedWorkspaceObj ? (selectedWorkspaceObj.display_name || selectedWorkspaceObj.owner_email) : 'My Workspace') + '</span>';
                 } else {
                     selectedWorkspaceObj = workspaces.find(w => w.owner_email === currentUser.email) || workspaces[0] || null;
@@ -514,18 +519,57 @@
         function renderWorkspaceSidebar() {
             const list = $('accountList');
             list.innerHTML = '';
-            const ws = selectedWorkspaceObj;
-            if (ws) {
-                list.appendChild(makeNavItem(ws.display_name || ws.owner_email, ws.id, ws.display_name || ws.owner_email, true));
-            } else {
-                list.appendChild(makeNavItem('', '', 'My Workspace', true));
+            const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
+
+            if (isAdmin && simWsId) {
+                // Admin simulating one customer workspace
+                const ws = selectedWorkspaceObj;
+                list.appendChild(makeNavItem(ws ? (ws.display_name || ws.owner_email) : 'Unknown', ws && ws.id, ws ? (ws.display_name || ws.owner_email) : 'Unknown workspace', true));
+                return;
             }
+
+            // Customer (or admin's own): ALL their workspaces, clickable to switch
+            const mine = (workspaces || []).filter(w => w.owner_email === (currentUser ? currentUser.email : ''));
+            const shown = mine.length ? mine : (workspaces || []);
+            shown.forEach(w => {
+                const live = (w.google_is_live || w.meta_is_live) ? ' ●' : '';
+                list.appendChild(makeNavItem(w.display_name || w.owner_email, w.id, (w.display_name || w.owner_email) + live, selectedWorkspaceObj && String(selectedWorkspaceObj.id) === String(w.id)));
+            });
+        }
+
+        function switchWorkspace(wsId) {
+            const ws = (workspaces || []).find(w => String(w.id) === String(wsId));
+            if (!ws) return;
+            selectedWorkspaceObj = ws;
+            window.location.href = '/adguard-workspace?ws=' + ws.id;
+        }
+
+        // ---------- Add Another Account (multi-workspace) ----------
+        function openAddWorkspace() {
+            const name = prompt('Name this account (e.g. "Crash Club", "DSU"):');
+            if (!name || !name.trim()) return;
+            const platform = confirm('Connect META ADS for this account?\n\nOK = Meta Ads\nCancel = Google Ads');
+            createWorkspace(name, platform ? 'meta' : 'google');
+        }
+
+        async function createWorkspace(name, platform) {
+            try {
+                const res = await fetch(API + '/workspaces/create', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, platform })
+                });
+                if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'Failed'); }
+                const data = await res.json();
+                window.location.href = data.authorization_url; // straight to consent, bound to new ws
+            } catch (e) { toast(e.message, 'error'); }
         }
 
         function makeNavItem(name, id, label, active) {
             const div = document.createElement('div');
             div.className = 'nav-item' + (active ? ' active' : '');
             div.innerHTML = '<span class="account-dot"></span>' + escapeHtml(label);
+            if (id) div.onclick = function() { switchWorkspace(id); };
             return div;
         }
 

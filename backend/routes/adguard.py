@@ -519,6 +519,60 @@ def _get_or_create_workspace(db: Session, user: User) -> AdGuardAccount:
     return ws
 
 
+class CreateWorkspaceRequest(BaseModel):
+    name: str
+    platform: Optional[str] = "google"  # which connector to launch after creation
+
+
+PLAN_WORKSPACE_LIMITS = {"trial": 1, "starter": 1, "pro": 3, "agency": 10}
+
+
+@router.post("/workspaces/create")
+def create_workspace(req: CreateWorkspaceRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
+    """Multi-account-per-login: create an additional named workspace (plan-limited).
+
+    Pro = 3 workspaces, Agency = 10. Returns the OAuth URL to connect the new
+    account's platform right away (one flow: create -> consent -> bound to new ws).
+    """
+    _require_adguard_access(user)
+    name = (req.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Workspace name required")
+
+    my_ws = db.query(AdGuardAccount).filter(AdGuardAccount.owner_email == user.email).all()
+    if user.role in ("admin", "superadmin"):
+        my_count = db.query(AdGuardAccount).count()  # admins manage all; limit applies per-owner
+        my_count = len(my_ws) if my_ws else 0
+    else:
+        my_count = len(my_ws)
+
+    # Plan limit check (from the user's first workspace plan; default trial)
+    plan = (my_ws[0].plan if my_ws else "trial") or "trial"
+    limit = PLAN_WORKSPACE_LIMITS.get(plan, 1)
+    if my_count >= limit:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Plan '{plan}' allows {limit} workspace(s). Upgrade to Pro (3) or Agency (10) for more.",
+        )
+
+    ws = AdGuardAccount(owner_email=user.email, display_name=name)
+    db.add(ws)
+    db.commit()
+    db.refresh(ws)
+
+    platform = (req.platform or "google").lower()
+    try:
+        if platform == "meta":
+            from backend.services.adguard_meta import get_adguard_meta_auth_url
+            url = get_adguard_meta_auth_url(ws.id)
+        else:
+            from backend.services.oauth import get_adguard_auth_url
+            url = get_adguard_auth_url(ws.id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"workspace_id": ws.id, "display_name": ws.display_name, "authorization_url": url}
+
+
 @router.get("/oauth/connect")
 def oauth_connect(db: Session = Depends(get_db), user: User = Depends(get_current_user_required)):
     """Create/reuse the user's AdGuard workspace and return the Google OAuth URL."""
